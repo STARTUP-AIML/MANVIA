@@ -62,22 +62,25 @@ The repository maintains an exhaustive technical blueprint:
 To onboard as a developer on Phase 1+, follow the [Developer Onboarding Guide](MANVIA-DOCS/10_HANDOVER/Developer_Onboarding.md):
 
 ```bash
-# 1. Switch to feature branch
-git checkout feature/phase-1-backend-foundation
+# 1. Ensure you are on the Phase 1 feature branch
+git branch --show-current
 
-# 2. Copy environment file
-cp .env.example .env.local
+# 2. Configure environment file
+cp .env.example .env
 
-# 3. Spin up local PostgreSQL 18 & Redis
+# 3. Spin up local PostgreSQL 18 & Redis backing services
 docker compose -f docker-compose.dev.yml up -d
 
-# 4. Install dependencies & run migrations
+# 4. Install dependencies
 npm install
-npx prisma migrate dev
-npm run seed
 
-# 5. Start development server
-npm run start:dev
+# 5. Run tests & quality checks
+npm test
+npm run typecheck
+npm run lint
+
+# 6. Start development server
+npm run dev
 ```
 
 ---
