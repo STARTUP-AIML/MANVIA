@@ -1,0 +1,15 @@
+# Global owners for the entire repository
+* @STARTUP-AIML
+
+# Backend codebase
+/backend/ @STARTUP-AIML
+/src/ @STARTUP-AIML
+
+# Documentation and Architecture
+/MANVIA-DOCS/ @STARTUP-AIML
+/MANVIA_SYSTEM_MASTER.md @STARTUP-AIML
+/.planning/ @STARTUP-AIML
+
+# Infrastructure & CI
+/.github/ @STARTUP-AIML
+/docker-compose*.yml @STARTUP-AIML
