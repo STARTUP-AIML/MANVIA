@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { getEnvConfig, type EnvConfig } from './env.js';
+import { getEnvConfig, sanitizeDatabaseUrl, type EnvConfig } from './env.js';
 
 @Injectable()
 export class ConfigService {
@@ -61,5 +61,26 @@ export class ConfigService {
 
   public get isTest(): boolean {
     return this.config.NODE_ENV === 'test';
+  }
+
+  // Database Configuration (Phase 3)
+  public get databaseUrl(): string {
+    return this.config.DATABASE_URL;
+  }
+
+  public get sanitizedDatabaseUrl(): string {
+    return sanitizeDatabaseUrl(this.config.DATABASE_URL);
+  }
+
+  public get databasePoolMin(): number {
+    return this.config.DATABASE_POOL_MIN;
+  }
+
+  public get databasePoolMax(): number {
+    return this.config.DATABASE_POOL_MAX;
+  }
+
+  public get databaseConnectionTimeoutMs(): number {
+    return this.config.DATABASE_CONNECTION_TIMEOUT_MS;
   }
 }

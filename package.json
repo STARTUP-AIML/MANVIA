@@ -27,7 +27,12 @@
     "test:cov": "npm --prefix backend run test:cov",
     "docker:up": "docker compose -f docker-compose.dev.yml up -d",
     "docker:down": "docker compose -f docker-compose.dev.yml down",
-    "docker:build": "docker build -t manvia-backend:latest ./backend"
+    "docker:build": "docker build -t manvia-backend:latest ./backend",
+    "db:generate": "npm --prefix backend run db:generate",
+    "db:migrate": "npm --prefix backend run db:migrate",
+    "db:migrate:deploy": "npm --prefix backend run db:migrate:deploy",
+    "db:migrate:status": "npm --prefix backend run db:migrate:status",
+    "db:validate": "npm --prefix backend run db:validate"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.7.1",

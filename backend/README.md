@@ -26,8 +26,8 @@ backend/
 │   │   ├── observability/ # Telemetry interface
 │   │   └── pipes/         # Global ValidationPipe (whitelist, forbidNonWhitelisted, transform)
 │   ├── health/            # Liveness, readiness, and overall health service & endpoints
-│   ├── database/          # Database boundary (Phase 3 owns schema & migrations)
-│   ├── cache/             # Redis cache & distributed lock abstractions (Phase 3)
+│   ├── database/          # PostgreSQL 18 + Prisma 7 database module, PrismaService, transactions & health
+│   ├── cache/             # Redis cache & distributed lock abstractions (Phase 2/3)
 │   ├── events/            # Domain event bus abstractions
 │   ├── modules/           # Domain business modules (Phase 4+)
 │   ├── integrations/      # Third-party service adapters
@@ -37,10 +37,11 @@ backend/
 │   ├── main.ts            # FastifyAdapter bootstrap, Helmet security, CORS, Swagger & shutdown hooks
 │   └── index.ts           # Re-exports main.js for entrypoint backwards compatibility
 ├── test/
-│   ├── unit/              # Isolated logic unit tests (env, error, health, filter, pipe, request-id, logging)
-│   ├── integration/       # Subsystem integration tests (foundation, swagger)
+│   ├── unit/              # Isolated logic unit tests (env, error, health, filter, pipe, request-id, logging, database)
+│   ├── integration/       # Subsystem integration tests (foundation, swagger, database)
 │   └── e2e/               # HTTP API end-to-end tests (health, api, validation)
-├── prisma/                # Prisma schema anchor (Phase 3 owns schema)
+├── prisma/                # Prisma 7 schema & migrations directory
+├── prisma.config.ts       # Prisma 7 CLI configuration & migration datasource
 ├── scripts/               # Maintenance and environment verification scripts
 ├── Dockerfile             # Multi-stage production container definition
 ├── .dockerignore          # Docker build exclusion rules
@@ -116,31 +117,39 @@ All future business endpoints automatically inherit the `/api/v1/` route prefix 
 
 ## 6. Available Scripts
 
-| Command                    | Description                                          |
-| -------------------------- | ---------------------------------------------------- |
-| `npm run dev`              | Runs the development server with file watch (`tsx`)  |
-| `npm run build`            | Compiles TypeScript into `dist/`                     |
-| `npm run start`            | Runs the compiled production server (`dist/main.js`) |
-| `npm run lint`             | Runs ESLint 9 flat config across `src` and `test`    |
-| `npm run lint:fix`         | Automatically fixes auto-fixable lint issues         |
-| `npm run format`           | Formats all files with Prettier                      |
-| `npm run format:check`     | Verifies formatting without modifying files          |
-| `npm run typecheck`        | Validates TypeScript types without emitting code     |
-| `npm test`                 | Runs the Vitest test suite                           |
-| `npm run test:unit`        | Runs unit tests only                                 |
-| `npm run test:integration` | Runs integration tests only                          |
-| `npm run test:e2e`         | Runs end-to-end API tests                            |
-| `npm run test:cov`         | Generates test coverage report                       |
+| Command                     | Description                                                |
+| --------------------------- | ---------------------------------------------------------- |
+| `npm run dev`               | Runs the development server with file watch (`tsx`)        |
+| `npm run build`             | Generates Prisma client and compiles TypeScript to `dist/` |
+| `npm run start`             | Runs the compiled production server (`dist/main.js`)       |
+| `npm run db:generate`       | Generates Prisma 7 client from schema                      |
+| `npm run db:migrate`        | Runs Prisma migrations in development                      |
+| `npm run db:migrate:deploy` | Applies pending Prisma migrations in production            |
+| `npm run db:migrate:status` | Checks Prisma migration status                             |
+| `npm run db:validate`       | Validates `prisma/schema.prisma` integrity                 |
+| `npm run lint`              | Runs ESLint 9 flat config across `src` and `test`          |
+| `npm run lint:fix`          | Automatically fixes auto-fixable lint issues               |
+| `npm run format`            | Formats all files with Prettier                            |
+| `npm run format:check`      | Verifies formatting without modifying files                |
+| `npm run typecheck`         | Validates TypeScript types without emitting code           |
+| `npm test`                  | Runs the Vitest test suite                                 |
+| `npm run test:unit`         | Runs unit tests only                                       |
+| `npm run test:integration`  | Runs integration tests only                                |
+| `npm run test:e2e`          | Runs end-to-end API tests                                  |
+| `npm run test:cov`          | Generates test coverage report                             |
 
 ---
 
 ## 7. Docker Workflow
 
 ```bash
+# Start local PostgreSQL 18 & Redis development services
+docker compose -f ../docker-compose.dev.yml up -d
+
 # Build multi-stage production image
 docker build -t manvia-backend:latest .
 
-# Run production container (starts cleanly without requiring database)
+# Run production container
 docker run -p 3000:3000 --env-file .env.example manvia-backend:latest
 ```
 
@@ -150,5 +159,5 @@ docker run -p 3000:3000 --env-file .env.example manvia-backend:latest
 
 - **Phase 1 (Completed):** Repository foundation, strict TypeScript, Vitest, ESLint, Prettier, Docker, CI, environment validation, health check service, storage abstraction interface.
 - **Phase 2 (Completed):** NestJS application bootstrap, Fastify HTTP adapter, global ValidationPipe, GlobalExceptionFilter, request correlation ID (`X-Request-ID`), Helmet security baseline, environment-driven CORS, health endpoints (`/health`, `/health/live`, `/health/ready`), Swagger/OpenAPI (`/docs`), graceful shutdown hooks.
-- **Phase 3 (Upcoming):** PostgreSQL schema design, Prisma 7 client generation, database migrations, pgvector initialization.
+- **Phase 3 (Completed):** PostgreSQL 18.x (`pgvector/pgvector:pg18`), Prisma 7.x client lifecycle, `PrismaService`, `DatabaseModule`, connection pooling (`pg.Pool`), transaction execution foundation, database health/readiness probe, migration tooling (`db:generate`, `db:migrate`, `db:validate`), Docker PostgreSQL 18 container setup.
 - **Phase 4+:** Domain business modules (Identity, Authentication, Patients, Doctors, Appointments, AI Companion, etc.).

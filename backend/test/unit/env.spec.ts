@@ -51,4 +51,46 @@ describe('Environment Configuration (Unit)', () => {
       /JWT_SECRET must be at least 16 characters/,
     );
   });
+
+  it('should load default database configuration parameters', () => {
+    const config = validateEnv({});
+    expect(config.DATABASE_URL).toContain('postgresql://');
+    expect(config.DATABASE_POOL_MIN).toBe(2);
+    expect(config.DATABASE_POOL_MAX).toBe(10);
+    expect(config.DATABASE_CONNECTION_TIMEOUT_MS).toBe(10000);
+  });
+
+  it('should accept valid postgresql and postgres database URLs', () => {
+    const custom = validateEnv({
+      DATABASE_URL:
+        'postgres://custom_user:custom_pass@db.internal:5433/prod_manvia?sslmode=require',
+    });
+    expect(custom.DATABASE_URL).toBe(
+      'postgres://custom_user:custom_pass@db.internal:5433/prod_manvia?sslmode=require',
+    );
+  });
+
+  it('should reject malformed database URLs', () => {
+    expect(() => validateEnv({ DATABASE_URL: 'http://not-a-database' })).toThrow(
+      /DATABASE_URL must be a valid PostgreSQL connection string/,
+    );
+    expect(() => validateEnv({ DATABASE_URL: 'mysql://user:pass@localhost:3306/db' })).toThrow(
+      /DATABASE_URL must be a valid PostgreSQL connection string/,
+    );
+    expect(() => validateEnv({ DATABASE_URL: 'plain-text' })).toThrow(
+      /DATABASE_URL must be a valid PostgreSQL connection string/,
+    );
+  });
+
+  it('should sanitize credentials in database URLs for safe logging', async () => {
+    const { sanitizeDatabaseUrl } = await import('../../src/config/env.js');
+    const secretUrl =
+      'postgresql://admin:super_secret_pw123@prod-cluster.aws.internal:5432/manvia?schema=public';
+    const sanitized = sanitizeDatabaseUrl(secretUrl);
+
+    expect(sanitized).not.toContain('super_secret_pw123');
+    expect(sanitized).toContain('***');
+    expect(sanitized).toContain('admin');
+    expect(sanitized).toContain('prod-cluster.aws.internal');
+  });
 });
