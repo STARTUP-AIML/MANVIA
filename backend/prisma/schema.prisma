@@ -160,6 +160,11 @@ model PatientProfile {
   user                         User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   careRelationships            CareRelationship[]
   consents                     Consent[]
+  wellnessCheckIns             WellnessCheckIn[]
+  healthRecords                HealthRecord[]
+  timelineEvents               TimelineEvent[]
+  appointments                 Appointment[]
+  preConsultations             PreConsultation[]
 
   @@index([publicPatientId])
   @@map("patient_profiles")
@@ -209,6 +214,7 @@ model DoctorProfile {
   consultationOffers        ConsultationOffer[]
   careRelationships         CareRelationship[]
   consents                  Consent[]
+  appointments              Appointment[]
 
   @@index([publicDoctorId])
   @@index([verificationStatus])
@@ -449,6 +455,8 @@ model ConsultationOffer {
   createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
 
+  appointments     Appointment[]
+
   @@index([doctorId])
   @@index([doctorId, status])
   @@index([consultationType])
@@ -556,5 +564,194 @@ model ConsentHistory {
   @@index([consentId])
   @@index([actorId])
   @@index([createdAt])
-  @@map("consent_histories")
+}
+
+
+// ------------------------------------------------------------------------------
+// Wellness Engine Domain (Phase 11: Patient Non-Diagnostic Wellness & Trends)
+// ------------------------------------------------------------------------------
+
+model WellnessCheckIn {
+  id                   String         @id @default(uuid()) @db.Uuid
+  patientId            String         @map("patient_id") @db.Uuid
+  patient              PatientProfile @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  mood                 Int            // 1-5 scale (1: Very Low, 2: Low, 3: Fair, 4: Good, 5: Excellent)
+  stress               Int            // 1-5 scale (1: Very Low, 2: Low, 3: Moderate, 4: High, 5: Very High)
+  energy               Int            // 1-5 scale (1: Very Low, 2: Low, 3: Moderate, 4: High, 5: Very High)
+  sleepQuality         Int            @map("sleep_quality") // 1-5 scale (1: Very Poor, 2: Poor, 3: Fair, 4: Good, 5: Excellent)
+  sleepDurationMinutes Int?           @map("sleep_duration_minutes") // Optional recorded sleep duration in minutes
+  note                 String?        @db.Text // Optional personal wellness journal/reflection entry
+  recordedAt           DateTime       @default(now()) @map("recorded_at") @db.Timestamptz(6)
+  createdAt            DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([patientId])
+  @@index([patientId, recordedAt])
+  @@map("wellness_check_ins")
+}
+
+// ------------------------------------------------------------------------------
+// Health Records & Health Timeline Domain (Phase 12)
+// ------------------------------------------------------------------------------
+
+enum HealthRecordCategory {
+  LAB_REPORT
+  PRESCRIPTION
+  CLINICAL_SUMMARY
+  IMAGING
+  DISCHARGE_SUMMARY
+  OTHER
+}
+
+enum HealthRecordStatus {
+  PENDING
+  AVAILABLE
+  ARCHIVED
+  DELETED
+}
+
+model HealthRecord {
+  id               String               @id @default(uuid()) @db.Uuid
+  publicRecordId   String               @unique @map("public_record_id") @db.VarChar(32)
+  patientId        String               @map("patient_id") @db.Uuid
+  patient          PatientProfile       @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  uploadedByUserId String               @map("uploaded_by_user_id") @db.Uuid
+  category         HealthRecordCategory
+  title            String               @db.VarChar(200)
+  description      String?              @db.Text
+  storageKey       String               @unique @map("storage_key") @db.VarChar(512)
+  originalFileName String               @map("original_file_name") @db.VarChar(255)
+  mimeType         String               @map("mime_type") @db.VarChar(100)
+  fileSizeBytes    Int                  @map("file_size_bytes")
+  sha256Hash       String?              @map("sha256_hash") @db.VarChar(64)
+  status           HealthRecordStatus   @default(AVAILABLE)
+  recordedDate     DateTime             @map("recorded_date") @db.Date
+  createdAt        DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([patientId])
+  @@index([patientId, recordedDate])
+  @@index([category])
+  @@index([status])
+  @@map("health_records")
+}
+
+enum TimelineEventType {
+  HEALTH_RECORD_ADDED
+  WELLNESS_CHECK_IN
+  CONSULTATION
+  APPOINTMENT
+  OTHER
+}
+
+model TimelineEvent {
+  id             String            @id @default(uuid()) @db.Uuid
+  publicEventId  String            @unique @map("public_event_id") @db.VarChar(32)
+  patientId      String            @map("patient_id") @db.Uuid
+  patient        PatientProfile    @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  eventType      TimelineEventType @map("event_type")
+  title          String            @db.VarChar(200)
+  summary        String            @db.Text
+  sourceType     String            @map("source_type") @db.VarChar(50)
+  sourceId       String?           @map("source_id") @db.VarChar(128)
+  eventTimestamp DateTime          @map("event_timestamp") @db.Timestamptz(6)
+  metadata       String?           @db.Text
+  createdAt      DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([patientId])
+  @@index([patientId, eventTimestamp(sort: Desc)])
+  @@index([eventType])
+  @@index([sourceType, sourceId])
+  @@map("timeline_events")
+}
+
+// ------------------------------------------------------------------------------
+// Pre-consultation + Appointment Engine Domain (Phase 13)
+// ------------------------------------------------------------------------------
+
+enum AppointmentStatus {
+  RESERVED
+  REQUESTED
+  CONFIRMED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+  DECLINED
+  EXPIRED
+  NO_SHOW
+}
+
+enum SlotReservationState {
+  AVAILABLE
+  HELD_IN_RESERVATION
+  BOOKED
+}
+
+enum PreConsultationStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  SUBMITTED
+}
+
+model Appointment {
+  id                  String               @id @default(uuid()) @db.Uuid
+  publicAppointmentId String               @unique @map("public_appointment_id") @db.VarChar(32)
+  patientId           String               @map("patient_id") @db.Uuid
+  patient             PatientProfile       @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctorId            String               @map("doctor_id") @db.Uuid
+  doctor              DoctorProfile        @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+  consultationOfferId String               @map("consultation_offer_id") @db.Uuid
+  consultationOffer   ConsultationOffer    @relation(fields: [consultationOfferId], references: [id], onDelete: Restrict)
+  startAt             DateTime             @map("start_at") @db.Timestamptz(6)
+  endAt               DateTime             @map("end_at") @db.Timestamptz(6)
+  status              AppointmentStatus    @default(REQUESTED)
+  reservationState    SlotReservationState @default(BOOKED) @map("reservation_state")
+  reservedUntil       DateTime?            @map("reserved_until") @db.Timestamptz(6)
+  cancellationReason  String?              @map("cancellation_reason") @db.Text
+  cancelledAt         DateTime?            @map("cancelled_at") @db.Timestamptz(6)
+  cancelledBy         String?              @map("cancelled_by") @db.VarChar(128)
+  declineReason       String?              @map("decline_reason") @db.Text
+  declinedAt          DateTime?            @map("declined_at") @db.Timestamptz(6)
+  confirmedAt         DateTime?            @map("confirmed_at") @db.Timestamptz(6)
+  startedAt           DateTime?            @map("started_at") @db.Timestamptz(6)
+  completedAt         DateTime?            @map("completed_at") @db.Timestamptz(6)
+  noShowAt            DateTime?            @map("no_show_at") @db.Timestamptz(6)
+  notes               String?              @db.Text
+  createdAt           DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  preConsultation     PreConsultation?
+
+  @@index([patientId])
+  @@index([doctorId])
+  @@index([consultationOfferId])
+  @@index([startAt])
+  @@index([status])
+  @@index([doctorId, startAt])
+  @@index([patientId, startAt])
+  @@map("appointments")
+}
+
+model PreConsultation {
+  id                 String                @id @default(uuid()) @db.Uuid
+  appointmentId      String                @unique @map("appointment_id") @db.Uuid
+  appointment        Appointment           @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  patientId          String                @map("patient_id") @db.Uuid
+  patient            PatientProfile        @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  status             PreConsultationStatus @default(NOT_STARTED)
+  reasonForVisit     String                @map("reason_for_visit") @db.VarChar(1000)
+  symptoms           String?               @db.Text
+  symptomOnset       String?               @map("symptom_onset") @db.VarChar(100)
+  currentMedications String?               @map("current_medications") @db.Text
+  allergies          String?               @db.Text
+  patientNotes       String?               @map("patient_notes") @db.Text
+  submittedAt        DateTime?             @map("submitted_at") @db.Timestamptz(6)
+  createdAt          DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([appointmentId])
+  @@index([patientId])
+  @@index([status])
+  @@map("pre_consultations")
 }
