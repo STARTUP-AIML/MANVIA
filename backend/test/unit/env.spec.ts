@@ -13,6 +13,8 @@ describe('Environment Configuration (Unit)', () => {
     expect(config.HOST).toBe('0.0.0.0');
     expect(config.STORAGE_DRIVER).toBe('local');
     expect(config.OTEL_ENABLED).toBe(false);
+    expect(config.SWAGGER_ENABLED).toBe(true);
+    expect(config.SWAGGER_PATH).toBe('docs');
   });
 
   it('should parse custom port and environment correctly', () => {
@@ -21,12 +23,16 @@ describe('Environment Configuration (Unit)', () => {
       PORT: '8080',
       STORAGE_DRIVER: 's3',
       OTEL_ENABLED: 'true',
+      SWAGGER_ENABLED: 'false',
+      SWAGGER_PATH: 'api-reference',
     });
 
     expect(custom.NODE_ENV).toBe('production');
     expect(custom.PORT).toBe(8080);
     expect(custom.STORAGE_DRIVER).toBe('s3');
     expect(custom.OTEL_ENABLED).toBe(true);
+    expect(custom.SWAGGER_ENABLED).toBe(false);
+    expect(custom.SWAGGER_PATH).toBe('api-reference');
   });
 
   it('should reject invalid port numbers', () => {
