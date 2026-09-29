@@ -6,7 +6,13 @@
 // Lifecycle integration with NestJS (OnModuleInit, OnApplicationShutdown)
 // ==============================================================================
 
-import { Injectable, Logger, type OnModuleInit, type OnApplicationShutdown } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  type OnModuleInit,
+  type OnApplicationShutdown,
+} from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
@@ -20,7 +26,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnAppli
   private readonly pool: pg.Pool;
   private connected = false;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(@Inject(ConfigService) private readonly configService: ConfigService) {
     const connectionString = configService.databaseUrl;
     const pool = new pg.Pool({
       connectionString,

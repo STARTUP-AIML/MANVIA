@@ -65,7 +65,9 @@ export class HealthRecordsService {
     private readonly storageService: IHealthRecordsStorageService,
     @Inject(HEALTH_RECORDS_AUDIT_SERVICE)
     private readonly auditService: IHealthRecordsAuditService,
+    @Inject(HealthTimelineService)
     private readonly healthTimelineService: HealthTimelineService,
+    @Inject(CareRelationshipsService)
     private readonly careRelService: CareRelationshipsService,
     @Inject(CARE_RELATIONSHIP_REPOSITORY)
     private readonly careRelRepo: ICareRelationshipRepository,

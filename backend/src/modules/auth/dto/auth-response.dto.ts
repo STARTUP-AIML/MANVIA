@@ -10,7 +10,7 @@ import { UserResponseDto } from './user-response.dto.js';
 export class AuthResponseDto {
   @ApiProperty({
     description: 'Authenticated user profile details',
-    type: UserResponseDto,
+    type: () => UserResponseDto,
   })
   user!: UserResponseDto;
 

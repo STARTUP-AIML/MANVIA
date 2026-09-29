@@ -34,6 +34,7 @@ export class WellnessService {
     private readonly wellnessRepo: IWellnessRepository,
     @Inject(WELLNESS_AUDIT_SERVICE)
     private readonly auditService: IWellnessAuditService,
+    @Inject(CareRelationshipsService)
     private readonly careRelService: CareRelationshipsService,
     @Inject(CARE_RELATIONSHIP_REPOSITORY)
     private readonly careRelRepo: ICareRelationshipRepository,

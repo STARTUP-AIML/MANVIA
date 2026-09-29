@@ -32,6 +32,7 @@ export class PreConsultationService {
     private readonly appointmentRepo: IAppointmentRepository,
     @Inject(APPOINTMENT_AUDIT_SERVICE)
     private readonly auditService: IAppointmentAuditService,
+    @Inject(CareRelationshipsService)
     private readonly careRelService: CareRelationshipsService,
     @Inject(DOCTORS_REPOSITORY)
     private readonly doctorsRepo: IDoctorsRepository,
