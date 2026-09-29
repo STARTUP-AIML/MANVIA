@@ -3,12 +3,14 @@ import { randomUUID } from 'node:crypto';
 import { ConflictError, NotFoundError } from '../../../common/errors/app-error.js';
 import type { AppointmentEntity } from '../entities/appointment.entity.js';
 import type { PreConsultationEntity } from '../entities/pre-consultation.entity.js';
+import type { AppointmentCancellationEntity } from '../entities/appointment-cancellation.entity.js';
 import { AppointmentStatus } from '../enums/appointment-status.enum.js';
 import { SlotReservationState } from '../enums/slot-reservation-state.enum.js';
 import { PreConsultationStatus } from '../enums/pre-consultation-status.enum.js';
 import type {
   AppointmentQueryOptions,
   CreateAppointmentInput,
+  CreateCancellationInput,
   CreatePreConsultationInput,
   IAppointmentRepository,
   UpdateAppointmentInput,
@@ -20,6 +22,7 @@ import { generatePublicAppointmentId } from '../utils/public-appointment-id.util
 export class InMemoryAppointmentRepository implements IAppointmentRepository {
   private appointments: Map<string, AppointmentEntity> = new Map();
   private preConsultations: Map<string, PreConsultationEntity> = new Map();
+  private cancellations: Map<string, AppointmentCancellationEntity> = new Map();
 
   public async createAppointment(input: CreateAppointmentInput): Promise<AppointmentEntity> {
     const inactiveStatuses = [
@@ -304,5 +307,42 @@ export class InMemoryAppointmentRepository implements IAppointmentRepository {
 
     this.preConsultations.set(id, updated);
     return { ...updated };
+  }
+
+  public async createCancellation(
+    input: CreateCancellationInput,
+  ): Promise<AppointmentCancellationEntity> {
+    const id = randomUUID();
+    const now = new Date();
+    const entity: AppointmentCancellationEntity = {
+      id,
+      appointmentId: input.appointmentId,
+      cancelledBy: input.cancelledBy,
+      cancellationActorType: input.cancellationActorType,
+      reason: input.reason,
+      reasonCode: input.reasonCode ?? null,
+      metadata: input.metadata ?? null,
+      cancelledAt: now,
+      createdAt: now,
+    };
+    this.cancellations.set(id, entity);
+    return { ...entity };
+  }
+
+  public async findCancellationByAppointmentId(
+    appointmentId: string,
+  ): Promise<AppointmentCancellationEntity | null> {
+    for (const c of this.cancellations.values()) {
+      if (c.appointmentId === appointmentId) {
+        return { ...c };
+      }
+    }
+    return null;
+  }
+
+  public clear(): void {
+    this.appointments.clear();
+    this.preConsultations.clear();
+    this.cancellations.clear();
   }
 }

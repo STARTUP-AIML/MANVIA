@@ -1,5 +1,5 @@
-import { IsNotEmpty, IsString, MaxLength, MinLength } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsBoolean, IsNotEmpty, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CancelAppointmentDto {
   @ApiProperty({
@@ -13,4 +13,23 @@ export class CancelAppointmentDto {
   @MinLength(3, { message: 'reason must be at least 3 characters' })
   @MaxLength(500, { message: 'reason cannot exceed 500 characters' })
   public reason!: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Structured reason classification code (e.g. PATIENT_SCHEDULE_CONFLICT, EMERGENCY)',
+    example: 'SCHEDULE_CONFLICT',
+  })
+  @IsString()
+  @IsOptional()
+  @MaxLength(64)
+  public reasonCode?: string;
+
+  @ApiPropertyOptional({
+    description: 'Whether to request a refund according to policy (default: true)',
+    default: true,
+    example: true,
+  })
+  @IsBoolean()
+  @IsOptional()
+  public requestRefund?: boolean;
 }

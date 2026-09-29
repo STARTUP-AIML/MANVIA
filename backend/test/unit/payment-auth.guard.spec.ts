@@ -1,0 +1,58 @@
+import { describe, it, expect, beforeEach } from 'vitest';
+import type { ExecutionContext } from '@nestjs/common';
+import { PaymentAuthGuard } from '../../src/modules/payments/guards/payment-auth.guard.js';
+import { UnauthorizedError } from '../../src/common/errors/app-error.js';
+
+describe('PaymentAuthGuard (Unit Tests)', () => {
+  let guard: PaymentAuthGuard;
+
+  beforeEach(() => {
+    guard = new PaymentAuthGuard();
+  });
+
+  const createMockContext = (request: Record<string, unknown>): ExecutionContext => {
+    return {
+      switchToHttp: () => ({
+        getRequest: () => request,
+        getResponse: () => ({}),
+        getNext: () => ({}),
+      }),
+    } as unknown as ExecutionContext;
+  };
+
+  it('should allow access when request has user object', () => {
+    const ctx = createMockContext({
+      user: {
+        userId: 'patient-123',
+        activeRole: 'PATIENT',
+      },
+      headers: {},
+    });
+
+    expect(guard.canActivate(ctx)).toBe(true);
+  });
+
+  it('should populate user from x-user-id and x-user-role headers', () => {
+    const req: { headers: Record<string, string>; user?: { userId: string; activeRole: string } } =
+      {
+        headers: {
+          'x-user-id': 'doc-123',
+          'x-user-role': 'DOCTOR',
+        },
+      };
+    const ctx = createMockContext(req as unknown as Record<string, unknown>);
+
+    expect(guard.canActivate(ctx)).toBe(true);
+    expect(req.user).toBeDefined();
+    expect(req.user?.userId).toBe('doc-123');
+    expect(req.user?.activeRole).toBe('DOCTOR');
+  });
+
+  it('should throw UnauthorizedError when no credentials are provided', () => {
+    const ctx = createMockContext({
+      headers: {},
+    });
+
+    expect(() => guard.canActivate(ctx)).toThrow(UnauthorizedError);
+  });
+});

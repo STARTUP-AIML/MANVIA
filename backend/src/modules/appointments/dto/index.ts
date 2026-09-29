@@ -6,3 +6,4 @@ export * from './decline-appointment.dto.js';
 export * from './appointment-query.dto.js';
 export * from './pre-consultation-draft.dto.js';
 export * from './pre-consultation-response.dto.js';
+export * from './cancellation-response.dto.js';
