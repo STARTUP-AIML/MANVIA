@@ -99,6 +99,10 @@ Migrations must always be executed through Prisma Migrate:
 
 > **Safety Rule**: `prisma db push` must NEVER be used in production. Migrations must be version-controlled SQL files in `prisma/migrations/`.
 
+### 5.1 CI Database Lifecycle
+
+In GitHub Actions CI, ephemeral PostgreSQL 18 service containers (`pgvector/pgvector:pg18`) spin up with an empty database. The CI workflow applies all committed migrations via `npm run db:migrate:deploy` and verifies schema alignment with `npm run db:migrate:status` before executing integration, E2E, and coverage test suites (`npm run test:cov`). This ensures database-backed tests run against the authoritative schema without manual intervention or test-only schema hacks.
+
 ---
 
 ## 6. Local Development with Docker
