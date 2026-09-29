@@ -4,56 +4,55 @@
 -- ==============================================================================
 
 -- 1. Create Enums
-CREATE TYPE "CareRelationshipStatus" AS ENUM (
-    'REQUESTED',
-    'ACTIVE',
-    'SUSPENDED',
-    'TERMINATED',
-    'REVOKED'
-);
+DO $$ BEGIN
+    CREATE TYPE "CareRelationshipStatus" AS ENUM (
+        'REQUESTED',
+        'ACTIVE',
+        'SUSPENDED',
+        'TERMINATED',
+        'REVOKED'
+    );
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
-CREATE TYPE "ConsentScope" AS ENUM (
-    'PATIENT_PROFILE',
-    'CONSULTATION_INFO',
-    'PRE_CONSULTATION',
-    'HEALTH_RECORDS',
-    'HEALTH_TIMELINE',
-    'WELLNESS'
-);
+DO $$ BEGIN
+    CREATE TYPE "ConsentScope" AS ENUM (
+        'PATIENT_PROFILE',
+        'CONSULTATION_INFO',
+        'PRE_CONSULTATION',
+        'HEALTH_RECORDS',
+        'HEALTH_TIMELINE',
+        'WELLNESS'
+    );
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
-CREATE TYPE "ConsentStatus" AS ENUM (
-    'ACTIVE',
-    'REVOKED',
-    'EXPIRED'
-);
+DO $$ BEGIN
+    CREATE TYPE "ConsentStatus" AS ENUM (
+        'ACTIVE',
+        'REVOKED',
+        'EXPIRED'
+    );
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
-CREATE TYPE "ConsentAction" AS ENUM (
-    'GRANTED',
-    'REVOKED',
-    'EXPIRED',
-    'SCOPE_UPDATED'
-);
+DO $$ BEGIN
+    CREATE TYPE "ConsentAction" AS ENUM (
+        'GRANTED',
+        'REVOKED',
+        'EXPIRED',
+        'SCOPE_UPDATED'
+    );
+EXCEPTION
+    WHEN duplicate_object THEN null;
+END $$;
 
--- 2. Create Table: patient_profiles
-CREATE TABLE "patient_profiles" (
-    "id" UUID NOT NULL DEFAULT gen_random_uuid(),
-    "user_id" UUID NOT NULL,
-    "public_patient_id" VARCHAR(16) NOT NULL,
-    "legal_first_name" VARCHAR(100) NOT NULL,
-    "legal_last_name" VARCHAR(100) NOT NULL,
-    "display_name" VARCHAR(150),
-    "date_of_birth" DATE,
-    "gender" VARCHAR(30),
-    "emergency_contact_name" VARCHAR(150),
-    "emergency_contact_phone" VARCHAR(30),
-    "created_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    "updated_at" TIMESTAMPTZ(6) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "patient_profiles_pkey" PRIMARY KEY ("id"),
-    CONSTRAINT "patient_profiles_user_id_key" UNIQUE ("user_id"),
-    CONSTRAINT "patient_profiles_public_patient_id_key" UNIQUE ("public_patient_id"),
-    CONSTRAINT "patient_profiles_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE
-);
+-- 2. Extend Table: patient_profiles (Phase 10 additions to Phase 6 baseline)
+ALTER TABLE "patient_profiles" ADD COLUMN IF NOT EXISTS "display_name" VARCHAR(150);
+ALTER TABLE "patient_profiles" ADD COLUMN IF NOT EXISTS "gender" VARCHAR(30);
 
 -- 3. Create Table: care_relationships
 CREATE TABLE "care_relationships" (
@@ -112,7 +111,7 @@ CREATE TABLE "consent_histories" (
 );
 
 -- 6. Indexes for Performance & Authorization Verification
-CREATE INDEX "patient_profiles_public_patient_id_idx" ON "patient_profiles"("public_patient_id");
+CREATE INDEX IF NOT EXISTS "patient_profiles_public_patient_id_idx" ON "patient_profiles"("public_patient_id");
 
 CREATE INDEX "care_relationships_patient_id_idx" ON "care_relationships"("patient_id");
 CREATE INDEX "care_relationships_doctor_id_idx" ON "care_relationships"("doctor_id");
