@@ -29,6 +29,14 @@ describe('Swagger / OpenAPI Integration', () => {
     // Verify Bearer Auth security scheme placeholder
     expect(document.components?.securitySchemes).toBeDefined();
     expect(document.components?.securitySchemes?.['bearer-auth']).toBeDefined();
+
+    // Verify Phase 4 Authentication endpoints in OpenAPI paths
+    expect(document.paths['/api/v1/auth/register']).toBeDefined();
+    expect(document.paths['/api/v1/auth/login']).toBeDefined();
+    expect(document.paths['/api/v1/auth/refresh']).toBeDefined();
+    expect(document.paths['/api/v1/auth/logout']).toBeDefined();
+    expect(document.paths['/api/v1/auth/change-password']).toBeDefined();
+    expect(document.paths['/api/v1/auth/me']).toBeDefined();
   });
 
   it('should return null when SWAGGER_ENABLED is configured false', () => {

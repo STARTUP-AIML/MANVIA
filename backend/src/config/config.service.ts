@@ -83,4 +83,21 @@ export class ConfigService {
   public get databaseConnectionTimeoutMs(): number {
     return this.config.DATABASE_CONNECTION_TIMEOUT_MS;
   }
+
+  // Authentication & Security (Phase 4)
+  public get jwtSecret(): string {
+    return this.config.JWT_SECRET;
+  }
+
+  public get jwtAccessExpiration(): string {
+    return this.config.JWT_ACCESS_EXPIRATION;
+  }
+
+  public get jwtRefreshSecret(): string {
+    return this.config.JWT_REFRESH_SECRET;
+  }
+
+  public get jwtRefreshExpiration(): string {
+    return this.config.JWT_REFRESH_EXPIRATION;
+  }
 }
