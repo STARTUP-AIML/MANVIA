@@ -1,11 +1,14 @@
 // ==============================================================================
-// MANVIA — Prisma Schema Placeholder (Phase 1 Foundation Boundary)
+// MANVIA — Prisma Schema (Phase 3 PostgreSQL + Prisma Foundation)
 // ==============================================================================
-// NOTICE: The complete database architecture, entity relational models,
-// composite exclusion constraints (double-booking prevention), pgvector extensions,
-// and migrations are owned and authored by Phase 3 (PostgreSQL + Prisma).
+// NOTICE: This schema establishes the infrastructure foundation only.
+// In strict adherence to Phase 3 requirements, NO business domain models
+// (User, Patient, Doctor, Appointment, HealthRecord, Consent, etc.) exist here.
+// Future domain phases will author their respective models.
 //
-// This file serves as the directory and configuration boundary anchor for Phase 1.
+// Baseline:
+// - PostgreSQL 18.x
+// - Prisma 7.x
 // ==============================================================================
 
 generator client {
@@ -14,5 +17,4 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }

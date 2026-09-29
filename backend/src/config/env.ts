@@ -30,12 +30,17 @@ export const EnvSchema = z.object({
     .default(true),
   SWAGGER_PATH: z.string().default('docs'),
 
-  // Database (Phase 3 boundary)
+  // Database (Phase 3 PostgreSQL + Prisma Foundation)
   DATABASE_URL: z
     .string()
+    .regex(
+      /^(postgresql|postgres):\/\/.+/i,
+      'DATABASE_URL must be a valid PostgreSQL connection string starting with postgresql:// or postgres://',
+    )
     .default('postgresql://postgres:postgres@localhost:5432/manvia_dev?schema=public'),
   DATABASE_POOL_MIN: z.coerce.number().int().positive().default(2),
   DATABASE_POOL_MAX: z.coerce.number().int().positive().default(10),
+  DATABASE_CONNECTION_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),
 
   // Cache & Redis (Phase 2/3 boundary)
   REDIS_URL: z.string().default('redis://localhost:6379'),
@@ -106,4 +111,19 @@ export function getEnvConfig(): EnvConfig {
  */
 export function resetEnvConfig(): void {
   cachedConfig = null;
+}
+
+/**
+ * Redacts credentials (passwords) from a database connection URL for safe logging and diagnostics.
+ */
+export function sanitizeDatabaseUrl(url: string): string {
+  try {
+    const parsed = new URL(url);
+    if (parsed.password) {
+      parsed.password = '***';
+    }
+    return parsed.toString();
+  } catch {
+    return url.replace(/:\/\/(.*?):(.*?)@/, '://$1:***@');
+  }
 }
