@@ -1,0 +1,5 @@
+export enum ReviewAction {
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+  MORE_INFO_REQUESTED = 'MORE_INFO_REQUESTED',
+}

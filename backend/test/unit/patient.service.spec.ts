@@ -27,6 +27,8 @@ describe('PatientService', () => {
     dateOfBirth: new Date('1990-05-15'),
     biologicalSex: BiologicalSex.FEMALE,
     bloodGroup: 'B+',
+    displayName: null,
+    gender: null,
     emergencyContactName: 'Anil Sharma',
     emergencyContactPhone: '+14155552671',
     emergencyContactRelationship: 'SPOUSE',

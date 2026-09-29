@@ -1,0 +1,490 @@
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import type { NestFastifyApplication } from '@nestjs/platform-fastify';
+import { createApp } from '../../src/main.js';
+import { DOCTORS_REPOSITORY } from '../../src/modules/doctors/interfaces/doctor-repository.interface.js';
+import type { IDoctorsRepository } from '../../src/modules/doctors/interfaces/doctor-repository.interface.js';
+import { VerificationDocumentType } from '../../src/modules/doctor-verification/enums/verification-document-type.enum.js';
+import { DoctorVerificationStatus } from '../../src/modules/doctor-verification/enums/doctor-verification-status.enum.js';
+
+describe('Doctor Verification HTTP API (E2E)', () => {
+  let app: NestFastifyApplication;
+
+  const DOCTOR_USER_ID = 'usr-e2e-doctor-01';
+  const OTHER_DOCTOR_USER_ID = 'usr-e2e-doctor-02';
+  const ADMIN_USER_ID = 'usr-e2e-admin-01';
+  const PATIENT_USER_ID = 'usr-e2e-patient-01';
+
+  beforeAll(async () => {
+    process.env.NODE_ENV = 'test';
+    app = await createApp();
+    await app.init();
+    await app.getHttpAdapter().getInstance().ready();
+
+    const repo = app.get<IDoctorsRepository>(DOCTORS_REPOSITORY);
+    const specialties = await repo.findActiveSpecialties();
+    const languages = await repo.findAllLanguages();
+
+    // Create Doctor 1 Profile
+    await app.inject({
+      method: 'POST',
+      url: '/api/v1/doctors/profile',
+      headers: {
+        'x-user-id': DOCTOR_USER_ID,
+        'x-user-role': 'DOCTOR',
+      },
+      payload: {
+        displayName: 'Dr. Meredith Grey',
+        medicalRegistrationNumber: 'MED-E2E-GREY-01',
+        licensingCouncil: 'Washington State Medical Commission',
+        yearsOfExperience: 8,
+        specialties: [{ specialtyId: specialties[0]!.id, isPrimary: true }],
+        languages: [{ languageId: languages[0]!.id }],
+      },
+    });
+
+    // Create Doctor 2 Profile
+    await app.inject({
+      method: 'POST',
+      url: '/api/v1/doctors/profile',
+      headers: {
+        'x-user-id': OTHER_DOCTOR_USER_ID,
+        'x-user-role': 'DOCTOR',
+      },
+      payload: {
+        displayName: 'Dr. Derek Shepherd',
+        medicalRegistrationNumber: 'MED-E2E-SHEP-02',
+        licensingCouncil: 'Washington State Medical Commission',
+        yearsOfExperience: 14,
+        specialties: [{ specialtyId: specialties[0]!.id, isPrimary: true }],
+        languages: [{ languageId: languages[0]!.id }],
+      },
+    });
+  });
+
+  afterAll(async () => {
+    if (app) {
+      await app.close();
+    }
+  });
+
+  // ----------------------------------------------------------------------------
+  // 1. Doctor Self-Service Workflow
+  // ----------------------------------------------------------------------------
+
+  let docVerificationId: string;
+  let documentId: string;
+
+  it('GET /api/v1/doctors/me/verification should return 200 with initial DRAFT workflow', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/v1/doctors/me/verification',
+      headers: {
+        'x-user-id': DOCTOR_USER_ID,
+        'x-user-role': 'DOCTOR',
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.status).toBe(DoctorVerificationStatus.DRAFT);
+    expect(body.documents).toHaveLength(0);
+    docVerificationId = body.id;
+  });
+
+  it('POST /api/v1/doctors/me/verification should update draft submission notes', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/doctors/me/verification',
+      headers: {
+        'x-user-id': DOCTOR_USER_ID,
+        'x-user-role': 'DOCTOR',
+      },
+      payload: {
+        notes: 'Attached certified Washington state license.',
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.submissionNotes).toBe('Attached certified Washington state license.');
+  });
+
+  it('POST /api/v1/doctors/me/verification/documents should upload credential document metadata', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/doctors/me/verification/documents',
+      headers: {
+        'x-user-id': DOCTOR_USER_ID,
+        'x-user-role': 'DOCTOR',
+      },
+      payload: {
+        documentType: VerificationDocumentType.MEDICAL_LICENSE,
+        originalFileName: 'wa_state_license.pdf',
+        mimeType: 'application/pdf',
+        fileSizeBytes: 245000,
+        contentBase64: Buffer.from('PDF_STREAM_MOCK').toString('base64'),
+      },
+    });
+
+    expect(res.statusCode).toBe(201);
+    const body = JSON.parse(res.body);
+    expect(body.id).toBeDefined();
+    expect(body.documentType).toBe(VerificationDocumentType.MEDICAL_LICENSE);
+    expect(body.originalFileName).toBe('wa_state_license.pdf');
+    documentId = body.id;
+  });
+
+  it('GET /api/v1/doctors/me/verification/documents/:documentId/access should return 200 with signed URL', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/doctors/me/verification/documents/${documentId}/access`,
+      headers: {
+        'x-user-id': DOCTOR_USER_ID,
+        'x-user-role': 'DOCTOR',
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.documentId).toBe(documentId);
+    expect(body.accessUrl).toContain('vault.manvia.internal');
+    expect(body.expiresInSeconds).toBe(300);
+  });
+
+  it('POST /api/v1/doctors/me/verification/submit should transition submission to PENDING_REVIEW', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/doctors/me/verification/submit',
+      headers: {
+        'x-user-id': DOCTOR_USER_ID,
+        'x-user-role': 'DOCTOR',
+      },
+      payload: {
+        notes: 'Submitting all verified credentials for hospital privileges.',
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.status).toBe(DoctorVerificationStatus.PENDING_REVIEW);
+    expect(body.submittedAt).not.toBeNull();
+  });
+
+  // ----------------------------------------------------------------------------
+  // 2. Admin Review & Decision Workflow
+  // ----------------------------------------------------------------------------
+
+  it('GET /api/v1/admin/doctor-verifications should list pending submissions for admin', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/v1/admin/doctor-verifications?status=PENDING_REVIEW',
+      headers: {
+        'x-user-id': ADMIN_USER_ID,
+        'x-user-role': 'ADMIN',
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.total).toBeGreaterThanOrEqual(1);
+    const target = body.items.find((i: { id: string }) => i.id === docVerificationId);
+    expect(target).toBeDefined();
+    expect(target.doctorProfile.displayName).toBe('Dr. Meredith Grey');
+    expect(target.documents).toHaveLength(1);
+  });
+
+  it('GET /api/v1/admin/doctor-verifications/:id should return full details and documents for review', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/admin/doctor-verifications/${docVerificationId}`,
+      headers: {
+        'x-user-id': ADMIN_USER_ID,
+        'x-user-role': 'ADMIN',
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.id).toBe(docVerificationId);
+    expect(body.doctorProfile.medicalRegistrationNumber).toBe('MED-E2E-GREY-01');
+    expect(body.documents[0].id).toBe(documentId);
+  });
+
+  it('GET /api/v1/admin/doctor-verifications/:id/documents/:docId/access should allow reviewer to inspect credential', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/admin/doctor-verifications/${docVerificationId}/documents/${documentId}/access`,
+      headers: {
+        'x-user-id': ADMIN_USER_ID,
+        'x-user-role': 'ADMIN',
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.accessUrl).toBeDefined();
+    expect(body.expiresInSeconds).toBe(600);
+  });
+
+  it('POST /api/v1/admin/doctor-verifications/:id/approve should approve verification and update physician status', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/admin/doctor-verifications/${docVerificationId}/approve`,
+      headers: {
+        'x-user-id': ADMIN_USER_ID,
+        'x-user-role': 'ADMIN',
+      },
+      payload: {
+        notes: 'Medical board registry check passed.',
+      },
+    });
+
+    expect(res.statusCode).toBe(200);
+    const body = JSON.parse(res.body);
+    expect(body.status).toBe(DoctorVerificationStatus.APPROVED);
+    expect(body.reviewedBy).toBe(ADMIN_USER_ID);
+    expect(body.reviews).toHaveLength(1);
+    expect(body.reviews[0].action).toBe('APPROVED');
+
+    // Confirm doctor's profile now reflects VERIFIED status
+    const profileRes = await app.inject({
+      method: 'GET',
+      url: '/api/v1/doctors/me',
+      headers: {
+        'x-user-id': DOCTOR_USER_ID,
+        'x-user-role': 'DOCTOR',
+      },
+    });
+    expect(profileRes.statusCode).toBe(200);
+    const profileBody = JSON.parse(profileRes.body);
+    expect(profileBody.verificationStatus).toBe('VERIFIED');
+    expect(profileBody.verifiedAt).not.toBeNull();
+  });
+
+  // ----------------------------------------------------------------------------
+  // 3. Concurrency & State Guard Tests
+  // ----------------------------------------------------------------------------
+
+  it('POST /api/v1/admin/doctor-verifications/:id/approve should return 409 Conflict if already approved', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/admin/doctor-verifications/${docVerificationId}/approve`,
+      headers: {
+        'x-user-id': 'usr-e2e-admin-02',
+        'x-user-role': 'ADMIN',
+      },
+      payload: {},
+    });
+
+    expect(res.statusCode).toBe(409);
+    const body = JSON.parse(res.body);
+    expect(body.message).toContain('already been approved');
+  });
+
+  it('POST /api/v1/admin/doctor-verifications/:id/reject should return 409 Conflict if already approved', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/admin/doctor-verifications/${docVerificationId}/reject`,
+      headers: {
+        'x-user-id': 'usr-e2e-admin-02',
+        'x-user-role': 'ADMIN',
+      },
+      payload: {
+        reason: 'Attempting to reject an approved doctor',
+      },
+    });
+
+    expect(res.statusCode).toBe(409);
+  });
+
+  // ----------------------------------------------------------------------------
+  // 4. Rejection and Resubmission Flow
+  // ----------------------------------------------------------------------------
+
+  let doc2VerificationId: string;
+
+  it('should handle rejection and subsequent resubmission for Doctor 2', async () => {
+    // 1. Upload document for Doctor 2
+    await app.inject({
+      method: 'POST',
+      url: '/api/v1/doctors/me/verification/documents',
+      headers: {
+        'x-user-id': OTHER_DOCTOR_USER_ID,
+        'x-user-role': 'DOCTOR',
+      },
+      payload: {
+        documentType: VerificationDocumentType.MEDICAL_LICENSE,
+        originalFileName: 'old_license.pdf',
+        mimeType: 'application/pdf',
+        fileSizeBytes: 100000,
+      },
+    });
+
+    // 2. Submit for review
+    const submitRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/doctors/me/verification/submit',
+      headers: {
+        'x-user-id': OTHER_DOCTOR_USER_ID,
+        'x-user-role': 'DOCTOR',
+      },
+      payload: {},
+    });
+    expect(submitRes.statusCode).toBe(200);
+    doc2VerificationId = JSON.parse(submitRes.body).id;
+
+    // 3. Admin rejects without reason -> 400 Bad Request
+    const rejectNoReason = await app.inject({
+      method: 'POST',
+      url: `/api/v1/admin/doctor-verifications/${doc2VerificationId}/reject`,
+      headers: {
+        'x-user-id': ADMIN_USER_ID,
+        'x-user-role': 'ADMIN',
+      },
+      payload: { reason: '' },
+    });
+    expect(rejectNoReason.statusCode).toBe(400);
+
+    // 4. Admin rejects with valid reason
+    const rejectRes = await app.inject({
+      method: 'POST',
+      url: `/api/v1/admin/doctor-verifications/${doc2VerificationId}/reject`,
+      headers: {
+        'x-user-id': ADMIN_USER_ID,
+        'x-user-role': 'ADMIN',
+      },
+      payload: {
+        reason: 'License image is blurry and unreadable. Please upload a high-resolution PDF scan.',
+      },
+    });
+    expect(rejectRes.statusCode).toBe(200);
+    const rejectBody = JSON.parse(rejectRes.body);
+    expect(rejectBody.status).toBe(DoctorVerificationStatus.REJECTED);
+    expect(rejectBody.rejectionReason).toContain('License image is blurry');
+
+    // 5. Doctor checks verification status and sees remediation reason
+    const docStatusRes = await app.inject({
+      method: 'GET',
+      url: '/api/v1/doctors/me/verification',
+      headers: {
+        'x-user-id': OTHER_DOCTOR_USER_ID,
+        'x-user-role': 'DOCTOR',
+      },
+    });
+    expect(docStatusRes.statusCode).toBe(200);
+    const docStatusBody = JSON.parse(docStatusRes.body);
+    expect(docStatusBody.status).toBe(DoctorVerificationStatus.REJECTED);
+    expect(docStatusBody.rejectionReason).toContain('blurry');
+
+    // 6. Doctor uploads new document and resubmits
+    await app.inject({
+      method: 'POST',
+      url: '/api/v1/doctors/me/verification/documents',
+      headers: {
+        'x-user-id': OTHER_DOCTOR_USER_ID,
+        'x-user-role': 'DOCTOR',
+      },
+      payload: {
+        documentType: VerificationDocumentType.MEDICAL_LICENSE,
+        originalFileName: 'high_res_license.pdf',
+        mimeType: 'application/pdf',
+        fileSizeBytes: 300000,
+      },
+    });
+
+    const resubmitRes = await app.inject({
+      method: 'POST',
+      url: '/api/v1/doctors/me/verification/submit',
+      headers: {
+        'x-user-id': OTHER_DOCTOR_USER_ID,
+        'x-user-role': 'DOCTOR',
+      },
+      payload: {
+        notes: 'Uploaded clear scan.',
+      },
+    });
+    expect(resubmitRes.statusCode).toBe(200);
+    expect(JSON.parse(resubmitRes.body).status).toBe(DoctorVerificationStatus.PENDING_REVIEW);
+  });
+
+  // ----------------------------------------------------------------------------
+  // 5. Security & RBAC Enforcements
+  // ----------------------------------------------------------------------------
+
+  it('SECURITY: Unauthenticated user should be rejected with 401 on doctor endpoints', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/v1/doctors/me/verification',
+    });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('SECURITY: Unauthenticated user should be rejected with 401 on admin endpoints', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/v1/admin/doctor-verifications',
+    });
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('SECURITY: Patient role should be rejected with 403 on doctor verification endpoints', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/v1/doctors/me/verification',
+      headers: {
+        'x-user-id': PATIENT_USER_ID,
+        'x-user-role': 'PATIENT',
+      },
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('SECURITY: Patient role should be rejected with 403 on admin verification endpoints', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/v1/admin/doctor-verifications',
+      headers: {
+        'x-user-id': PATIENT_USER_ID,
+        'x-user-role': 'PATIENT',
+      },
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('SECURITY: Doctor role should be rejected with 403 on admin endpoints', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: '/api/v1/admin/doctor-verifications',
+      headers: {
+        'x-user-id': DOCTOR_USER_ID,
+        'x-user-role': 'DOCTOR',
+      },
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('SECURITY: Doctor cannot self-approve their own verification', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: `/api/v1/admin/doctor-verifications/${docVerificationId}/approve`,
+      headers: {
+        'x-user-id': DOCTOR_USER_ID,
+        'x-user-role': 'DOCTOR',
+      },
+      payload: {},
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('SECURITY: Doctor A cannot access Doctor B verification document', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/doctors/me/verification/documents/${documentId}/access`,
+      headers: {
+        'x-user-id': OTHER_DOCTOR_USER_ID,
+        'x-user-role': 'DOCTOR',
+      },
+    });
+    expect(res.statusCode).toBe(403);
+  });
+});

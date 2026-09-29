@@ -1,7 +1,7 @@
 # MANVIA Backend Foundation
 
-> **Phase 6 Deliverable — Patient Domain Foundation**  
-> **Status:** Production-Grade Patient Domain Operational  
+> **Phase 6 Deliverable — Patient Domain Foundation**
+> **Status:** Production-Grade Patient Domain Operational
 > **Runtime:** Node.js 24 LTS | **Language:** TypeScript 5.x (Strict) | **Framework:** NestJS 11.x (Fastify Adapter) | **Database:** PostgreSQL 18.x + Prisma 7.x
 
 ---

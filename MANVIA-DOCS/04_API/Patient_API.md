@@ -1,8 +1,8 @@
 # MANVIA — Patient Domain API Specification
 
-> Version: 0.2.0-phase6  
-> Status: PHASE 6 IMPLEMENTED (Patient Domain Foundation)  
-> Last Updated: 2026-09-29  
+> Version: 0.2.0-phase6
+> Status: PHASE 6 IMPLEMENTED (Patient Domain Foundation)
+> Last Updated: 2026-09-29
 
 ---
 
