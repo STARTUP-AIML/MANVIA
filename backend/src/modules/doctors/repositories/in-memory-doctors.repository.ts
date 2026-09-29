@@ -260,6 +260,26 @@ export class InMemoryDoctorsRepository implements IDoctorsRepository {
     return this.cloneProfile(existing);
   }
 
+  public async updateVerificationStatus(
+    id: string,
+    status: VerificationStatus,
+    verifiedAt?: Date | null | undefined,
+  ): Promise<DoctorProfileEntity> {
+    const existing = this.profiles.get(id);
+    if (!existing) {
+      throw new NotFoundError(`Doctor profile with ID '${id}' not found`);
+    }
+
+    existing.verificationStatus = status;
+    if (verifiedAt !== undefined) {
+      existing.verifiedAt = verifiedAt;
+    }
+    existing.updatedAt = new Date();
+
+    this.profiles.set(id, existing);
+    return this.cloneProfile(existing);
+  }
+
   public async findPublicDoctors(
     criteria: DoctorFilterCriteria,
   ): Promise<{ doctors: DoctorProfileEntity[]; total: number }> {
