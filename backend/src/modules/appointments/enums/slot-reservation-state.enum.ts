@@ -1,0 +1,5 @@
+export enum SlotReservationState {
+  AVAILABLE = 'AVAILABLE',
+  HELD_IN_RESERVATION = 'HELD_IN_RESERVATION',
+  BOOKED = 'BOOKED',
+}
