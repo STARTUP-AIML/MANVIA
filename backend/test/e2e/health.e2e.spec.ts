@@ -1,54 +1,67 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import request from 'supertest';
-import { bootstrap } from '../../src/index.js';
-import type { Server } from 'node:http';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import type { NestFastifyApplication } from '@nestjs/platform-fastify';
+import { createApp } from '../../src/main.js';
 
-describe('Health & Foundation (E2E)', () => {
-  let server: Server;
+describe('Health Endpoints (E2E)', () => {
+  let app: NestFastifyApplication;
 
-  beforeEach(() => {
+  beforeAll(async () => {
     process.env.NODE_ENV = 'test';
-    const app = bootstrap();
-    server = app.server;
+    app = await createApp();
+    await app.init();
+    await app.getHttpAdapter().getInstance().ready();
+  });
+
+  afterAll(async () => {
+    if (app) {
+      await app.close();
+    }
   });
 
   it('GET /health should return 200 and liveness payload', async () => {
-    const res = await request(server).get('/health');
-    expect(res.status).toBe(200);
-    expect(res.body.status).toBe('ok');
-    expect(res.body.version).toBeDefined();
-    expect(res.body.uptimeSeconds).toBeGreaterThanOrEqual(0);
+    const res = await app.inject({ method: 'GET', url: '/health' });
+    expect(res.statusCode).toBe(200);
+
+    const body = JSON.parse(res.body);
+    expect(body.status).toBe('ok');
+    expect(body.version).toBeDefined();
+    expect(body.uptimeSeconds).toBeGreaterThanOrEqual(0);
+    expect(typeof body.timestamp).toBe('string');
   });
 
-  it('GET /health/liveness should return 200 with status ok', async () => {
-    const res = await request(server).get('/health/liveness');
-    expect(res.status).toBe(200);
-    expect(res.body.status).toBe('ok');
+  it('GET /health/live should return 200 with status ok', async () => {
+    const res = await app.inject({ method: 'GET', url: '/health/live' });
+    expect(res.statusCode).toBe(200);
+
+    const body = JSON.parse(res.body);
+    expect(body.status).toBe('ok');
+    expect(body.version).toBeDefined();
   });
 
-  it('GET /health/readiness should return 200 with healthy components', async () => {
-    const res = await request(server).get('/health/readiness');
-    expect(res.status).toBe(200);
-    expect(res.body.status).toBe('healthy');
-    expect(res.body.components).toBeDefined();
+  it('GET /health/liveness should return 200 with status ok (alias)', async () => {
+    const res = await app.inject({ method: 'GET', url: '/health/liveness' });
+    expect(res.statusCode).toBe(200);
+
+    const body = JSON.parse(res.body);
+    expect(body.status).toBe('ok');
   });
 
-  it('GET / should return 200 with application metadata', async () => {
-    const res = await request(server).get('/');
-    expect(res.status).toBe(200);
-    expect(res.body.name).toBe('manvia-backend');
-    expect(res.body.status).toBe('online');
+  it('GET /health/ready should return 200 with healthy readiness payload', async () => {
+    const res = await app.inject({ method: 'GET', url: '/health/ready' });
+    expect(res.statusCode).toBe(200);
+
+    const body = JSON.parse(res.body);
+    expect(body.status).toBe('healthy');
+    expect(body.components).toBeDefined();
+    expect(typeof body.uptimeSeconds).toBe('number');
   });
 
-  it('GET /api/v1 should return 200 with API prefix confirmation', async () => {
-    const res = await request(server).get('/api/v1');
-    expect(res.status).toBe(200);
-    expect(res.body.name).toBe('manvia-backend');
-  });
+  it('GET /health/readiness should return 200 with healthy readiness payload (alias)', async () => {
+    const res = await app.inject({ method: 'GET', url: '/health/readiness' });
+    expect(res.statusCode).toBe(200);
 
-  it('GET /unknown-route should return 404', async () => {
-    const res = await request(server).get('/unknown-route');
-    expect(res.status).toBe(404);
-    expect(res.body.error).toBe('Not Found');
+    const body = JSON.parse(res.body);
+    expect(body.status).toBe('healthy');
+    expect(body.components).toBeDefined();
   });
 });

@@ -18,6 +18,18 @@ export const EnvSchema = z.object({
   RATE_LIMIT_TTL_MS: z.coerce.number().int().positive().default(60000),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(100),
 
+  // Swagger / OpenAPI Documentation
+  SWAGGER_ENABLED: z
+    .preprocess((val) => {
+      if (typeof val === 'string') {
+        if (val.toLowerCase() === 'true' || val === '1') return true;
+        if (val.toLowerCase() === 'false' || val === '0') return false;
+      }
+      return val;
+    }, z.boolean())
+    .default(true),
+  SWAGGER_PATH: z.string().default('docs'),
+
   // Database (Phase 3 boundary)
   DATABASE_URL: z
     .string()

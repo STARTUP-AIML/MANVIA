@@ -1,3 +1,4 @@
+import { Injectable } from '@nestjs/common';
 import type {
   ComponentHealth,
   HealthIndicator,
@@ -6,6 +7,7 @@ import type {
   ReadinessResult,
 } from './health.interface.js';
 
+@Injectable()
 export class HealthService {
   private readonly indicators = new Map<string, HealthIndicator>();
   private readonly startTime = Date.now();

@@ -1,34 +1,45 @@
 # MANVIA Backend Foundation
 
-> **Phase 1 Deliverable — Repository and Engineering Foundation**  
-> **Status:** Operational Baseline  
-> **Runtime:** Node.js 24 LTS | **Language:** TypeScript 5.x (Strict)
+> **Phase 2 Deliverable — NestJS + Fastify Backend Foundation**  
+> **Status:** Production-Grade Application Foundation Operational  
+> **Runtime:** Node.js 24 LTS | **Language:** TypeScript 5.x (Strict) | **Framework:** NestJS 11.x (Fastify Adapter)
 
 ---
 
 ## 1. Subsystem Overview
 
-`backend/` contains the server-side code for the MANVIA platform. It is structured as a modular monolith in preparation for Phase 2 (NestJS + Fastify Foundation).
+`backend/` contains the server-side code for the MANVIA platform, architected as a modular monolith in NestJS utilizing Fastify for high-throughput HTTP performance.
 
 ### Directory Structure
 
 ```
 backend/
 ├── src/
-│   ├── config/            # Strongly-typed environment variables (Zod)
-│   ├── common/            # Error hierarchy, storage & observability interfaces
-│   ├── health/            # Liveness and readiness health service
-│   ├── database/          # Database connection boundary (Phase 3)
-│   ├── cache/             # Redis cache & distributed lock interfaces
+│   ├── config/            # Strongly-typed environment variables (Zod) & Swagger configuration
+│   ├── common/            # Error hierarchy, exception filter, validation pipe, request correlation & logging
+│   │   ├── decorators/    # @RequestId() parameter decorator
+│   │   ├── dto/           # Infrastructure validation DTOs
+│   │   ├── errors/        # AppError hierarchy (ValidationError, NotFoundError, etc.)
+│   │   ├── filters/       # GlobalExceptionFilter (RFC 7807/standardized error envelope)
+│   │   ├── interceptors/  # LoggingInterceptor (redacted structured HTTP logging)
+│   │   ├── interfaces/    # Storage abstraction interface
+│   │   ├── observability/ # Telemetry interface
+│   │   └── pipes/         # Global ValidationPipe (whitelist, forbidNonWhitelisted, transform)
+│   ├── health/            # Liveness, readiness, and overall health service & endpoints
+│   ├── database/          # Database boundary (Phase 3 owns schema & migrations)
+│   ├── cache/             # Redis cache & distributed lock abstractions (Phase 3)
 │   ├── events/            # Domain event bus abstractions
 │   ├── modules/           # Domain business modules (Phase 4+)
 │   ├── integrations/      # Third-party service adapters
 │   ├── workers/           # Background job consumers
-│   └── index.ts           # Foundation HTTP server & lifecycle bootstrap
+│   ├── app.controller.ts  # Platform root metadata & api/v1 baseline endpoints
+│   ├── app.module.ts      # NestJS root application module
+│   ├── main.ts            # FastifyAdapter bootstrap, Helmet security, CORS, Swagger & shutdown hooks
+│   └── index.ts           # Re-exports main.js for entrypoint backwards compatibility
 ├── test/
-│   ├── unit/              # Isolated logic unit tests
-│   ├── integration/       # Subsystem integration tests
-│   └── e2e/               # HTTP API end-to-end tests
+│   ├── unit/              # Isolated logic unit tests (env, error, health, filter, pipe, request-id, logging)
+│   ├── integration/       # Subsystem integration tests (foundation, swagger)
+│   └── e2e/               # HTTP API end-to-end tests (health, api, validation)
 ├── prisma/                # Prisma schema anchor (Phase 3 owns schema)
 ├── scripts/               # Maintenance and environment verification scripts
 ├── Dockerfile             # Multi-stage production container definition
@@ -38,7 +49,7 @@ backend/
 ├── tsconfig.build.json    # Lean build compiler options (excluding tests)
 ├── eslint.config.mjs      # Modern ESLint 9 flat configuration
 ├── .prettierrc.json       # Code formatting rules
-└── vitest.config.ts       # Test runner & coverage thresholds
+└── vitest.config.ts       # Test runner with swc compiler & coverage thresholds
 ```
 
 ---
@@ -68,46 +79,76 @@ npm run dev
 
 # 5. Access health checks
 curl http://localhost:3000/health
-curl http://localhost:3000/health/readiness
+curl http://localhost:3000/health/live
+curl http://localhost:3000/health/ready
+
+# 6. Access OpenAPI / Swagger UI
+open http://localhost:3000/docs
 ```
 
 ---
 
-## 4. Available Scripts
+## 4. Endpoints Baseline (Phase 2)
 
-| Command                    | Description                                         |
-| -------------------------- | --------------------------------------------------- |
-| `npm run dev`              | Runs the development server with file watch (`tsx`) |
-| `npm run build`            | Compiles TypeScript into `dist/`                    |
-| `npm run start`            | Runs the compiled production server                 |
-| `npm run lint`             | Runs ESLint 9 flat config across `src` and `test`   |
-| `npm run lint:fix`         | Automatically fixes auto-fixable lint issues        |
-| `npm run format`           | Formats all files with Prettier                     |
-| `npm run format:check`     | Verifies formatting without modifying files         |
-| `npm run typecheck`        | Validates TypeScript types without emitting code    |
-| `npm test`                 | Runs the Vitest test suite                          |
-| `npm run test:unit`        | Runs unit tests only                                |
-| `npm run test:integration` | Runs integration tests only                         |
-| `npm run test:e2e`         | Runs end-to-end API tests                           |
-| `npm run test:cov`         | Generates test coverage report                      |
+| Method | Endpoint        | Description                                                |
+| ------ | --------------- | ---------------------------------------------------------- |
+| `GET`  | `/`             | Platform root metadata and system status                   |
+| `GET`  | `/api/v1`       | API v1 baseline status and prefix confirmation             |
+| `GET`  | `/health`       | Overall system health check                                |
+| `GET`  | `/health/live`  | Process liveness probe (alias: `/health/liveness`)         |
+| `GET`  | `/health/ready` | Traffic readiness probe (alias: `/health/readiness`)       |
+| `GET`  | `/docs`         | Interactive Swagger / OpenAPI documentation (configurable) |
+
+All future business endpoints automatically inherit the `/api/v1/` route prefix via NestJS `app.setGlobalPrefix('api/v1')`.
 
 ---
 
-## 5. Docker Workflow
+## 5. Security & Request Correlation
+
+- **Security Headers:** `@fastify/helmet` enforces HSTS, `X-Content-Type-Options: nosniff`, `X-Frame-Options`, and customized Content Security Policy for Swagger UI.
+- **CORS:** Environment-configurable via `CORS_ALLOWED_ORIGINS`. In production, strict origin validation is enforced.
+- **Request Correlation:** Every incoming request receives or generates a cryptographically secure UUID stamped into `X-Request-ID` and `X-Correlation-ID` response headers.
+- **Global Validation:** Configured with `whitelist: true`, `forbidNonWhitelisted: true`, and implicit/explicit type transformation.
+- **Global Exception Filter:** All errors follow the canonical MANVIA error envelope format (`statusCode`, `error`, `message`, `details`, `requestId`, `timestamp`). Stack traces are stripped in production.
+- **Safe Logging:** Structured logging using request correlation; credentials, authorization headers, passwords, and healthcare data are strictly redacted.
+
+---
+
+## 6. Available Scripts
+
+| Command                    | Description                                          |
+| -------------------------- | ---------------------------------------------------- |
+| `npm run dev`              | Runs the development server with file watch (`tsx`)  |
+| `npm run build`            | Compiles TypeScript into `dist/`                     |
+| `npm run start`            | Runs the compiled production server (`dist/main.js`) |
+| `npm run lint`             | Runs ESLint 9 flat config across `src` and `test`    |
+| `npm run lint:fix`         | Automatically fixes auto-fixable lint issues         |
+| `npm run format`           | Formats all files with Prettier                      |
+| `npm run format:check`     | Verifies formatting without modifying files          |
+| `npm run typecheck`        | Validates TypeScript types without emitting code     |
+| `npm test`                 | Runs the Vitest test suite                           |
+| `npm run test:unit`        | Runs unit tests only                                 |
+| `npm run test:integration` | Runs integration tests only                          |
+| `npm run test:e2e`         | Runs end-to-end API tests                            |
+| `npm run test:cov`         | Generates test coverage report                       |
+
+---
+
+## 7. Docker Workflow
 
 ```bash
 # Build multi-stage production image
 docker build -t manvia-backend:latest .
 
-# Run production container
+# Run production container (starts cleanly without requiring database)
 docker run -p 3000:3000 --env-file .env.example manvia-backend:latest
 ```
 
 ---
 
-## 6. Architecture Boundaries
+## 8. Architecture Boundaries
 
 - **Phase 1 (Completed):** Repository foundation, strict TypeScript, Vitest, ESLint, Prettier, Docker, CI, environment validation, health check service, storage abstraction interface.
-- **Phase 2 (Upcoming):** NestJS framework initialization, Fastify HTTP adapter, Swagger/OpenAPI, global exception filters, request correlation ID middleware.
-- **Phase 3 (Upcoming):** PostgreSQL schema design, Prisma client generation, database migrations, pgvector initialization.
-- **Phase 4+:** Domain business modules (Identity, Patients, Doctors, Appointments, AI Companion, etc.).
+- **Phase 2 (Completed):** NestJS application bootstrap, Fastify HTTP adapter, global ValidationPipe, GlobalExceptionFilter, request correlation ID (`X-Request-ID`), Helmet security baseline, environment-driven CORS, health endpoints (`/health`, `/health/live`, `/health/ready`), Swagger/OpenAPI (`/docs`), graceful shutdown hooks.
+- **Phase 3 (Upcoming):** PostgreSQL schema design, Prisma 7 client generation, database migrations, pgvector initialization.
+- **Phase 4+:** Domain business modules (Identity, Authentication, Patients, Doctors, Appointments, AI Companion, etc.).
