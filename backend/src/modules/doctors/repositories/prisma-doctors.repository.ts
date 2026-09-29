@@ -316,6 +316,34 @@ export class PrismaDoctorsRepository implements IDoctorsRepository {
     return this.mapToEntity(updated);
   }
 
+  public async updateVerificationStatus(
+    id: string,
+    status: VerificationStatus,
+    verifiedAt?: Date | null | undefined,
+  ): Promise<DoctorProfileEntity> {
+    this.ensurePrismaClient();
+
+    const existing = await this.prisma.doctorProfile.findUnique({ where: { id } });
+    if (!existing) {
+      throw new NotFoundError(`Doctor profile with ID '${id}' not found`);
+    }
+
+    const updated = await this.prisma.doctorProfile.update({
+      where: { id },
+      data: {
+        verificationStatus: status,
+        ...(verifiedAt !== undefined ? { verifiedAt } : {}),
+      },
+      include: {
+        specialties: { include: { specialty: true } },
+        languages: { include: { language: true } },
+        qualifications: true,
+      },
+    });
+
+    return this.mapToEntity(updated);
+  }
+
   public async findPublicDoctors(
     criteria: DoctorFilterCriteria,
   ): Promise<{ doctors: DoctorProfileEntity[]; total: number }> {
