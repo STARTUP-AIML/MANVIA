@@ -1,6 +1,7 @@
 import type { DoctorProfileEntity } from '../entities/doctor-profile.entity.js';
 import type { SpecialtyEntity } from '../entities/specialty.entity.js';
 import type { LanguageEntity } from '../entities/language.entity.js';
+import type { VerificationStatus } from '../enums/verification-status.enum.js';
 
 export interface DoctorFilterCriteria {
   specialty?: string | undefined;
@@ -56,6 +57,11 @@ export interface IDoctorsRepository {
   findByPublicId(publicId: string): Promise<DoctorProfileEntity | null>;
   findByRegistrationNumber(registrationNumber: string): Promise<DoctorProfileEntity | null>;
   updateProfile(id: string, data: UpdateDoctorProfileData): Promise<DoctorProfileEntity>;
+  updateVerificationStatus(
+    id: string,
+    status: VerificationStatus,
+    verifiedAt?: Date | null | undefined,
+  ): Promise<DoctorProfileEntity>;
   findPublicDoctors(
     criteria: DoctorFilterCriteria,
   ): Promise<{ doctors: DoctorProfileEntity[]; total: number }>;
