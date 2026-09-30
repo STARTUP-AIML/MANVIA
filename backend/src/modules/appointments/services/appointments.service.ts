@@ -66,8 +66,11 @@ export class AppointmentsService {
     private readonly appointmentRepo: IAppointmentRepository,
     @Inject(APPOINTMENT_AUDIT_SERVICE)
     private readonly auditService: IAppointmentAuditService,
+    @Inject(AppointmentStateMachineService)
     private readonly stateMachine: AppointmentStateMachineService,
+    @Inject(PreConsultationService)
     private readonly preConsultationService: PreConsultationService,
+    @Inject(CareRelationshipsService)
     private readonly careRelService: CareRelationshipsService,
     @Inject(CARE_RELATIONSHIP_REPOSITORY)
     private readonly careRelRepo: ICareRelationshipRepository,

@@ -10,7 +10,7 @@
   "type": "module",
   "main": "dist/main.js",
   "scripts": {
-    "dev": "tsx watch src/main.ts",
+    "dev": "vite-node -c vitest.config.ts --watch src/main.ts",
     "build": "prisma generate && rimraf dist && tsc -p tsconfig.build.json",
     "start": "node dist/main.js",
     "db:generate": "prisma generate",

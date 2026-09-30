@@ -21,6 +21,7 @@ import type { CurrentUserContext } from '../../doctors/interfaces/auth-context.i
 @Injectable()
 export class ConsentGuard implements CanActivate {
   constructor(
+    @Inject(Reflector)
     private readonly reflector: Reflector,
     @Inject(CARE_RELATIONSHIP_REPOSITORY)
     private readonly careRelRepo: ICareRelationshipRepository,
