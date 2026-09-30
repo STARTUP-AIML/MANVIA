@@ -14,6 +14,10 @@ import { CareRelationshipsModule } from './modules/care-relationships/care-relat
 import { WellnessModule } from './modules/wellness/wellness.module.js';
 import { HealthRecordsModule } from './modules/health-records/health-records.module.js';
 import { AppointmentsModule } from './modules/appointments/appointments.module.js';
+import { RefundsModule } from './modules/refunds/refunds.module.js';
+import { WaitlistModule } from './modules/waitlist/waitlist.module.js';
+import { NotificationsModule } from './modules/notifications/notifications.module.js';
+import { PaymentsModule } from './modules/payments/payments.module.js';
 import { AIModule } from './modules/ai/ai.module.js';
 
 @Module({
@@ -32,6 +36,10 @@ import { AIModule } from './modules/ai/ai.module.js';
     WellnessModule,
     HealthRecordsModule,
     AppointmentsModule,
+    RefundsModule,
+    WaitlistModule,
+    NotificationsModule,
+    PaymentsModule,
     AIModule,
   ],
   controllers: [AppController],

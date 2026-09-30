@@ -1,5 +1,6 @@
 import type { AppointmentEntity } from '../entities/appointment.entity.js';
 import type { PreConsultationEntity } from '../entities/pre-consultation.entity.js';
+import type { AppointmentCancellationEntity } from '../entities/appointment-cancellation.entity.js';
 import type { AppointmentStatus } from '../enums/appointment-status.enum.js';
 import type { SlotReservationState } from '../enums/slot-reservation-state.enum.js';
 import type { PreConsultationStatus } from '../enums/pre-consultation-status.enum.js';
@@ -70,6 +71,15 @@ export interface UpdatePreConsultationInput {
   submittedAt?: Date | null | undefined;
 }
 
+export interface CreateCancellationInput {
+  appointmentId: string;
+  cancelledBy: string;
+  cancellationActorType: 'PATIENT' | 'DOCTOR' | 'ADMIN' | 'SYSTEM';
+  reason: string;
+  reasonCode?: string | null | undefined;
+  metadata?: string | null | undefined;
+}
+
 export interface IAppointmentRepository {
   createAppointment(input: CreateAppointmentInput): Promise<AppointmentEntity>;
   findAppointmentById(id: string): Promise<AppointmentEntity | null>;
@@ -96,6 +106,11 @@ export interface IAppointmentRepository {
     id: string,
     input: UpdatePreConsultationInput,
   ): Promise<PreConsultationEntity>;
+
+  createCancellation(input: CreateCancellationInput): Promise<AppointmentCancellationEntity>;
+  findCancellationByAppointmentId(
+    appointmentId: string,
+  ): Promise<AppointmentCancellationEntity | null>;
 }
 
 export const APPOINTMENT_REPOSITORY = Symbol('APPOINTMENT_REPOSITORY');

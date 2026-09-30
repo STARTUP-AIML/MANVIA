@@ -54,6 +54,18 @@ describe('NestJS + Fastify Foundation Integration', () => {
     healthService.unregisterIndicator('integration-service');
   });
 
+  it('should respond to /health and /health/ready endpoints', async () => {
+    const healthRes = await app.inject({ method: 'GET', url: '/health' });
+    expect(healthRes.statusCode).toBe(200);
+    const healthJson = JSON.parse(healthRes.body);
+    expect(healthJson.status).toBe('ok');
+
+    const readyRes = await app.inject({ method: 'GET', url: '/health/ready' });
+    expect(readyRes.statusCode).toBe(200);
+    const readyJson = JSON.parse(readyRes.body);
+    expect(readyJson.status).toBe('healthy');
+  });
+
   it('should support graceful shutdown without unhandled errors', async () => {
     await expect(app.close()).resolves.toBeUndefined();
   });

@@ -20,6 +20,7 @@ import {
   AppointmentQueryDto,
   AppointmentResponseDto,
   CancelAppointmentDto,
+  CancellationDetailsResponseDto,
   CreateAppointmentDto,
   PaginatedAppointmentsResponseDto,
   PreConsultationDraftDto,
@@ -148,6 +149,30 @@ export class PatientAppointmentsController {
     @Body() dto: CancelAppointmentDto,
   ): Promise<AppointmentResponseDto> {
     return this.appointmentsService.cancelPatientAppointment(user.userId, appointmentId, dto);
+  }
+
+  @Get(':appointmentId/cancellation')
+  @ApiOperation({
+    summary: 'View appointment cancellation & refund details (Patient)',
+    description:
+      'Retrieves the cancellation record, policy evaluation, and refund details for a cancelled appointment.',
+  })
+  @ApiParam({
+    name: 'appointmentId',
+    description: 'Internal appointment UUID or public ID (APT-XXXXXXXX)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Cancellation details retrieved',
+    type: CancellationDetailsResponseDto,
+  })
+  @ApiResponse({ status: 403, description: 'Forbidden access to another patient’s appointment' })
+  @ApiResponse({ status: 404, description: 'Cancellation record not found' })
+  public async getCancellation(
+    @CurrentUser() user: CurrentUserContext,
+    @Param('appointmentId') appointmentId: string,
+  ): Promise<CancellationDetailsResponseDto> {
+    return this.appointmentsService.getAppointmentCancellation(user, appointmentId);
   }
 
   // --- Pre-Consultation Intake Endpoints ---

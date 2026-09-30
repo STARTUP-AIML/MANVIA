@@ -19,6 +19,7 @@ import {
   AppointmentQueryDto,
   AppointmentResponseDto,
   CancelAppointmentDto,
+  CancellationDetailsResponseDto,
   DeclineAppointmentDto,
   PaginatedAppointmentsResponseDto,
   PreConsultationResponseDto,
@@ -150,6 +151,29 @@ export class DoctorAppointmentsController {
     @Body() dto: CancelAppointmentDto,
   ): Promise<AppointmentResponseDto> {
     return this.appointmentsService.cancelDoctorAppointment(user.userId, appointmentId, dto);
+  }
+
+  @Get(':appointmentId/cancellation')
+  @ApiOperation({
+    summary: 'Get appointment cancellation record (Doctor Access)',
+    description:
+      'Retrieves cancellation metadata for a cancelled appointment. Only the assigned physician can view.',
+  })
+  @ApiParam({
+    name: 'appointmentId',
+    description: 'Internal appointment UUID or public ID (APT-XXXXXXXX)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Cancellation details retrieved successfully',
+    type: CancellationDetailsResponseDto,
+  })
+  @ApiResponse({ status: 404, description: 'Appointment or cancellation record not found' })
+  public async getCancellation(
+    @CurrentUser() user: CurrentUserContext,
+    @Param('appointmentId') appointmentId: string,
+  ): Promise<CancellationDetailsResponseDto> {
+    return this.appointmentsService.getAppointmentCancellation(user, appointmentId);
   }
 
   @Post(':appointmentId/start')

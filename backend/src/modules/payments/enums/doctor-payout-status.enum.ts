@@ -1,0 +1,8 @@
+export enum DoctorPayoutStatus {
+  PENDING = 'PENDING',
+  ELIGIBLE = 'ELIGIBLE',
+  PROCESSING = 'PROCESSING',
+  PAID = 'PAID',
+  FAILED = 'FAILED',
+  CANCELLED = 'CANCELLED',
+}

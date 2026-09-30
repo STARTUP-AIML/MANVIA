@@ -2,12 +2,17 @@ import { Injectable, Optional } from '@nestjs/common';
 import { ConflictError, NotFoundError } from '../../../common/errors/app-error.js';
 import type { AppointmentEntity } from '../entities/appointment.entity.js';
 import type { PreConsultationEntity } from '../entities/pre-consultation.entity.js';
+import type {
+  AppointmentCancellationEntity,
+  CancellationActorType,
+} from '../entities/appointment-cancellation.entity.js';
 import { AppointmentStatus } from '../enums/appointment-status.enum.js';
 import { SlotReservationState } from '../enums/slot-reservation-state.enum.js';
 import { PreConsultationStatus } from '../enums/pre-consultation-status.enum.js';
 import type {
   AppointmentQueryOptions,
   CreateAppointmentInput,
+  CreateCancellationInput,
   CreatePreConsultationInput,
   IAppointmentRepository,
   UpdateAppointmentInput,
@@ -56,6 +61,18 @@ interface RawPreConsultation {
   updatedAt: string | Date;
 }
 
+interface RawAppointmentCancellation {
+  id: string;
+  appointmentId: string;
+  cancelledBy: string;
+  cancellationActorType: CancellationActorType;
+  reason: string;
+  reasonCode: string | null;
+  metadata: string | null;
+  cancelledAt: string | Date;
+  createdAt: string | Date;
+}
+
 interface PrismaModelDelegate<T = Record<string, unknown>> {
   create(args: { data: Record<string, unknown> }): Promise<T>;
   findUnique(args: { where: Record<string, unknown> }): Promise<T | null>;
@@ -73,6 +90,7 @@ interface PrismaModelDelegate<T = Record<string, unknown>> {
 interface PrismaClientLike {
   appointment: PrismaModelDelegate<RawAppointment>;
   preConsultation: PrismaModelDelegate<RawPreConsultation>;
+  appointmentCancellation: PrismaModelDelegate<RawAppointmentCancellation>;
 }
 
 @Injectable()
@@ -421,5 +439,56 @@ export class PrismaAppointmentRepository implements IAppointmentRepository {
     });
 
     return this.mapPreConsultationToEntity(updated);
+  }
+
+  public async createCancellation(
+    input: CreateCancellationInput,
+  ): Promise<AppointmentCancellationEntity> {
+    const client = this.getClient();
+    const raw = await client.appointmentCancellation.create({
+      data: {
+        appointmentId: input.appointmentId,
+        cancelledBy: input.cancelledBy,
+        cancellationActorType: input.cancellationActorType,
+        reason: input.reason,
+        reasonCode: input.reasonCode ?? null,
+        metadata: input.metadata ?? null,
+      },
+    });
+
+    return {
+      id: raw.id,
+      appointmentId: raw.appointmentId,
+      cancelledBy: raw.cancelledBy,
+      cancellationActorType: raw.cancellationActorType,
+      reason: raw.reason,
+      reasonCode: raw.reasonCode,
+      metadata: raw.metadata,
+      cancelledAt: new Date(raw.cancelledAt),
+      createdAt: new Date(raw.createdAt),
+    };
+  }
+
+  public async findCancellationByAppointmentId(
+    appointmentId: string,
+  ): Promise<AppointmentCancellationEntity | null> {
+    const client = this.getClient();
+    const raw = await client.appointmentCancellation.findUnique({
+      where: { appointmentId },
+    });
+
+    return raw
+      ? {
+          id: raw.id,
+          appointmentId: raw.appointmentId,
+          cancelledBy: raw.cancelledBy,
+          cancellationActorType: raw.cancellationActorType,
+          reason: raw.reason,
+          reasonCode: raw.reasonCode,
+          metadata: raw.metadata,
+          cancelledAt: new Date(raw.cancelledAt),
+          createdAt: new Date(raw.createdAt),
+        }
+      : null;
   }
 }
