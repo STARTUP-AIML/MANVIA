@@ -50,6 +50,12 @@ model User {
   auditLogs           AuditLog[]
   patientProfile      PatientProfile?
   doctorProfile       DoctorProfile?
+  aiConversations     AIConversation[]
+  aiFeedbacks         AIMessageFeedback[]
+  aiSafetyEvents      AISafetyEvent[]
+  aiMemories          AIMemory[]
+  aiRealtimeSessions  AIRealtimeSession[]
+  aiHumanHandoffs     AIHumanHandoff[]
 
   @@map("users")
 }
@@ -215,6 +221,7 @@ model DoctorProfile {
   careRelationships         CareRelationship[]
   consents                  Consent[]
   appointments              Appointment[]
+  aiHandoffs                AIHumanHandoff[]
 
   @@index([publicDoctorId])
   @@index([verificationStatus])
@@ -755,3 +762,323 @@ model PreConsultation {
   @@index([status])
   @@map("pre_consultations")
 }
+
+// ------------------------------------------------------------------------------
+// AI Companion Boundary (Phase 15 Core Foundation)
+// ------------------------------------------------------------------------------
+
+enum AIConversationStatus {
+  ACTIVE
+  ARCHIVED
+  DELETED
+}
+
+enum AIMessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum AIMessageStatus {
+  SENT
+  DELIVERED
+  FAILED
+}
+
+enum AIFeedbackRating {
+  POSITIVE
+  NEGATIVE
+}
+
+model AIConversation {
+  id                   String               @id @default(uuid()) @db.Uuid
+  publicConversationId String               @unique @map("public_conversation_id") @db.VarChar(16)
+  userId               String               @map("user_id") @db.Uuid
+  user                 User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title                String               @db.VarChar(255)
+  status               AIConversationStatus @default(ACTIVE)
+  lastMessageAt        DateTime             @default(now()) @map("last_message_at") @db.Timestamptz(6)
+  archivedAt           DateTime?            @map("archived_at") @db.Timestamptz(6)
+  createdAt            DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  messages             AIMessage[]
+  safetyEvents         AISafetyEvent[]
+  humanHandoffs        AIHumanHandoff[]
+
+  @@index([userId])
+  @@index([userId, status])
+  @@index([lastMessageAt])
+  @@map("ai_conversations")
+}
+
+model AIMessage {
+  id              String               @id @default(uuid()) @db.Uuid
+  publicMessageId String               @unique @map("public_message_id") @db.VarChar(16)
+  conversationId  String               @map("conversation_id") @db.Uuid
+  conversation    AIConversation       @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  role            AIMessageRole
+  content         String               @db.Text
+  status          AIMessageStatus      @default(SENT)
+  createdAt       DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  generation      AIMessageGeneration?
+  feedbacks       AIMessageFeedback[]
+
+  @@index([conversationId])
+  @@index([conversationId, createdAt])
+  @@map("ai_messages")
+}
+
+model AIMessageGeneration {
+  id               String    @id @default(uuid()) @db.Uuid
+  messageId        String    @unique @map("message_id") @db.Uuid
+  message          AIMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  provider         String    @db.VarChar(64)
+  model            String    @db.VarChar(64)
+  latencyMs        Int       @map("latency_ms")
+  promptTokens     Int       @default(0) @map("prompt_tokens")
+  completionTokens Int       @default(0) @map("completion_tokens")
+  totalTokens      Int       @default(0) @map("total_tokens")
+  finishReason     String?   @map("finish_reason") @db.VarChar(64)
+  correlationId    String?   @map("correlation_id") @db.VarChar(64)
+  isAiGenerated    Boolean   @default(true) @map("is_ai_generated")
+  disclosureNotice String    @map("disclosure_notice") @db.Text
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@map("ai_message_generations")
+}
+
+model AIMessageFeedback {
+  id        String           @id @default(uuid()) @db.Uuid
+  messageId String           @map("message_id") @db.Uuid
+  message   AIMessage        @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  userId    String           @map("user_id") @db.Uuid
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rating    AIFeedbackRating
+  comment   String?          @db.Text
+  createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([messageId, userId])
+  @@index([messageId])
+  @@index([userId])
+  @@map("ai_message_feedbacks")
+}
+
+// ------------------------------------------------------------------------------
+// AI Companion Phase 16 & 17: Medical RAG, AI Safety, Memory, Realtime & Handoff
+// ------------------------------------------------------------------------------
+
+enum AISafetyClassification {
+  SAFE
+  MEDICAL_INFORMATION
+  POTENTIALLY_HARMFUL
+  URGENT_MEDICAL
+  CRISIS
+  SELF_HARM_OR_SUICIDE
+  EMERGENCY
+  UNSUPPORTED_CLINICAL_REQUEST
+}
+
+enum AISafetyAction {
+  ALLOWED
+  FLAGGED
+  DISCLOSURE_ATTACHED
+  REFUSAL
+  EMERGENCY_ESCALATION
+  CRISIS_REFERRAL
+}
+
+enum AIMemoryCategory {
+  PREFERENCE
+  COMMUNICATION_STYLE
+  WELLNESS_GOAL
+  PERSONALIZATION
+}
+
+enum AIMemoryStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum AIRealtimeState {
+  IDLE
+  LISTENING
+  PROCESSING
+  SPEAKING
+  INTERRUPTED
+  MUTED
+  PAUSED
+  RECONNECTING
+  ERROR
+  HANDOFF_TO_HUMAN
+  ENDED
+}
+
+enum AIHandoffStatus {
+  REQUESTED
+  QUEUED
+  ASSIGNED
+  ACCEPTED
+  DECLINED
+  CANCELLED
+  COMPLETED
+  EXPIRED
+}
+
+enum AIHandoffUrgency {
+  ROUTINE
+  URGENT
+  CRISIS
+}
+
+model AIMedicalSource {
+  id              String              @id @default(uuid()) @db.Uuid
+  publicSourceId  String              @unique @map("public_source_id") @db.VarChar(16)
+  title           String              @db.VarChar(255)
+  organization    String              @db.VarChar(255)
+  sourceType      String              @map("source_type") @db.VarChar(64)
+  version         String?             @db.VarChar(64)
+  publicationDate DateTime?           @map("publication_date") @db.Timestamptz(6)
+  trustStatus     String              @default("VERIFIED") @map("trust_status") @db.VarChar(32)
+  isActive        Boolean             @default(true) @map("is_active")
+  createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  documents       AIMedicalDocument[]
+
+  @@index([publicSourceId])
+  @@index([isActive])
+  @@map("ai_medical_sources")
+}
+
+model AIMedicalDocument {
+  id                 String          @id @default(uuid()) @db.Uuid
+  sourceId           String          @map("source_id") @db.Uuid
+  source             AIMedicalSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  documentIdentifier String          @map("document_identifier") @db.VarChar(128)
+  title              String          @db.VarChar(255)
+  chunkCount         Int             @default(0) @map("chunk_count")
+  metadata           Json?
+  createdAt          DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  chunks             AIMedicalChunk[]
+
+  @@unique([sourceId, documentIdentifier])
+  @@index([sourceId])
+  @@map("ai_medical_documents")
+}
+
+model AIMedicalChunk {
+  id              String            @id @default(uuid()) @db.Uuid
+  documentId      String            @map("document_id") @db.Uuid
+  document        AIMedicalDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  chunkIdentifier String            @map("chunk_identifier") @db.VarChar(128)
+  content         String            @db.Text
+  keywords        String[]          @default([])
+  relevanceScore  Float?            @map("relevance_score")
+  metadata        Json?
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([documentId])
+  @@map("ai_medical_chunks")
+}
+
+model AISafetyEvent {
+  id              String                 @id @default(uuid()) @db.Uuid
+  publicEventId   String                 @unique @map("public_event_id") @db.VarChar(16)
+  userId          String                 @map("user_id") @db.Uuid
+  user            User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversationId  String?                @map("conversation_id") @db.Uuid
+  conversation    AIConversation?        @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  classification  AISafetyClassification
+  actionTaken     AISafetyAction         @map("action_taken")
+  confidenceScore Float?                 @map("confidence_score")
+  matchedRules    String[]               @default([]) @map("matched_rules")
+  locale          String                 @default("en-US") @db.VarChar(16)
+  metadata        Json?
+  createdAt       DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([userId])
+  @@index([conversationId])
+  @@index([classification])
+  @@index([createdAt])
+  @@map("ai_safety_events")
+}
+
+model AIMemory {
+  id             String           @id @default(uuid()) @db.Uuid
+  publicMemoryId String           @unique @map("public_memory_id") @db.VarChar(16)
+  userId         String           @map("user_id") @db.Uuid
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category       AIMemoryCategory
+  key            String           @db.VarChar(128)
+  value          String           @db.Text
+  confidence     Float            @default(1.0)
+  source         String           @default("USER_EXPLICIT") @db.VarChar(64)
+  status         AIMemoryStatus   @default(ACTIVE)
+  isUserApproved Boolean          @default(true) @map("is_user_approved")
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([userId, category, key])
+  @@index([userId])
+  @@index([userId, status])
+  @@map("ai_memories")
+}
+
+model AIRealtimeSession {
+  id                String          @id @default(uuid()) @db.Uuid
+  publicSessionId   String          @unique @map("public_session_id") @db.VarChar(16)
+  userId            String          @map("user_id") @db.Uuid
+  user              User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider          String          @db.VarChar(64)
+  model             String          @db.VarChar(64)
+  state             AIRealtimeState @default(IDLE)
+  connectionInfo    Json?           @map("connection_info")
+  expiresAt         DateTime        @map("expires_at") @db.Timestamptz(6)
+  interruptionCount Int             @default(0) @map("interruption_count")
+  reconnectCount    Int             @default(0) @map("reconnect_count")
+  totalLatencyMs    Int             @default(0) @map("total_latency_ms")
+  metadata          Json?
+  createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([userId])
+  @@index([userId, state])
+  @@index([expiresAt])
+  @@map("ai_realtime_sessions")
+}
+
+model AIHumanHandoff {
+  id               String           @id @default(uuid()) @db.Uuid
+  publicHandoffId  String           @unique @map("public_handoff_id") @db.VarChar(16)
+  userId           String           @map("user_id") @db.Uuid
+  user             User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversationId   String?          @map("conversation_id") @db.Uuid
+  conversation     AIConversation?  @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+  assignedDoctorId String?          @map("assigned_doctor_id") @db.Uuid
+  assignedDoctor   DoctorProfile?   @relation(fields: [assignedDoctorId], references: [id], onDelete: SetNull)
+  reason           String           @db.VarChar(128)
+  safetyLevel      String           @default("ROUTINE") @map("safety_level") @db.VarChar(32)
+  requestedUrgency AIHandoffUrgency @default(ROUTINE) @map("requested_urgency")
+  status           AIHandoffStatus  @default(REQUESTED)
+  userSummary      String?          @map("user_summary") @db.Text
+  consentGranted   Boolean          @default(false) @map("consent_granted")
+  acceptedAt       DateTime?        @map("accepted_at") @db.Timestamptz(6)
+  completedAt      DateTime?        @map("completed_at") @db.Timestamptz(6)
+  metadata         Json?
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([userId])
+  @@index([assignedDoctorId])
+  @@index([status])
+  @@index([conversationId])
+  @@map("ai_human_handoffs")
+}
+
+

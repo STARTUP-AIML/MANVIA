@@ -1,0 +1,11 @@
+export { AIRealtimeState } from '@prisma/client';
+
+export enum AvatarEventType {
+  SPEECH_STARTED = 'SPEECH_STARTED',
+  SPEECH_CHUNK = 'SPEECH_CHUNK',
+  SPEECH_ENDED = 'SPEECH_ENDED',
+  INTERRUPTED = 'INTERRUPTED',
+  LISTENING_STARTED = 'LISTENING_STARTED',
+  THINKING = 'THINKING',
+  ERROR = 'ERROR',
+}
