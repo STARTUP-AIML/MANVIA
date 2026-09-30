@@ -14,6 +14,7 @@ import { CareRelationshipsModule } from './modules/care-relationships/care-relat
 import { WellnessModule } from './modules/wellness/wellness.module.js';
 import { HealthRecordsModule } from './modules/health-records/health-records.module.js';
 import { AppointmentsModule } from './modules/appointments/appointments.module.js';
+import { AIModule } from './modules/ai/ai.module.js';
 
 @Module({
   imports: [
@@ -31,6 +32,7 @@ import { AppointmentsModule } from './modules/appointments/appointments.module.j
     WellnessModule,
     HealthRecordsModule,
     AppointmentsModule,
+    AIModule,
   ],
   controllers: [AppController],
   providers: [],
