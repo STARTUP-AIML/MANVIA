@@ -53,8 +53,6 @@ model User {
   notifications           Notification[]
   notificationPreferences NotificationPreference?
   notificationDevices     NotificationDevice[]
-  patientProfile      PatientProfile?
-  doctorProfile       DoctorProfile?
   aiConversations     AIConversation[]
   aiFeedbacks         AIMessageFeedback[]
   aiSafetyEvents      AISafetyEvent[]
