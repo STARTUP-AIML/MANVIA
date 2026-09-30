@@ -25,6 +25,10 @@ import {
   DOCTORS_REPOSITORY,
   type IDoctorsRepository,
 } from '../../doctors/interfaces/doctor-repository.interface.js';
+import {
+  CARE_RELATIONSHIP_REPOSITORY,
+  type ICareRelationshipRepository,
+} from '../../care-relationships/interfaces/care-relationship-repository.interface.js';
 import { InvoiceService } from './invoice.service.js';
 import { PricingService } from './pricing.service.js';
 import { DoctorPayoutService } from './doctor-payout.service.js';
@@ -75,6 +79,9 @@ export class PaymentsService {
     @Optional()
     @Inject('EVENT_BUS')
     private readonly eventBus?: IEventBus,
+    @Optional()
+    @Inject(CARE_RELATIONSHIP_REPOSITORY)
+    private readonly careRelRepo?: ICareRelationshipRepository,
   ) {}
 
   /**
@@ -106,7 +113,10 @@ export class PaymentsService {
     }
 
     // 3. Authorization: Only the patient or admin may initiate payment
-    if (actor.activeRole === 'PATIENT' && appointment.patientId !== actor.userId) {
+    if (
+      actor.activeRole === 'PATIENT' &&
+      !(await this.isPatientAuthorized(actor.userId, appointment.patientId))
+    ) {
       throw new ForbiddenError('Patients are only authorized to pay for their own appointments');
     }
 
@@ -244,7 +254,10 @@ export class PaymentsService {
     }
 
     // Authorization
-    if (actor.activeRole === 'PATIENT' && payment.patientId !== actor.userId) {
+    if (
+      actor.activeRole === 'PATIENT' &&
+      !(await this.isPatientAuthorized(actor.userId, payment.patientId))
+    ) {
       throw new ForbiddenError('Patients are only authorized to verify their own payments');
     }
 
@@ -391,9 +404,15 @@ export class PaymentsService {
       throw new NotFoundError(`Payment '${identifier}' not found`);
     }
 
-    if (actor.activeRole === 'PATIENT' && payment.patientId !== actor.userId) {
+    if (
+      actor.activeRole === 'PATIENT' &&
+      !(await this.isPatientAuthorized(actor.userId, payment.patientId))
+    ) {
       throw new ForbiddenError('Patients are only authorized to access their own payments');
-    } else if (actor.activeRole === 'DOCTOR' && payment.doctorId !== actor.userId) {
+    } else if (
+      actor.activeRole === 'DOCTOR' &&
+      !(await this.isDoctorAuthorized(actor.userId, payment.doctorId))
+    ) {
       throw new ForbiddenError(
         'Doctors are only authorized to access payments for their consultations',
       );
@@ -417,9 +436,15 @@ export class PaymentsService {
       throw new NotFoundError(`Payment '${identifier}' not found`);
     }
 
-    if (actor.activeRole === 'PATIENT' && payment.patientId !== actor.userId) {
+    if (
+      actor.activeRole === 'PATIENT' &&
+      !(await this.isPatientAuthorized(actor.userId, payment.patientId))
+    ) {
       throw new ForbiddenError('Patients are only authorized to access their own payment attempts');
-    } else if (actor.activeRole === 'DOCTOR' && payment.doctorId !== actor.userId) {
+    } else if (
+      actor.activeRole === 'DOCTOR' &&
+      !(await this.isDoctorAuthorized(actor.userId, payment.doctorId))
+    ) {
       throw new ForbiddenError(
         'Doctors are only authorized to access payment attempts for their consultations',
       );
@@ -436,9 +461,9 @@ export class PaymentsService {
     const scopedQuery: FindPaymentsQuery = { ...query };
 
     if (actor.activeRole === 'PATIENT') {
-      scopedQuery.patientId = actor.userId;
+      scopedQuery.patientId = await this.resolvePatientId(actor.userId);
     } else if (actor.activeRole === 'DOCTOR') {
-      scopedQuery.doctorId = actor.userId;
+      scopedQuery.doctorId = await this.resolveDoctorId(actor.userId);
     }
 
     const { items, total } = await this.paymentRepo.findPayments(scopedQuery);
@@ -495,5 +520,49 @@ export class PaymentsService {
     }
 
     return result;
+  }
+
+  private async isPatientAuthorized(
+    actorUserId: string,
+    targetPatientId: string,
+  ): Promise<boolean> {
+    if (targetPatientId === actorUserId) return true;
+    if (this.careRelRepo) {
+      const patient = await this.careRelRepo.findPatientByUserId(actorUserId);
+      if (
+        patient &&
+        (patient.id === targetPatientId || patient.publicPatientId === targetPatientId)
+      ) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private async isDoctorAuthorized(actorUserId: string, targetDoctorId: string): Promise<boolean> {
+    if (targetDoctorId === actorUserId) return true;
+    if (this.doctorsRepo) {
+      const doctor = await this.doctorsRepo.findByUserId(actorUserId);
+      if (doctor && (doctor.id === targetDoctorId || doctor.publicDoctorId === targetDoctorId)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private async resolvePatientId(actorUserId: string): Promise<string> {
+    if (this.careRelRepo) {
+      const patient = await this.careRelRepo.findPatientByUserId(actorUserId);
+      if (patient) return patient.id;
+    }
+    return actorUserId;
+  }
+
+  private async resolveDoctorId(actorUserId: string): Promise<string> {
+    if (this.doctorsRepo) {
+      const doctor = await this.doctorsRepo.findByUserId(actorUserId);
+      if (doctor) return doctor.id;
+    }
+    return actorUserId;
   }
 }

@@ -104,6 +104,10 @@ export class InMemoryRefundRepository implements IRefundRepository {
     if (params.appointmentId) {
       list = list.filter((r) => r.appointmentId === params.appointmentId);
     }
+    if (params.appointmentIds && params.appointmentIds.length > 0) {
+      const idSet = new Set(params.appointmentIds);
+      list = list.filter((r) => idSet.has(r.appointmentId));
+    }
     if (params.status) {
       list = list.filter((r) => r.status === params.status);
     }

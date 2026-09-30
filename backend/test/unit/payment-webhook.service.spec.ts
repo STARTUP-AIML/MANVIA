@@ -194,4 +194,187 @@ describe('Phase 19 — PaymentWebhookService', () => {
     const current = await paymentRepo.findPaymentById('pay-uuid-stale');
     expect(current!.status).toBe(PaymentStatus.SUCCEEDED);
   });
+
+  it('should process refund webhook event and publish PAYMENT_REFUNDED domain event', async () => {
+    const payment = new PaymentEntity({
+      id: 'pay-uuid-refund',
+      publicPaymentId: 'PAY-REFUND-1',
+      appointmentId: 'appt-refund-1',
+      patientId: 'pat-1',
+      doctorId: 'doc-1',
+      amount: '150.00',
+      currency: 'USD',
+      status: PaymentStatus.SUCCEEDED,
+      provider: 'simulated',
+      providerPaymentId: 'sim_pay_refund_1',
+      paidAt: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    await paymentRepo.savePayment(payment);
+
+    const refundEvent = {
+      id: 'evt_refund_100',
+      type: 'payment.refunded',
+      providerPaymentId: 'sim_pay_refund_1',
+      status: 'SUCCEEDED',
+      amount: '150.00',
+    };
+    const { payload, signature } = paymentProvider.generateSignedWebhookPayload(refundEvent);
+
+    const result = await webhookService.handleWebhook(
+      'simulated',
+      { 'x-manvia-signature': signature },
+      payload,
+    );
+
+    expect(result.processed).toBe(true);
+    expect(result.ignored).toBe(false);
+    expect(eventBus.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'PAYMENT_REFUNDED',
+        aggregateId: 'pay-uuid-refund',
+        payload: expect.objectContaining({
+          paymentId: 'pay-uuid-refund',
+          publicPaymentId: 'PAY-REFUND-1',
+          appointmentId: 'appt-refund-1',
+        }),
+      }),
+    );
+  });
+
+  it('should mark webhook as ignored when no associated payment is found', async () => {
+    const unknownEvent = {
+      id: 'evt_unknown_pay',
+      type: 'payment.succeeded',
+      providerPaymentId: 'sim_pay_nonexistent',
+      status: 'SUCCEEDED',
+    };
+    const { payload, signature } = paymentProvider.generateSignedWebhookPayload(unknownEvent);
+
+    const result = await webhookService.handleWebhook(
+      'simulated',
+      { 'x-manvia-signature': signature },
+      payload,
+    );
+
+    expect(result.processed).toBe(false);
+    expect(result.ignored).toBe(true);
+    expect(result.message).toBe('No associated payment found');
+  });
+
+  it('should transition payment to FAILED and emit PAYMENT_FAILED on failure webhook', async () => {
+    const payment = new PaymentEntity({
+      id: 'pay-uuid-fail',
+      publicPaymentId: 'PAY-FAIL-1',
+      appointmentId: 'appt-fail-1',
+      patientId: 'pat-1',
+      doctorId: 'doc-1',
+      amount: '75.00',
+      currency: 'USD',
+      status: PaymentStatus.PENDING,
+      provider: 'simulated',
+      providerPaymentId: 'sim_pay_fail_1',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    await paymentRepo.savePayment(payment);
+
+    const failEvent = {
+      id: 'evt_fail_100',
+      type: 'payment.failed',
+      providerPaymentId: 'sim_pay_fail_1',
+      status: 'FAILED',
+      failureReason: 'Insufficient funds in simulated account',
+    };
+    const { payload, signature } = paymentProvider.generateSignedWebhookPayload(failEvent);
+
+    const result = await webhookService.handleWebhook(
+      'simulated',
+      { 'x-manvia-signature': signature },
+      payload,
+    );
+
+    expect(result.processed).toBe(true);
+    const updated = await paymentRepo.findPaymentById('pay-uuid-fail');
+    expect(updated!.status).toBe(PaymentStatus.FAILED);
+    expect(eventBus.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventType: 'PAYMENT_FAILED',
+        aggregateId: 'pay-uuid-fail',
+      }),
+    );
+  });
+
+  it('should handle idempotent re-delivery of payment.succeeded when already SUCCEEDED', async () => {
+    const payment = new PaymentEntity({
+      id: 'pay-uuid-already-succ',
+      publicPaymentId: 'PAY-ALREADY-SUCC',
+      appointmentId: 'appt-already-succ',
+      patientId: 'pat-1',
+      doctorId: 'doc-1',
+      amount: '50.00',
+      currency: 'USD',
+      status: PaymentStatus.SUCCEEDED,
+      provider: 'simulated',
+      providerPaymentId: 'sim_pay_succ_again',
+      paidAt: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    await paymentRepo.savePayment(payment);
+
+    const succEvent = {
+      id: 'evt_succ_again',
+      type: 'payment.succeeded',
+      providerPaymentId: 'sim_pay_succ_again',
+      status: 'SUCCEEDED',
+    };
+    const { payload, signature } = paymentProvider.generateSignedWebhookPayload(succEvent);
+
+    const result = await webhookService.handleWebhook(
+      'simulated',
+      { 'x-manvia-signature': signature },
+      payload,
+    );
+
+    expect(result.processed).toBe(true);
+    const current = await paymentRepo.findPaymentById('pay-uuid-already-succ');
+    expect(current!.status).toBe(PaymentStatus.SUCCEEDED);
+  });
+
+  it('should record failure and throw ValidationError when unexpected error occurs during processing', async () => {
+    const payment = new PaymentEntity({
+      id: 'pay-uuid-err',
+      publicPaymentId: 'PAY-ERR-1',
+      appointmentId: 'appt-err-1',
+      patientId: 'pat-1',
+      doctorId: 'doc-1',
+      amount: '50.00',
+      currency: 'USD',
+      status: PaymentStatus.PENDING,
+      provider: 'simulated',
+      providerPaymentId: 'sim_pay_err_1',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+    await paymentRepo.savePayment(payment);
+
+    // Force error in invoiceService
+    vi.spyOn(invoiceService, 'generateInvoice').mockRejectedValueOnce(
+      new Error('Database disk full error'),
+    );
+
+    const succEvent = {
+      id: 'evt_err_test',
+      type: 'payment.succeeded',
+      providerPaymentId: 'sim_pay_err_1',
+      status: 'SUCCEEDED',
+    };
+    const { payload, signature } = paymentProvider.generateSignedWebhookPayload(succEvent);
+
+    await expect(
+      webhookService.handleWebhook('simulated', { 'x-manvia-signature': signature }, payload),
+    ).rejects.toThrow(/Webhook processing error/);
+  });
 });

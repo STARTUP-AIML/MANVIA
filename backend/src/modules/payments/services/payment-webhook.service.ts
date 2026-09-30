@@ -134,7 +134,27 @@ export class PaymentWebhookService {
 
     // 5. Apply state machine transition atomically
     try {
-      if (eventType.includes('succeeded') || status === 'SUCCEEDED') {
+      const isRefundEvent = eventType.toLowerCase().includes('refund');
+      if (isRefundEvent) {
+        this.logger.log(
+          `Received refund webhook event ${providerEventId} (${eventType}) for payment ${payment.publicPaymentId}`,
+        );
+        if (this.eventBus) {
+          await this.eventBus.publish({
+            eventId: randomUUID(),
+            eventType: 'PAYMENT_REFUNDED',
+            aggregateId: payment.id,
+            occurredAt: new Date(),
+            payload: {
+              paymentId: payment.id,
+              publicPaymentId: payment.publicPaymentId,
+              patientId: payment.patientId,
+              doctorId: payment.doctorId,
+              appointmentId: payment.appointmentId,
+            },
+          });
+        }
+      } else if (eventType.includes('succeeded') || status === 'SUCCEEDED') {
         if (payment.status === PaymentStatus.SUCCEEDED) {
           this.logger.log(
             `Payment ${payment.publicPaymentId} is already in SUCCEEDED state. Preserving idempotency.`,

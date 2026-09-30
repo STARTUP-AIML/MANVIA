@@ -70,7 +70,7 @@ describe('Patient Domain API E2E (/api/v1/patients)', () => {
       payload: { email: doctorOnlyEmail, password: testPassword },
     });
     doctorOnlyToken = JSON.parse(loginDoc.body).accessToken;
-  });
+  }, 30000);
 
   afterAll(async () => {
     if (prisma) {

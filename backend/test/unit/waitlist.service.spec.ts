@@ -288,4 +288,175 @@ describe('WaitlistService (Unit Tests)', () => {
       expect(expiredEntry.status).toBe(WaitlistStatus.EXPIRED);
     });
   });
+
+  describe('fulfillActiveWaitlistForPatientAndDoctor', () => {
+    it('should fulfill active waitlist entry on direct booking', async () => {
+      const entry = await waitlistService.joinWaitlist(PATIENT_USER_1, {
+        doctorId,
+        consultationOfferId: offerId,
+      });
+
+      const patientProfile = await careRelRepo.findPatientByUserId(PATIENT_USER_1);
+      expect(patientProfile).toBeDefined();
+
+      await waitlistService.fulfillActiveWaitlistForPatientAndDoctor(patientProfile!.id, doctorId);
+
+      const updated = await waitlistService.getPatientWaitlistEntryById(PATIENT_USER_1, entry.id);
+      expect(updated.status).toBe(WaitlistStatus.FULFILLED);
+      expect(updated.fulfilledAt).toBeDefined();
+    });
+
+    it('should cancel reserved appointment when waitlist was in OFFERED status and directly booked', async () => {
+      const entry = await waitlistService.joinWaitlist(PATIENT_USER_1, {
+        doctorId,
+        consultationOfferId: offerId,
+      });
+
+      const slotStart = new Date('2026-10-05T10:00:00.000Z');
+      const slotEnd = new Date('2026-10-05T10:30:00.000Z');
+      await waitlistService.matchAndOfferSlot(doctorId, slotStart, slotEnd, offerId);
+
+      const patientProfile = await careRelRepo.findPatientByUserId(PATIENT_USER_1);
+      const rawEntry = await waitlistRepo.findById(entry.id);
+      expect(rawEntry?.status).toBe(WaitlistStatus.OFFERED);
+      expect(rawEntry?.offeredAppointmentId).toBeDefined();
+
+      await waitlistService.fulfillActiveWaitlistForPatientAndDoctor(patientProfile!.id, doctorId);
+
+      const appt = await appointmentRepo.findAppointmentById(rawEntry!.offeredAppointmentId!);
+      expect(appt?.status).toBe(AppointmentStatus.CANCELLED);
+      expect(appt?.reservationState).toBe(SlotReservationState.AVAILABLE);
+
+      const updated = await waitlistService.getPatientWaitlistEntryById(PATIENT_USER_1, entry.id);
+      expect(updated.status).toBe(WaitlistStatus.FULFILLED);
+    });
+
+    it('should silently handle patient with no active waitlist for doctor', async () => {
+      await expect(
+        waitlistService.fulfillActiveWaitlistForPatientAndDoctor('non-existent-pat', doctorId),
+      ).resolves.toBeUndefined();
+    });
+  });
+
+  describe('getDoctorWaitlist', () => {
+    it('should return paginated entries for authenticated doctor', async () => {
+      await waitlistService.joinWaitlist(PATIENT_USER_1, {
+        doctorId,
+        consultationOfferId: offerId,
+      });
+
+      const res = await waitlistService.getDoctorWaitlist(DOCTOR_USER, {
+        page: 1,
+        limit: 10,
+      });
+
+      expect(res.data.length).toBe(1);
+      expect(res.total).toBe(1);
+      expect(res.page).toBe(1);
+      expect(res.limit).toBe(10);
+      expect(res.data[0]?.publicDoctorId).toBe('DOC-WAIT-001');
+    });
+
+    it('should throw NotFoundError if doctor profile does not exist', async () => {
+      await expect(
+        waitlistService.getDoctorWaitlist('non-doctor-user', { page: 1, limit: 10 }),
+      ).rejects.toThrow(/Doctor profile not found/);
+    });
+
+    it('should map offered appointment and preferred dates in doctor waitlist response', async () => {
+      await waitlistService.joinWaitlist(PATIENT_USER_1, {
+        doctorId,
+        consultationOfferId: offerId,
+        preferredStartDate: '2026-10-15T00:00:00Z',
+        preferredEndDate: '2026-10-20T00:00:00Z',
+      });
+
+      const startAt = new Date('2026-10-16T10:00:00Z');
+      const endAt = new Date('2026-10-16T11:00:00Z');
+      await waitlistService.matchAndOfferSlot(doctorId, startAt, endAt, offerId);
+
+      const res = await waitlistService.getDoctorWaitlist(DOCTOR_USER, {
+        page: 1,
+        limit: 10,
+      });
+
+      expect(res.data.length).toBe(1);
+      expect(res.data[0]?.offeredAppointmentPublicId).toBeDefined();
+      expect(res.data[0]?.preferredStartDate).toBe('2026-10-15T00:00:00.000Z');
+      expect(res.data[0]?.preferredEndDate).toBe('2026-10-20T00:00:00.000Z');
+    });
+  });
+
+  describe('matchAndOfferSlot advanced paths', () => {
+    it('should skip a candidate who has an overlapping active appointment and offer to next eligible candidate', async () => {
+      // Candidate 1 (higher priority)
+      await waitlistService.joinWaitlist(PATIENT_USER_1, {
+        doctorId,
+        consultationOfferId: offerId,
+        priority: 10,
+      });
+      // Candidate 2 (lower priority)
+      await waitlistService.joinWaitlist(PATIENT_USER_2, {
+        doctorId,
+        consultationOfferId: offerId,
+        priority: 5,
+      });
+
+      const startAt = new Date('2026-10-22T14:00:00Z');
+      const endAt = new Date('2026-10-22T15:00:00Z');
+
+      // Create an existing overlapping appointment for patient 1 with a different doctor
+      const anotherDoctor = await doctorsRepo.createProfile({
+        userId: 'another-doctor-user',
+        publicDoctorId: 'DOC-ANOTHER-01',
+        displayName: 'Dr. Another',
+        medicalRegistrationNumber: 'MED-9999',
+        licensingCouncil: 'Medical Board',
+        yearsOfExperience: 10,
+        defaultConsultationFee: 100,
+        currency: 'USD',
+      });
+
+      const patient1 = await careRelRepo.findPatientByUserId(PATIENT_USER_1);
+      await appointmentRepo.createAppointment({
+        patientId: patient1!.id,
+        doctorId: anotherDoctor.id,
+        consultationOfferId: offerId,
+        startAt: new Date('2026-10-22T14:15:00Z'),
+        endAt: new Date('2026-10-22T14:45:00Z'),
+        status: AppointmentStatus.CONFIRMED,
+        reservationState: SlotReservationState.HELD_IN_RESERVATION,
+      });
+
+      const offered = await waitlistService.matchAndOfferSlot(doctorId, startAt, endAt, offerId);
+
+      expect(offered).not.toBeNull();
+      const patient2 = await careRelRepo.findPatientByUserId(PATIENT_USER_2);
+      expect(offered!.patientId).toBe(patient2!.id);
+    });
+
+    it('should return null when doctor already has an active overlapping appointment', async () => {
+      await waitlistService.joinWaitlist(PATIENT_USER_1, {
+        doctorId,
+        consultationOfferId: offerId,
+      });
+
+      const startAt = new Date('2026-10-25T14:00:00Z');
+      const endAt = new Date('2026-10-25T15:00:00Z');
+
+      const patient1 = await careRelRepo.findPatientByUserId(PATIENT_USER_1);
+      await appointmentRepo.createAppointment({
+        patientId: patient1!.id,
+        doctorId,
+        consultationOfferId: offerId,
+        startAt,
+        endAt,
+        status: AppointmentStatus.CONFIRMED,
+        reservationState: SlotReservationState.HELD_IN_RESERVATION,
+      });
+
+      const offered = await waitlistService.matchAndOfferSlot(doctorId, startAt, endAt, offerId);
+      expect(offered).toBeNull();
+    });
+  });
 });

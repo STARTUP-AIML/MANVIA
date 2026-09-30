@@ -23,6 +23,7 @@ export interface UpdateRefundParams {
 
 export interface FindRefundsParams {
   appointmentId?: string | undefined;
+  appointmentIds?: string[] | undefined;
   status?: RefundStatus | undefined;
   page?: number | undefined;
   limit?: number | undefined;

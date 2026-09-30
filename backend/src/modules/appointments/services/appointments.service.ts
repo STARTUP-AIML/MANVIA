@@ -219,6 +219,15 @@ export class AppointmentsService {
       },
     });
 
+    // If patient had an active waitlist entry for this doctor, fulfill it so they don't remain queued
+    if (this.waitlistService) {
+      await this.waitlistService
+        .fulfillActiveWaitlistForPatientAndDoctor(patient.id, doctor.id)
+        .catch((err) => {
+          this.logger.warn(`Failed to fulfill active waitlist on booking: ${err.message}`);
+        });
+    }
+
     return this.buildResponseDto(
       appointment,
       patient,

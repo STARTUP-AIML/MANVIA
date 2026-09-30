@@ -28,6 +28,7 @@ import {
 } from '../dto/waitlist-response.dto.js';
 import type { WaitlistEntryEntity } from '../entities/waitlist-entry.entity.js';
 import { CareRelationshipsService } from '../../care-relationships/services/care-relationships.service.js';
+import { CareRelationshipStatus } from '../../care-relationships/enums/care-relationship-status.enum.js';
 import {
   CARE_RELATIONSHIP_REPOSITORY,
   type ICareRelationshipRepository,
@@ -381,6 +382,18 @@ export class WaitlistService {
       confirmedAt: new Date(),
     });
 
+    // Establish care relationship if not present
+    const existingCareRel = await this.careRelRepo.findCareRelationship(patient.id, entry.doctorId);
+    if (!existingCareRel) {
+      await this.careRelRepo.createCareRelationship({
+        patientId: patient.id,
+        doctorId: entry.doctorId,
+        status: CareRelationshipStatus.ACTIVE,
+        establishedAt: new Date(),
+        notes: `Care relationship established via waitlist offer acceptance ${appt.publicAppointmentId}`,
+      });
+    }
+
     const updated = await this.waitlistRepo.updateEntry(entry.id, {
       status: WaitlistStatus.FULFILLED,
       acceptedAt: new Date(),
@@ -537,13 +550,38 @@ export class WaitlistService {
       return null;
     }
 
-    // Top candidate (priority DESC, joinedAt ASC)
-    const candidate = eligible[0];
-    if (!candidate) return null;
+    // Find first candidate without an overlapping active appointment and with a valid consultation offer
+    let candidate: WaitlistEntryEntity | null = null;
+    let offerToUse: string | null = null;
 
-    const offerToUse = consultationOfferId ?? candidate.consultationOfferId;
-    if (!offerToUse) {
-      this.logger.warn(`No consultation offer available for waitlist candidate ${candidate.id}`);
+    for (const entry of eligible) {
+      const neededOfferId = consultationOfferId ?? entry.consultationOfferId;
+      if (!neededOfferId) continue;
+
+      // Check if patient already has an active overlapping appointment during [startAt, endAt]
+      const { data: patientAppts } = await this.appointmentRepo.findAppointments({
+        patientId: entry.patientId,
+        startDate: startAt,
+        endDate: endAt,
+      });
+
+      const hasConflict = patientAppts.some(
+        (a) =>
+          a.status !== AppointmentStatus.CANCELLED &&
+          a.status !== AppointmentStatus.DECLINED &&
+          a.status !== AppointmentStatus.EXPIRED &&
+          a.startAt < endAt &&
+          a.endAt > startAt,
+      );
+
+      if (!hasConflict) {
+        candidate = entry;
+        offerToUse = neededOfferId;
+        break;
+      }
+    }
+
+    if (!candidate || !offerToUse) {
       return null;
     }
 
@@ -698,6 +736,38 @@ export class WaitlistService {
     const totalPages = Math.ceil(total / limit) || 1;
 
     return { data: items, total, page, limit, totalPages };
+  }
+
+  /**
+   * Fulfills or clears any active waitlist entry for a patient and doctor upon direct booking.
+   */
+  public async fulfillActiveWaitlistForPatientAndDoctor(
+    patientId: string,
+    doctorId: string,
+  ): Promise<void> {
+    const active = await this.waitlistRepo.findActiveByPatientAndDoctor(patientId, doctorId);
+    if (active) {
+      if (active.status === WaitlistStatus.OFFERED && active.offeredAppointmentId) {
+        await this.appointmentRepo.updateAppointment(active.offeredAppointmentId, {
+          status: AppointmentStatus.CANCELLED,
+          reservationState: SlotReservationState.AVAILABLE,
+          cancellationReason: 'Superseded by direct appointment booking',
+          cancelledAt: new Date(),
+        });
+      }
+      await this.waitlistRepo.updateEntry(active.id, {
+        status: WaitlistStatus.FULFILLED,
+        fulfilledAt: new Date(),
+      });
+      this.auditService.logEvent({
+        event: 'WAITLIST_FULFILLED',
+        actorId: patientId,
+        role: 'PATIENT',
+        resource: `WAITLIST:${active.id}`,
+        action: 'FULFILL_WAITLIST_DIRECT_BOOKING',
+        metadata: { publicWaitlistId: active.publicWaitlistId, doctorId },
+      });
+    }
   }
 
   private mapToResponseDto(

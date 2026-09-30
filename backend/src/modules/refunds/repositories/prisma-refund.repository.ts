@@ -159,6 +159,9 @@ export class PrismaRefundRepository implements IRefundRepository {
     const where: Record<string, unknown> = {};
 
     if (params.appointmentId) where.appointmentId = params.appointmentId;
+    if (params.appointmentIds && params.appointmentIds.length > 0) {
+      where.appointmentId = { in: params.appointmentIds };
+    }
     if (params.status) where.status = params.status;
 
     const page = params.page ?? 1;

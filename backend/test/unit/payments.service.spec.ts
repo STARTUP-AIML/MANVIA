@@ -10,6 +10,7 @@ import { DoctorPayoutService } from '../../src/modules/payments/services/doctor-
 import { PayoutEligibilityService } from '../../src/modules/payments/services/payout-eligibility.service.js';
 import { PaymentStatus } from '../../src/modules/payments/enums/payment-status.enum.js';
 import { PaymentAttemptStatus } from '../../src/modules/payments/enums/payment-attempt-status.enum.js';
+import { PaymentEntity } from '../../src/modules/payments/entities/payment.entity.js';
 import type { IAppointmentRepository } from '../../src/modules/appointments/interfaces/appointment-repository.interface.js';
 import type { IDoctorAvailabilityRepository } from '../../src/modules/doctor-availability/interfaces/availability-repository.interface.js';
 import type { IEventBus } from '../../src/events/event-bus.interface.js';
@@ -223,6 +224,142 @@ describe('Phase 19 — PaymentsService', () => {
       // Check financial ledger
       const txs = await paymentRepo.findTransactionsByPaymentId(created.id);
       expect(txs.some((t) => t.type === 'REFUND' && t.direction === 'DEBIT')).toBe(true);
+    });
+
+    it('should throw error when refunding non-existent payment or payment without provider reference', async () => {
+      await expect(
+        paymentsService.executeRefund('missing-pay', 'ref-1', '10.00', 'reason'),
+      ).rejects.toThrow(/Payment 'missing-pay'.*not found/);
+
+      const payWithoutProvider = new PaymentEntity({
+        id: 'pay-no-prov',
+        publicPaymentId: 'PAY-NOPROV',
+        appointmentId: 'appt-no-prov',
+        patientId: 'pat-1',
+        doctorId: 'doc-1',
+        amount: '10.00',
+        currency: 'USD',
+        status: PaymentStatus.CREATED,
+        provider: 'simulated',
+        providerPaymentId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      await paymentRepo.savePayment(payWithoutProvider);
+
+      await expect(
+        paymentsService.executeRefund(payWithoutProvider.id, 'ref-2', '10.00', 'reason'),
+      ).rejects.toThrow(/with active provider reference not found/);
+    });
+  });
+
+  describe('access control and queries', () => {
+    it('should enforce role-based access for getPaymentById and getPaymentAttempts', async () => {
+      const created = await paymentsService.createPayment({ appointmentId: 'appt-1' }, mockPatient);
+
+      // Patient owns payment
+      const byPatient = await paymentsService.getPaymentById(created.id, mockPatient);
+      expect(byPatient.id).toBe(created.id);
+
+      const attempts = await paymentsService.getPaymentAttempts(created.id, mockPatient);
+      expect(attempts).toHaveLength(1);
+
+      // Other patient forbidden
+      const otherPatient = { userId: 'pat-other', activeRole: 'PATIENT' as const };
+      await expect(paymentsService.getPaymentById(created.id, otherPatient)).rejects.toThrow(
+        /Patients are only authorized to access their own payments/,
+      );
+      await expect(paymentsService.getPaymentAttempts(created.id, otherPatient)).rejects.toThrow(
+        /Patients are only authorized to access their own payment attempts/,
+      );
+
+      // Doctor with consultation owns payment
+      const docContext = { userId: 'doc-200', activeRole: 'DOCTOR' as const };
+      const byDoc = await paymentsService.getPaymentById(created.id, docContext);
+      expect(byDoc.id).toBe(created.id);
+
+      const docAttempts = await paymentsService.getPaymentAttempts(created.id, docContext);
+      expect(docAttempts).toHaveLength(1);
+
+      // Other doctor forbidden
+      const otherDoc = { userId: 'doc-other', activeRole: 'DOCTOR' as const };
+      await expect(paymentsService.getPaymentById(created.id, otherDoc)).rejects.toThrow(
+        /Doctors are only authorized to access payments for their consultations/,
+      );
+      await expect(paymentsService.getPaymentAttempts(created.id, otherDoc)).rejects.toThrow(
+        /Doctors are only authorized to access payment attempts for their consultations/,
+      );
+
+      // Admin allowed
+      const adminContext = { userId: 'adm', activeRole: 'ADMIN' as const };
+      expect((await paymentsService.getPaymentById(created.id, adminContext)).id).toBe(created.id);
+      expect(await paymentsService.getPaymentAttempts(created.id, adminContext)).toHaveLength(1);
+
+      // Not found
+      await expect(paymentsService.getPaymentById('missing', adminContext)).rejects.toThrow(
+        "Payment 'missing' not found",
+      );
+      await expect(paymentsService.getPaymentAttempts('missing', adminContext)).rejects.toThrow(
+        "Payment 'missing' not found",
+      );
+    });
+
+    it('should query payments with patient, doctor, and admin scoping', async () => {
+      await paymentsService.createPayment({ appointmentId: 'appt-1' }, mockPatient);
+
+      const patientList = await paymentsService.getPayments({}, mockPatient);
+      expect(patientList.total).toBe(1);
+
+      const docList = await paymentsService.getPayments(
+        {},
+        { userId: 'doc-200', activeRole: 'DOCTOR' },
+      );
+      expect(docList.total).toBe(1);
+
+      const adminList = await paymentsService.getPayments(
+        {},
+        { userId: 'adm', activeRole: 'ADMIN' },
+      );
+      expect(adminList.total).toBe(1);
+    });
+
+    it('should throw NotFoundError if appointment not found, or fall back to default fee if offer not found', async () => {
+      vi.mocked(appointmentRepo.findAppointmentById)!.mockResolvedValueOnce(null);
+      await expect(
+        paymentsService.createPayment({ appointmentId: 'missing-appt' }, mockPatient),
+      ).rejects.toThrow("Appointment 'missing-appt' not found");
+
+      vi.mocked(appointmentRepo.findAppointmentById)!.mockResolvedValueOnce({
+        id: 'appt-no-offer',
+        patientId: 'pat-100',
+        doctorId: 'doc-200',
+        consultationOfferId: 'missing-offer',
+        status: 'REQUESTED',
+      } as unknown as Awaited<ReturnType<NonNullable<typeof appointmentRepo.findAppointmentById>>>);
+      vi.mocked(availabilityRepo.findOfferById)!.mockResolvedValueOnce(null);
+
+      const fallbackPayment = await paymentsService.createPayment(
+        { appointmentId: 'appt-no-offer' },
+        mockPatient,
+      );
+      expect(fallbackPayment.amount).toBe('100.00');
+    });
+
+    it('should return already verified payment on duplicate verifyPayment call', async () => {
+      const created = await paymentsService.createPayment({ appointmentId: 'appt-1' }, mockPatient);
+      await paymentsService.verifyPayment(
+        created.id,
+        { providerPaymentId: created.providerPaymentId! },
+        mockPatient,
+      );
+
+      const duplicateVerify = await paymentsService.verifyPayment(
+        created.id,
+        { providerPaymentId: created.providerPaymentId! },
+        mockPatient,
+      );
+
+      expect(duplicateVerify.status).toBe(PaymentStatus.SUCCEEDED);
     });
   });
 });

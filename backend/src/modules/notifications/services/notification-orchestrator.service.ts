@@ -147,10 +147,10 @@ export class NotificationOrchestratorService {
     const payload = (
       typeof event.payload === 'object' && event.payload !== null ? event.payload : {}
     ) as Record<string, unknown>;
-    const userId = (payload['patientId'] ||
-      payload['userId'] ||
-      payload['doctorId'] ||
-      payload['recipientId']) as string | undefined;
+    const userId = (payload['userId'] ||
+      payload['recipientId'] ||
+      payload['patientId'] ||
+      payload['doctorId']) as string | undefined;
     if (!userId) {
       this.logger.warn(
         `Cannot orchestrate notification: No recipient userId in event ${event.eventType}`,

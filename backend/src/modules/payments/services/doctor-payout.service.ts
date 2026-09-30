@@ -17,6 +17,11 @@ import { TransactionDirection } from '../enums/transaction-direction.enum.js';
 import { FinancialTransactionEntity } from '../entities/financial-transaction.entity.js';
 import { IdGeneratorUtil } from '../utils/id-generator.util.js';
 import { NotFoundError, ForbiddenError, ConflictError } from '../../../common/errors/app-error.js';
+import { Optional } from '@nestjs/common';
+import {
+  DOCTORS_REPOSITORY,
+  type IDoctorsRepository,
+} from '../../doctors/interfaces/doctor-repository.interface.js';
 import type { CurrentUserContext } from '../../doctors/interfaces/auth-context.interface.js';
 import type { PaymentEntity } from '../entities/payment.entity.js';
 import type { PricingBreakdown } from '../entities/pricing-breakdown.entity.js';
@@ -39,6 +44,9 @@ export class DoctorPayoutService {
     @Inject(PAYMENT_AUDIT_SERVICE)
     private readonly auditService: IPaymentAuditService,
     private readonly eligibilityService: PayoutEligibilityService,
+    @Optional()
+    @Inject(DOCTORS_REPOSITORY)
+    private readonly doctorsRepo?: IDoctorsRepository,
   ) {}
 
   /**
@@ -254,7 +262,10 @@ export class DoctorPayoutService {
       throw new NotFoundError(`Payout ${identifier} not found`);
     }
 
-    if (actor.activeRole === 'DOCTOR' && payout.doctorId !== actor.userId) {
+    if (
+      actor.activeRole === 'DOCTOR' &&
+      !(await this.isDoctorAuthorized(actor.userId, payout.doctorId))
+    ) {
       throw new ForbiddenError('Doctors can only view their own payouts');
     } else if (actor.activeRole === 'PATIENT') {
       throw new ForbiddenError('Patients are not authorized to view doctor payouts');
@@ -270,11 +281,30 @@ export class DoctorPayoutService {
     const scopedQuery: FindPayoutsQuery = { ...query };
 
     if (actor.activeRole === 'DOCTOR') {
-      scopedQuery.doctorId = actor.userId;
+      scopedQuery.doctorId = await this.resolveDoctorId(actor.userId);
     } else if (actor.activeRole === 'PATIENT') {
       throw new ForbiddenError('Patients are not authorized to view doctor payouts');
     }
 
     return this.repository.findPayouts(scopedQuery);
+  }
+
+  private async isDoctorAuthorized(actorUserId: string, targetDoctorId: string): Promise<boolean> {
+    if (targetDoctorId === actorUserId) return true;
+    if (this.doctorsRepo) {
+      const doctor = await this.doctorsRepo.findByUserId(actorUserId);
+      if (doctor && (doctor.id === targetDoctorId || doctor.publicDoctorId === targetDoctorId)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private async resolveDoctorId(actorUserId: string): Promise<string> {
+    if (this.doctorsRepo) {
+      const doctor = await this.doctorsRepo.findByUserId(actorUserId);
+      if (doctor) return doctor.id;
+    }
+    return actorUserId;
   }
 }

@@ -128,4 +128,231 @@ describe('NotificationDeliveryService (Unit)', () => {
       deliveryService.retryDelivery(delivery.id, { email: 'test@example.com' }),
     ).rejects.toThrow(/Max retry limit/);
   });
+
+  it('delivers in-app notifications instantly', async () => {
+    const notif = await repository.createNotification({
+      userId: 'u2',
+      type: NotificationType.APPOINTMENT_REQUESTED,
+      title: 'Requested',
+      body: 'Appointment is pending review',
+      severity: NotificationSeverity.INFO,
+      isRead: false,
+      readAt: null,
+      expiresAt: null,
+      metadata: null,
+      idempotencyKey: null,
+    });
+
+    const delivery = await deliveryService.dispatchChannel({
+      notification: notif,
+      channel: NotificationChannel.IN_APP,
+    });
+
+    expect(delivery.status).toBe(DeliveryStatus.DELIVERED);
+    expect(delivery.provider).toBe('internal-inapp');
+    expect(delivery.providerMessageId).toBe(notif.publicNotificationId);
+  });
+
+  it('fails email delivery when recipientEmail is missing', async () => {
+    const notif = await repository.createNotification({
+      userId: 'u3',
+      type: NotificationType.APPOINTMENT_CONFIRMED,
+      title: 'Confirmed',
+      body: 'Appointment is confirmed',
+      severity: NotificationSeverity.INFO,
+      isRead: false,
+      readAt: null,
+      expiresAt: null,
+      metadata: null,
+      idempotencyKey: null,
+    });
+
+    const delivery = await deliveryService.dispatchChannel({
+      notification: notif,
+      channel: NotificationChannel.EMAIL,
+    });
+
+    expect(delivery.status).toBe(DeliveryStatus.FAILED);
+    expect(delivery.failureCode).toBe('MISSING_RECIPIENT_EMAIL');
+  });
+
+  describe('PUSH notifications', () => {
+    it('fails push delivery when pushTokens is empty', async () => {
+      const notif = await repository.createNotification({
+        userId: 'u4',
+        type: NotificationType.APPOINTMENT_CANCELLED,
+        title: 'Cancelled',
+        body: 'Appointment cancelled',
+        severity: NotificationSeverity.WARNING,
+        isRead: false,
+        readAt: null,
+        expiresAt: null,
+        metadata: null,
+        idempotencyKey: null,
+      });
+
+      const delivery = await deliveryService.dispatchChannel({
+        notification: notif,
+        channel: NotificationChannel.PUSH,
+        pushTokens: [],
+      });
+
+      expect(delivery.status).toBe(DeliveryStatus.FAILED);
+      expect(delivery.failureCode).toBe('NO_ACTIVE_DEVICES');
+    });
+
+    it('successfully delivers push when tokens exist', async () => {
+      const notif = await repository.createNotification({
+        userId: 'u5',
+        type: NotificationType.APPOINTMENT_REMINDER,
+        title: 'Reminder',
+        body: 'Appointment tomorrow',
+        severity: NotificationSeverity.INFO,
+        isRead: false,
+        readAt: null,
+        expiresAt: null,
+        metadata: null,
+        idempotencyKey: null,
+      });
+
+      const delivery = await deliveryService.dispatchChannel({
+        notification: notif,
+        channel: NotificationChannel.PUSH,
+        pushTokens: ['fcm-token-12345678'],
+      });
+
+      expect(delivery.status).toBe(DeliveryStatus.DELIVERED);
+      expect(delivery.provider).toBe('simulated-push');
+    });
+
+    it('marks push FAILED when push provider fails', async () => {
+      const notif = await repository.createNotification({
+        userId: 'u6',
+        type: NotificationType.APPOINTMENT_CANCELLED,
+        title: 'Cancelled',
+        body: 'Cancelled',
+        severity: NotificationSeverity.WARNING,
+        isRead: false,
+        readAt: null,
+        expiresAt: null,
+        metadata: null,
+        idempotencyKey: null,
+      });
+
+      pushProvider.failNextWithTransient = true;
+
+      const delivery = await deliveryService.dispatchChannel({
+        notification: notif,
+        channel: NotificationChannel.PUSH,
+        pushTokens: ['token-fail-1234'],
+      });
+
+      expect(delivery.status).toBe(DeliveryStatus.FAILED);
+      expect(delivery.failureCode).toBe('RATE_LIMIT_EXCEEDED');
+    });
+  });
+
+  describe('SMS notifications', () => {
+    it('fails SMS delivery when phone number is missing', async () => {
+      const notif = await repository.createNotification({
+        userId: 'u7',
+        type: NotificationType.SECURITY_LOGIN,
+        title: 'Login',
+        body: 'Login OTP code',
+        severity: NotificationSeverity.CRITICAL,
+        isRead: false,
+        readAt: null,
+        expiresAt: null,
+        metadata: null,
+        idempotencyKey: null,
+      });
+
+      const delivery = await deliveryService.dispatchChannel({
+        notification: notif,
+        channel: NotificationChannel.SMS,
+      });
+
+      expect(delivery.status).toBe(DeliveryStatus.FAILED);
+      expect(delivery.failureCode).toBe('MISSING_PHONE_NUMBER');
+    });
+
+    it('delivers SMS successfully when phone number is provided', async () => {
+      const notif = await repository.createNotification({
+        userId: 'u8',
+        type: NotificationType.SECURITY_LOGIN,
+        title: 'Security Alert',
+        body: 'Code 123456',
+        severity: NotificationSeverity.CRITICAL,
+        isRead: false,
+        readAt: null,
+        expiresAt: null,
+        metadata: null,
+        idempotencyKey: null,
+      });
+
+      const delivery = await deliveryService.dispatchChannel({
+        notification: notif,
+        channel: NotificationChannel.SMS,
+        recipientPhone: '+1234567890',
+      });
+
+      expect(delivery.status).toBe(DeliveryStatus.DELIVERED);
+      expect(delivery.provider).toBe('simulated-sms');
+    });
+
+    it('fails SMS delivery when SMS provider fails', async () => {
+      const notif = await repository.createNotification({
+        userId: 'u9',
+        type: NotificationType.SECURITY_LOGIN,
+        title: 'Alert',
+        body: 'Alert text',
+        severity: NotificationSeverity.CRITICAL,
+        isRead: false,
+        readAt: null,
+        expiresAt: null,
+        metadata: null,
+        idempotencyKey: null,
+      });
+
+      smsProvider.failNextWithTransient = true;
+
+      const delivery = await deliveryService.dispatchChannel({
+        notification: notif,
+        channel: NotificationChannel.SMS,
+        recipientPhone: '+1234567890',
+      });
+
+      expect(delivery.status).toBe(DeliveryStatus.FAILED);
+      expect(delivery.failureCode).toBe('GATEWAY_TIMEOUT');
+    });
+  });
+
+  describe('retry error cases', () => {
+    it('throws error when retrying non-existent delivery', async () => {
+      await expect(deliveryService.retryDelivery('non-existent-delivery')).rejects.toThrow(
+        /Delivery not found/,
+      );
+    });
+
+    it('throws error when associated notification not found', async () => {
+      const delivery = await repository.createDelivery({
+        notificationId: 'missing-notification-id',
+        channel: NotificationChannel.EMAIL,
+        status: DeliveryStatus.FAILED,
+        provider: 'simulated-email',
+        providerMessageId: null,
+        attemptCount: 1,
+        lastAttemptAt: new Date(),
+        deliveredAt: null,
+        failedAt: new Date(),
+        failureCode: 'FAIL',
+        failureReason: 'Fail',
+        metadata: null,
+      });
+
+      await expect(
+        deliveryService.retryDelivery(delivery.id, { email: 'a@b.com' }),
+      ).rejects.toThrow(/Notification not found for delivery/);
+    });
+  });
 });

@@ -2,6 +2,7 @@ import { Module, forwardRef } from '@nestjs/common';
 import { AppointmentsModule } from '../appointments/appointments.module.js';
 import { DoctorsModule } from '../doctors/doctors.module.js';
 import { DoctorAvailabilityModule } from '../doctor-availability/doctor-availability.module.js';
+import { CareRelationshipsModule } from '../care-relationships/care-relationships.module.js';
 import { PaymentsController } from './controllers/payments.controller.js';
 import { PaymentWebhooksController } from './controllers/payment-webhooks.controller.js';
 import { InvoicesController } from './controllers/invoices.controller.js';
@@ -26,7 +27,12 @@ import { PRICING_STRATEGY } from './interfaces/pricing-strategy.interface.js';
 import { PAYMENT_AUDIT_SERVICE } from './interfaces/payment-audit-service.interface.js';
 
 @Module({
-  imports: [forwardRef(() => AppointmentsModule), DoctorsModule, DoctorAvailabilityModule],
+  imports: [
+    forwardRef(() => AppointmentsModule),
+    DoctorsModule,
+    DoctorAvailabilityModule,
+    CareRelationshipsModule,
+  ],
   controllers: [
     PaymentsController,
     PaymentWebhooksController,

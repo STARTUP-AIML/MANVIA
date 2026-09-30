@@ -278,23 +278,27 @@ export class RefundsService {
       limit: 1000,
     });
 
-    const apptIds = new Set(patientAppts.data.map((a) => a.id));
+    const apptIds = patientAppts.data.map((a) => a.id);
+    if (apptIds.length === 0) {
+      return { data: [], total: 0, page: query.page, limit: query.limit, totalPages: 1 };
+    }
 
-    const { data: allRefunds } = await this.refundRepo.findRefunds({
+    const { data, total } = await this.refundRepo.findRefunds({
+      appointmentIds: apptIds,
       status: query.status,
       page: query.page,
       limit: query.limit,
     });
 
-    // Filter to patient's appointments
-    const filtered = allRefunds.filter((r) => apptIds.has(r.appointmentId));
-    const totalPages = Math.ceil(filtered.length / query.limit) || 1;
+    const limit = query.limit ?? 20;
+    const page = query.page ?? 1;
+    const totalPages = Math.ceil(total / limit) || 1;
 
     return {
-      data: filtered.map((r) => this.mapToResponseDto(r)),
-      total: filtered.length,
-      page: query.page,
-      limit: query.limit,
+      data: data.map((r) => this.mapToResponseDto(r)),
+      total,
+      page,
+      limit,
       totalPages,
     };
   }

@@ -234,5 +234,102 @@ describe('RefundsService (Unit Tests)', () => {
         refundsService.getRefundById({ userId: ADMIN_USER, activeRole: 'ADMIN' }, 'REF-NONEXIST'),
       ).rejects.toThrow(NotFoundError);
     });
+
+    it('should return 404 if associated appointment is missing', async () => {
+      // Create a refund pointing to missing appointment
+      const orphanRefund = await refundRepo.createRefund({
+        publicRefundId: 'REF-ORPHAN01',
+        appointmentId: 'missing-appt-uuid',
+        amount: 25,
+        currency: 'USD',
+        reason: 'Orphan test',
+      });
+
+      await expect(
+        refundsService.getRefundById(
+          { userId: ADMIN_USER, activeRole: 'ADMIN' },
+          orphanRefund.publicRefundId,
+        ),
+      ).rejects.toThrow(/Associated appointment for refund/);
+    });
+
+    it('should forbid unassigned doctor from viewing refund', async () => {
+      await doctorsRepo.createProfile({
+        userId: 'other-doc-user',
+        publicDoctorId: 'DOC-88888888',
+        displayName: 'Dr. Other',
+        medicalRegistrationNumber: 'MED-888',
+        licensingCouncil: 'Council',
+        yearsOfExperience: 5,
+        defaultConsultationFee: 100,
+        currency: 'USD',
+      });
+
+      await expect(
+        refundsService.getRefundById(
+          { userId: 'other-doc-user', activeRole: 'DOCTOR' },
+          createdRefundPublicId,
+        ),
+      ).rejects.toThrow(ForbiddenError);
+    });
+
+    it('should reject unpermitted roles', async () => {
+      await expect(
+        refundsService.getRefundById(
+          { userId: 'guest-1', activeRole: 'GUEST' as unknown as 'PATIENT' },
+          createdRefundPublicId,
+        ),
+      ).rejects.toThrow(/unpermitted role/);
+    });
+  });
+
+  describe('getRefundsForAppointment', () => {
+    it('should return all refunds for given appointment', async () => {
+      const list = await refundsService.getRefundsForAppointment(testAppointmentId);
+      expect(Array.isArray(list)).toBe(true);
+    });
+  });
+
+  describe('getPatientRefunds', () => {
+    it('should return paginated refunds for the patient', async () => {
+      // Create a refund first
+      await refundsService.createRefund(
+        {
+          appointmentId: testAppointmentId,
+          amount: 50,
+          currency: 'USD',
+          reason: 'List test refund',
+        },
+        PATIENT_USER,
+        'PATIENT',
+      );
+
+      const res = await refundsService.getPatientRefunds(PATIENT_USER, { page: 1, limit: 10 });
+      expect(res.data.length).toBeGreaterThan(0);
+      expect(res.total).toBeGreaterThan(0);
+      expect(res.page).toBe(1);
+      expect(res.limit).toBe(10);
+    });
+
+    it('should return empty list if patient profile does not exist', async () => {
+      const res = await refundsService.getPatientRefunds('non-existent-user', {
+        page: 1,
+        limit: 10,
+      });
+      expect(res.data).toEqual([]);
+      expect(res.total).toBe(0);
+    });
+
+    it('should return empty list if patient has no appointments', async () => {
+      await careRelRepo.createPatientProfile('user-no-appts', {
+        publicPatientId: 'PAT-NOAPPTS',
+        legalFirstName: 'No',
+        legalLastName: 'Appts',
+      });
+
+      const res = await refundsService.getPatientRefunds('user-no-appts', { page: 1, limit: 10 });
+      expect(res.data).toEqual([]);
+      expect(res.total).toBe(0);
+    });
   });
 });
