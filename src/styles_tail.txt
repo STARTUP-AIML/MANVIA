@@ -1,0 +1,17 @@
+
+/* Phase 5 Wellness & Timeline Additions */
+@keyframes manvia-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.active-nav {
+  color: #096ed3 !important;
+  border-bottom: 2px solid #176fde !important;
+}
+
+button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible {
+  outline: 2px solid #0ba9e7;
+  outline-offset: 2px;
+}
+

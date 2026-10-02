@@ -15,6 +15,7 @@ const services = [
 function Ecosystem() {
   return (
     <section className="ecosystem wrap" id="about">
+      {/* Column 1 — Intelligence Layer copy */}
       <div className="eco-copy">
         <div className="eyebrow">THE INTELLIGENCE LAYER</div>
         <h2>
@@ -26,13 +27,15 @@ function Ecosystem() {
           Bringing together patients, doctors, hospitals, diagnostics and more — powered by AI, for
           better decisions and healthier lives.
         </p>
-        <button className="outline" type="button">
+        <button className="outline eco-btn" type="button">
           Learn More <span>→</span>
         </button>
       </div>
+
+      {/* Column 2 — Orbit diagram */}
       <div className="orbit">
-        <div className="orbit-ring ring1"></div>
-        <div className="orbit-ring ring2"></div>
+        <div className="orbit-ring ring1" />
+        <div className="orbit-ring ring2" />
         <div className="orbit-core">
           <div className="mini-logo">✦</div>
         </div>
@@ -57,37 +60,96 @@ function Ecosystem() {
           <span>Pharmacies</span>
         </div>
       </div>
+
+      {/* Column 3 — AI Companion text (matches reference's "YOUR AI COMPANION" section) */}
+      <div className="ai-companion-copy">
+        <div className="eyebrow">YOUR AI COMPANION</div>
+        <h2>
+          A little intelligence,
+          <br />
+          whenever you need it.
+        </h2>
+        <p>
+          Talk, type or speak — MANVIA AI is here 24/7 to listen, guide and support you.
+        </p>
+        <button className="primary small" type="button">
+          Try AI Assistant <span>→</span>
+        </button>
+      </div>
+
+      {/* Column 4 — AI Chat card */}
       <div className="assistant-card">
-        <div className="assistant-title">
-          <div className="mini-logo">✦</div>
-          <div>
-            <b>MANVIA AI</b>
-            <small>
-              <i /> Online
-            </small>
+        <div className="assistant-main">
+          <div className="assistant-title">
+            <img src="/manvia-ai-avatar.png" alt="MANVIA AI" className="assistant-logo" />
+            <div className="assistant-info">
+              <b>MANVIA AI</b>
+              <small>
+                <i /> Online
+              </small>
+            </div>
+            <button className="assistant-close" type="button" aria-label="Close">×</button>
           </div>
-          <span>×</span>
+
+          <div className="chat-messages">
+            <div className="chat-row bot">
+              <img src="/manvia-ai-avatar.png" alt="" className="chat-avatar" />
+              <div className="bubble bot">Hello! How are you feeling today?</div>
+            </div>
+
+            <div className="chat-row user">
+              <div className="bubble user">I've been feeling tired lately.</div>
+            </div>
+
+            <div className="chat-row bot">
+              <img src="/manvia-ai-avatar.png" alt="" className="chat-avatar" />
+              <div className="bubble bot">
+                I can help you understand what you're experiencing and guide you toward the next step.
+              </div>
+            </div>
+          </div>
+
+          <div className="chat-input-wrap">
+            <button className="chat-mic-btn" type="button" aria-label="Voice input">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                <line x1="12" x2="12" y1="19" y2="22" />
+              </svg>
+            </button>
+            <div className="chat-input">
+              <span>Type a message...</span>
+              <span className="chat-send-icon">↗</span>
+            </div>
+          </div>
         </div>
-        <div className="bubble bot">Hello! How are you feeling today?</div>
-        <div className="bubble user">I've been feeling tired lately.</div>
-        <div className="bubble bot">
-          I can help you understand what you're experiencing and guide you toward the next step.
-        </div>
-        <div className="chat-input">
-          Type a message... <b>↗</b>
-        </div>
+
         <div className="assistant-side">
           <span>
-            ▣<small>Text Chat</small>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+            <small>Text Chat</small>
           </span>
           <span>
-            ◉<small>Voice</small>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+            <small>Voice</small>
           </span>
           <span>
-            ◷<small>Always On</small>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+            <small>Always On</small>
           </span>
           <span>
-            ♢<small>Safe & Supportive</small>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+            <small>Safe &amp; Supportive</small>
           </span>
         </div>
       </div>
@@ -97,7 +159,7 @@ function Ecosystem() {
 
 function Modes() {
   const modes = [
-    ['Guest Mode', 'Explore MANVIA and learn more about our services.', 'mode-user.jpg', '♙'],
+    ['Guest Mode', 'Explore MANVIA and learn more about our services.', 'mode-guest.jpg', '♙'],
     ['User Mode', 'Your personal health and wellness journey.', 'mode-user.jpg', '♧'],
     ['EMP Mode', 'Healthcare operations and patient management.', 'mode-emp.jpg', '♙'],
     ['Admin Mode', 'Platform management, users, security and more.', 'mode-admin.jpg', '♢'],
@@ -117,10 +179,8 @@ function Modes() {
         <div className="mode-card" key={m[0]}>
           <div
             className="mode-image"
-            style={{
-              backgroundImage: `linear-gradient(90deg,rgba(255,255,255,.96),rgba(255,255,255,.12)),url('/${m[2]}')`,
-            }}
-          ></div>
+            style={{ backgroundImage: `url('/${m[2]}')` }}
+          />
           <div className="mode-content">
             <div className={`mode-icon i${i}`}>{m[3]}</div>
             <h3>{m[0]}</h3>
@@ -141,7 +201,11 @@ function Services() {
     <section className="services wrap" id="features">
       <div className="service-heading">
         <div className="eyebrow">HEALTHCARE SERVICES FOR</div>
-        <h2>Every Need</h2>
+        <h2>
+          Healthcare Services for
+          <br />
+          Every Need
+        </h2>
         <p>From everyday wellness to urgent care, MANVIA AI supports you at every step.</p>
         <a href="#features">View All Services →</a>
       </div>
@@ -159,13 +223,17 @@ function Services() {
       <div className="trust-banner">
         <div>
           <div className="eyebrow">FOR A HEALTHIER TOMORROW</div>
-          <h2>Trusted. Secure. Human.</h2>
+          <h2>
+            Trusted. Secure.
+            <br />
+            Human.
+          </h2>
           <p>Because your health, safety and privacy matter to us.</p>
           <button className="primary" onClick={() => navigate('/login')} type="button">
             Get Started <span>→</span>
           </button>
         </div>
-        <div className="banner-person"></div>
+        <div className="banner-person" />
       </div>
     </section>
   );
@@ -178,8 +246,10 @@ export function HomePage() {
     <>
       <AppHeader />
       <main id="home">
+        {/* ── HERO ───────────────────────────────────────────── */}
         <section className="hero">
-          <div className="hero-inner wrap">
+          <div className="hero-inner">
+            {/* LEFT: text content */}
             <div className="hero-copy">
               <div className="eyebrow pill">INTELLIGENCE FOR BETTER HEALTH</div>
               <h1>
@@ -192,15 +262,16 @@ export function HomePage() {
                 in one trusted experience.
               </p>
               <div className="hero-actions">
-                <button className="primary" onClick={() => navigate('/wellness')} type="button">
-                  Open Wellness Hub <span>→</span>
+                <button className="primary" onClick={() => navigate('/login')} type="button">
+                  Get Started <span>→</span>
                 </button>
                 <button
                   className="outline"
-                  onClick={() => navigate('/health-timeline')}
+                  onClick={() => navigate('/wellness')}
                   type="button"
+                  aria-label="Open Wellness Hub"
                 >
-                  Health Timeline <span>▶</span>
+                  Explore MANVIA AI <span>→</span>
                 </button>
               </div>
               <div className="trust-points">
@@ -225,7 +296,8 @@ export function HomePage() {
                 <span>
                   ♙{' '}
                   <b>
-                    Secure &<br />
+                    Secure &amp;
+                    <br />
                     Private
                   </b>
                 </span>
@@ -240,48 +312,29 @@ export function HomePage() {
                 </span>
               </div>
             </div>
+
+            {/* RIGHT: hero image + floating orbit overlay */}
             <div className="hero-visual">
-              <div className="hero-photo"></div>
-              <div className="hero-glow"></div>
-              <div className="hero-orbit">
-                <div className="hero-center">
-                  <div className="mini-logo big">✦</div>
-                </div>
-                <span className="hero-node hn1">
-                  ♙<small>Patient</small>
-                </span>
-                <span className="hero-node hn2">
-                  ♧<small>Doctor</small>
-                </span>
-                <span className="hero-node hn3">
-                  ▥<small>Hospital</small>
-                </span>
-                <span className="hero-node hn4">
-                  ⚗<small>Diagnostics</small>
-                </span>
-                <span className="hero-node hn5">
-                  ◉<small>Pharmacy</small>
-                </span>
-              </div>
-              <div className="hero-bubble">
-                Healthier
-                <br />
-                <b>Happier</b>
-                <br />
-                Together <span>♥</span>
-              </div>
+              <div className="hero-photo" />
             </div>
           </div>
         </section>
+
         <Ecosystem />
         <Modes />
         <Services />
       </main>
+
       <footer id="contact">
         <div className="wrap footer-inner">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <span style={{ fontSize: '18px', color: '#ffbe28' }}>☀</span>
-            <span style={{ fontWeight: 800, fontSize: '15px' }}>MANVIA</span>
+          <div className="footer-brand">
+            <div className="footer-logo-badge">
+              <img src="/manvia-logo-mark.png" alt="MANVIA" className="footer-logo-img" />
+            </div>
+            <div>
+              <span className="footer-name">MANVIA</span>
+              <span className="footer-tag">Care made simpler.</span>
+            </div>
           </div>
           <div className="footer-nav">
             <a href="#home">Home</a>

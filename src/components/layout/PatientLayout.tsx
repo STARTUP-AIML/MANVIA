@@ -9,7 +9,7 @@ export function PatientLayout({
   activeTab,
 }: {
   children: React.ReactNode;
-  activeTab: 'wellness' | 'timeline' | 'account' | 'companion';
+  activeTab?: 'wellness' | 'timeline' | 'doctors' | 'appointments' | 'account' | 'companion' | 'records';
 }) {
   const { isAuthenticated, isLoading } = useAuth();
   const navigate = useNavigate();
@@ -88,6 +88,51 @@ export function PatientLayout({
                 }}
               >
                 ◷ Health Timeline
+              </NavLink>
+              <NavLink
+                to="/doctors"
+                style={{
+                  fontSize: '13px',
+                  fontWeight: activeTab === 'doctors' ? 700 : 500,
+                  color: activeTab === 'doctors' ? '#096ed3' : '#64748b',
+                  padding: '6px 14px',
+                  borderRadius: '20px',
+                  background: activeTab === 'doctors' ? '#eff6ff' : 'transparent',
+                  border: activeTab === 'doctors' ? '1px solid #bfdbfe' : '1px solid transparent',
+                  textDecoration: 'none',
+                }}
+              >
+                ⚕ Find Doctors
+              </NavLink>
+              <NavLink
+                to="/appointments"
+                style={{
+                  fontSize: '13px',
+                  fontWeight: activeTab === 'appointments' ? 700 : 500,
+                  color: activeTab === 'appointments' ? '#096ed3' : '#64748b',
+                  padding: '6px 14px',
+                  borderRadius: '20px',
+                  background: activeTab === 'appointments' ? '#eff6ff' : 'transparent',
+                  border: activeTab === 'appointments' ? '1px solid #bfdbfe' : '1px solid transparent',
+                  textDecoration: 'none',
+                }}
+              >
+                📅 Appointments
+              </NavLink>
+              <NavLink
+                to="/health-records"
+                style={{
+                  fontSize: '13px',
+                  fontWeight: activeTab === 'records' ? 700 : 500,
+                  color: activeTab === 'records' ? '#096ed3' : '#64748b',
+                  padding: '6px 14px',
+                  borderRadius: '20px',
+                  background: activeTab === 'records' ? '#eff6ff' : 'transparent',
+                  border: activeTab === 'records' ? '1px solid #bfdbfe' : '1px solid transparent',
+                  textDecoration: 'none',
+                }}
+              >
+                📁 Health Records
               </NavLink>
             </nav>
           </div>

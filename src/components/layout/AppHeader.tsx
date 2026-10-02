@@ -5,10 +5,8 @@ import { useAuth } from '../../context/AuthContext.js';
 export function Logo() {
   return (
     <Link to="/" className="logo">
-      <div className="logo-mark">
-        <span className="logo-sun">☀</span>
-        <span className="logo-leaf">⌁</span>
-        <span className="logo-heart">♥</span>
+      <div className="logo-badge">
+        <img src="/manvia-logo-mark.png" alt="MANVIA Logo" className="logo-img" />
       </div>
       <div>
         <div className="logo-name">MANVIA</div>
@@ -64,6 +62,20 @@ export function AppHeader() {
               onClick={() => setOpen(false)}
             >
               Health Timeline
+            </NavLink>
+            <NavLink
+              to="/doctors"
+              className={({ isActive }) => (isActive ? 'active-nav' : '')}
+              onClick={() => setOpen(false)}
+            >
+              Doctors
+            </NavLink>
+            <NavLink
+              to="/appointments"
+              className={({ isActive }) => (isActive ? 'active-nav' : '')}
+              onClick={() => setOpen(false)}
+            >
+              Appointments
             </NavLink>
           </>
         )}
