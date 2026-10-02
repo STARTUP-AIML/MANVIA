@@ -25,6 +25,8 @@ describe('Environment Configuration (Unit)', () => {
       OTEL_ENABLED: 'true',
       SWAGGER_ENABLED: 'false',
       SWAGGER_PATH: 'api-reference',
+      JWT_SECRET: 'production-super-secret-jwt-key-minimum-32-chars-ok',
+      JWT_REFRESH_SECRET: 'production-super-secret-refresh-key-minimum-32-chars-ok',
     });
 
     expect(custom.NODE_ENV).toBe('production');
@@ -33,6 +35,24 @@ describe('Environment Configuration (Unit)', () => {
     expect(custom.OTEL_ENABLED).toBe(true);
     expect(custom.SWAGGER_ENABLED).toBe(false);
     expect(custom.SWAGGER_PATH).toBe('api-reference');
+  });
+
+  it('should reject placeholder JWT secrets in production environment', () => {
+    expect(() =>
+      validateEnv({
+        NODE_ENV: 'production',
+        JWT_SECRET: 'placeholder-jwt-secret-min-32-chars-for-dev-only',
+        JWT_REFRESH_SECRET: 'production-super-secret-refresh-key-minimum-32-chars-ok',
+      }),
+    ).toThrow(/In production, JWT_SECRET/);
+
+    expect(() =>
+      validateEnv({
+        NODE_ENV: 'production',
+        JWT_SECRET: 'production-super-secret-jwt-key-minimum-32-chars-ok',
+        JWT_REFRESH_SECRET: 'placeholder-jwt-refresh-secret-min-32-chars-for-dev-only',
+      }),
+    ).toThrow(/In production, JWT_REFRESH_SECRET/);
   });
 
   it('should reject invalid port numbers', () => {

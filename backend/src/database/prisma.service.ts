@@ -120,9 +120,14 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnAppli
       };
     } catch (err) {
       this.connected = false;
-      const rawError = err instanceof Error ? err.message : 'Database ping failure';
+      const rawError = err instanceof Error ? err.message.trim() : 'Database ping failure';
+      const errorCode = (err as { code?: string })?.code;
+      const errorMessage =
+        errorCode && !rawError.includes(errorCode)
+          ? `${rawError || 'Database ping failure'} [${errorCode}]`
+          : rawError || 'Database ping failure';
       // Redact potential connection strings or credentials from error message
-      const sanitizedError = rawError.replace(/:\/\/(.*?):(.*?)@/, '://$1:***@');
+      const sanitizedError = errorMessage.replace(/:\/\/(.*?):(.*?)@/, '://$1:***@');
 
       return {
         status: 'unhealthy',

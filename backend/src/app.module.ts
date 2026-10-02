@@ -19,6 +19,7 @@ import { WaitlistModule } from './modules/waitlist/waitlist.module.js';
 import { NotificationsModule } from './modules/notifications/notifications.module.js';
 import { PaymentsModule } from './modules/payments/payments.module.js';
 import { AIModule } from './modules/ai/ai.module.js';
+import { AdminModule } from './modules/admin/admin.module.js';
 
 @Module({
   imports: [
@@ -41,6 +42,7 @@ import { AIModule } from './modules/ai/ai.module.js';
     NotificationsModule,
     PaymentsModule,
     AIModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [],
