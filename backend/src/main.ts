@@ -150,34 +150,67 @@ export async function createApp(): Promise<NestFastifyApplication> {
   return app;
 }
 
+declare global {
+  var __MANVIA_APP__: NestFastifyApplication | undefined;
+  var __MANVIA_SIGNALS_REGISTERED__: boolean | undefined;
+}
+
 /**
  * Bootstraps and binds the NestJS Fastify application to HTTP network interfaces.
  */
 export async function bootstrap(): Promise<NestFastifyApplication> {
+  // In development watch mode, cleanly close any previous instance before re-binding port
+  if (globalThis.__MANVIA_APP__) {
+    await globalThis.__MANVIA_APP__.close();
+    globalThis.__MANVIA_APP__ = undefined;
+  }
+
   const app = await createApp();
+  globalThis.__MANVIA_APP__ = app;
   const configService = app.get(ConfigService);
   const logger = new Logger('MANVIA');
 
   await app.listen(configService.port, configService.host);
 
-  logger.log(
-    `[MANVIA] Backend foundation running on http://${configService.host}:${configService.port} [${configService.nodeEnv}]`,
-  );
-  if (configService.isSwaggerEnabled) {
+  if (configService.isDevelopment) {
+    const devHost =
+      configService.host === '0.0.0.0' || configService.host === '::'
+        ? 'localhost'
+        : configService.host;
+    const baseUrl = `http://${devHost}:${configService.port}`;
+    logger.log(`[MANVIA] Backend running at ${baseUrl}`);
+    logger.log(`[MANVIA] API: ${baseUrl}/${configService.apiPrefix}`);
+    logger.log(`[MANVIA] Health: ${baseUrl}/health`);
+    logger.log(`[MANVIA] Ready: ${baseUrl}/health/ready`);
+    if (configService.isSwaggerEnabled) {
+      logger.log(`[MANVIA] Swagger: ${baseUrl}/${configService.swaggerPath}`);
+    }
+  } else {
     logger.log(
-      `[MANVIA] Swagger documentation active on http://${configService.host}:${configService.port}/${configService.swaggerPath}`,
+      `[MANVIA] Backend foundation running on http://${configService.host}:${configService.port} [${configService.nodeEnv}]`,
     );
+    if (configService.isSwaggerEnabled) {
+      logger.log(
+        `[MANVIA] Swagger documentation active on http://${configService.host}:${configService.port}/${configService.swaggerPath}`,
+      );
+    }
   }
 
-  // Graceful process termination signal handlers
-  const signals: NodeJS.Signals[] = ['SIGTERM', 'SIGINT'];
-  for (const signal of signals) {
-    process.on(signal, async () => {
-      logger.log(`Received ${signal}. Gracefully terminating NestJS application...`);
-      await app.close();
-      logger.log('Application shutdown complete.');
-      process.exit(0);
-    });
+  // Graceful process termination signal handlers (registered once per process)
+  if (!globalThis.__MANVIA_SIGNALS_REGISTERED__) {
+    globalThis.__MANVIA_SIGNALS_REGISTERED__ = true;
+    const signals: NodeJS.Signals[] = ['SIGTERM', 'SIGINT'];
+    for (const signal of signals) {
+      process.on(signal, async () => {
+        logger.log(`Received ${signal}. Gracefully terminating NestJS application...`);
+        if (globalThis.__MANVIA_APP__) {
+          await globalThis.__MANVIA_APP__.close();
+          globalThis.__MANVIA_APP__ = undefined;
+        }
+        logger.log('Application shutdown complete.');
+        process.exit(0);
+      });
+    }
   }
 
   return app;

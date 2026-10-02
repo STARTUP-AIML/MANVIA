@@ -18,8 +18,18 @@ import { PrismaService } from '../database/prisma.service.js';
     {
       provide: HealthService,
       useFactory: (prisma: PrismaService) => {
-        const service = new HealthService('0.1.0-phase3');
+        const service = new HealthService('0.1.0-phase20');
         service.registerIndicator('database', () => prisma.checkHealth());
+        service.registerIndicator('memory', async () => {
+          const mem = process.memoryUsage();
+          const heapUsedMb = Math.round((mem.heapUsed / 1024 / 1024) * 100) / 100;
+          const heapTotalMb = Math.round((mem.heapTotal / 1024 / 1024) * 100) / 100;
+          const rssMb = Math.round((mem.rss / 1024 / 1024) * 100) / 100;
+          return {
+            status: 'healthy',
+            details: { heapUsedMb, heapTotalMb, rssMb },
+          };
+        });
         return service;
       },
       inject: [PrismaService],

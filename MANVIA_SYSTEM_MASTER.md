@@ -304,6 +304,8 @@ See: [.planning/PHASE_OWNERSHIP.md](.planning/PHASE_OWNERSHIP.md)
 | ADR-008 | REST over GraphQL | API_Overview.md |
 | ADR-009 | JWT + Refresh token authentication strategy | Authentication.md |
 | ADR-010 | Resource-level RBAC + consent enforcement | Authorization.md |
+| ADR-011 | Break-glass emergency clinical data access governance | Admin_API.md / PHASE_20_ARCHITECTURE.md |
+| ADR-012 | Platform runtime emergency kill switches | Admin_API.md / PHASE_20_ARCHITECTURE.md |
 
 ---
 

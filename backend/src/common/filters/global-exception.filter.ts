@@ -100,6 +100,12 @@ export class GlobalExceptionFilter implements ExceptionFilter {
       );
     }
 
+    // Production hardening: strictly mask all 5xx internal error details to prevent information disclosure
+    if (this.isProduction && statusCode >= 500) {
+      message = 'Internal server error';
+      details = undefined;
+    }
+
     const errorPayload: ApiErrorResponse = {
       statusCode,
       error: errorCode,

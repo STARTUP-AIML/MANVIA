@@ -58,6 +58,7 @@ export class WaitlistService {
     private readonly waitlistRepo: IWaitlistRepository,
     @Inject(WAITLIST_AUDIT_SERVICE)
     private readonly auditService: IWaitlistAuditService,
+    @Inject(CareRelationshipsService)
     private readonly careRelService: CareRelationshipsService,
     @Inject(CARE_RELATIONSHIP_REPOSITORY)
     private readonly careRelRepo: ICareRelationshipRepository,
