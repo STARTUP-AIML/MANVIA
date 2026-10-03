@@ -1,4 +1,4 @@
-# MANVIA Frontend — Pixel-Match Prototype
+# MANVIA Frontend
 
 This project recreates the supplied Aushvaira AI reference landing page as a MANVIA-branded React/Vite frontend.
 
