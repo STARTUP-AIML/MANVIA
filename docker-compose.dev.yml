@@ -1,0 +1,45 @@
+# MANVIA Development Backing Services
+# Phase 1 Foundation: Infrastructure boundary preparation
+# Note: Actual database schemas, models, and migrations are owned by Phase 3.
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg18
+    container_name: manvia-postgres-dev
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-manvia_dev}
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-manvia_dev}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  redis:
+    image: redis:7-alpine
+    container_name: manvia-redis-dev
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_dev_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+volumes:
+  postgres_dev_data:
+    name: manvia_postgres_dev_data
+  redis_dev_data:
+    name: manvia_redis_dev_data
