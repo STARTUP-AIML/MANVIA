@@ -1,0 +1,26 @@
+# Dependencies
+node_modules/
+.pnp/
+.pnp.js
+
+# Production build artifacts
+dist/
+dist-ssr/
+*.local
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# Test outputs
+coverage/
+test-results/
+playwright-report/
+blob-report/
+
+# Editor & OS files
+.DS_Store
+Thumbs.db
+*.tsbuildinfo
+.eslintcache

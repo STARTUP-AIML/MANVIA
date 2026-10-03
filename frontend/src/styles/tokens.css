@@ -1,0 +1,159 @@
+/**
+ * MANVIA Design System — Core Design Tokens
+ * Establishes foundational variables for colors, typography, spacing,
+ * elevation, motion, radii, and responsive breakpoints.
+ */
+
+:root {
+  /* Brand Primary: Medical Teal & Emerald Spectrum */
+  --manvia-primary-50: #f0fdfa;
+  --manvia-primary-100: #ccfbf1;
+  --manvia-primary-200: #99f6e4;
+  --manvia-primary-300: #5eead4;
+  --manvia-primary-400: #2dd4bf;
+  --manvia-primary-500: #14b8a6;
+  --manvia-primary-600: #0d9488; /* Primary Brand Accent */
+  --manvia-primary-700: #0f766e; /* Deep Brand Teal */
+  --manvia-primary-800: #115e59;
+  --manvia-primary-900: #134e4a;
+  --manvia-primary-950: #042f2e;
+
+  /* Neutral Slate */
+  --manvia-slate-50: #f8fafc;
+  --manvia-slate-100: #f1f5f9;
+  --manvia-slate-200: #e2e8f0;
+  --manvia-slate-300: #cbd5e1;
+  --manvia-slate-400: #94a3b8;
+  --manvia-slate-500: #64748b;
+  --manvia-slate-600: #475569;
+  --manvia-slate-700: #334155;
+  --manvia-slate-800: #1e293b;
+  --manvia-slate-900: #0f172a;
+  --manvia-slate-950: #020617;
+
+  /* Semantic Feedback Colors */
+  --manvia-success-50: #ecfdf5;
+  --manvia-success-500: #10b981;
+  --manvia-success-600: #059669;
+  --manvia-success-700: #047857;
+
+  --manvia-warning-50: #fffbeb;
+  --manvia-warning-500: #f59e0b;
+  --manvia-warning-600: #d97706;
+  --manvia-warning-700: #b45309;
+
+  --manvia-danger-50: #fef2f2;
+  --manvia-danger-500: #ef4444;
+  --manvia-danger-600: #dc2626;
+  --manvia-danger-700: #b91c1c;
+
+  --manvia-info-50: #f0f9ff;
+  --manvia-info-500: #0ea5e9;
+  --manvia-info-600: #0284c7;
+  --manvia-info-700: #0369a1;
+
+  /* Surface & Background */
+  --color-bg-app: #f8fafc;
+  --color-bg-surface: #ffffff;
+  --color-bg-surface-subtle: #f1f5f9;
+  --color-bg-surface-elevated: #ffffff;
+  --color-border-subtle: #e2e8f0;
+  --color-border-strong: #cbd5e1;
+  --color-border-focus: #0d9488;
+
+  /* Text & Foreground */
+  --color-text-primary: #0f172a;
+  --color-text-secondary: #475569;
+  --color-text-muted: #64748b;
+  --color-text-inverse: #ffffff;
+  --color-text-link: #0d9488;
+  --color-text-link-hover: #0f766e;
+
+  /* Typography Scale */
+  --font-family-sans:
+    "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
+  --font-family-mono:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+  --font-size-xs: 0.75rem; /* 12px */
+  --font-size-sm: 0.875rem; /* 14px */
+  --font-size-base: 1rem; /* 16px */
+  --font-size-lg: 1.125rem; /* 18px */
+  --font-size-xl: 1.25rem; /* 20px */
+  --font-size-2xl: 1.5rem; /* 24px */
+  --font-size-3xl: 1.875rem; /* 30px */
+  --font-size-4xl: 2.25rem; /* 36px */
+
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.625;
+
+  /* Spacing Scale */
+  --space-0: 0;
+  --space-1: 0.25rem; /* 4px */
+  --space-2: 0.5rem; /* 8px */
+  --space-3: 0.75rem; /* 12px */
+  --space-4: 1rem; /* 16px */
+  --space-5: 1.25rem; /* 20px */
+  --space-6: 1.5rem; /* 24px */
+  --space-8: 2rem; /* 32px */
+  --space-10: 2.5rem; /* 40px */
+  --space-12: 3rem; /* 48px */
+  --space-16: 4rem; /* 64px */
+
+  /* Border Radii */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-2xl: 24px;
+  --radius-full: 9999px;
+
+  /* Elevation & Shadows */
+  --shadow-xs: 0 1px 2px 0 rgba(15, 23, 42, 0.05);
+  --shadow-sm:
+    0 1px 3px 0 rgba(15, 23, 42, 0.1), 0 1px 2px -1px rgba(15, 23, 42, 0.1);
+  --shadow-md:
+    0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.06);
+  --shadow-lg:
+    0 10px 15px -3px rgba(15, 23, 42, 0.08),
+    0 4px 6px -4px rgba(15, 23, 42, 0.04);
+  --shadow-xl:
+    0 20px 25px -5px rgba(15, 23, 42, 0.1),
+    0 8px 10px -6px rgba(15, 23, 42, 0.04);
+
+  /* Motion & Easing */
+  --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-normal: 250ms cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Focus Ring */
+  --focus-ring: 0 0 0 3px rgba(13, 148, 136, 0.35);
+
+  /* Breakpoint Dimensions (Reference) */
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+
+  /* Layout Constraints */
+  --container-max-width: 1280px;
+  --header-height: 64px;
+  --sidebar-width: 260px;
+}
+
+/* Reduced Motion Preference Accessibility */
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --transition-fast: 0ms !important;
+    --transition-normal: 0ms !important;
+    --transition-slow: 0ms !important;
+  }
+}
