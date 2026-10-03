@@ -14,6 +14,9 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./vitest.setup.ts'],
     include: ['tests/**/*.{test,spec}.{ts,tsx}', 'src/**/*.{test,spec}.{ts,tsx}'],
+    // Force UTC across all test workers so timezone-sensitive slot/booking tests
+    // produce identical results on Windows (IST/PST/etc.) and in GitHub Actions CI.
+    env: { TZ: 'UTC' },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
