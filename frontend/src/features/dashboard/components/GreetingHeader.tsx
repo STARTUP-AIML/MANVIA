@@ -84,7 +84,7 @@ export const GreetingHeader: React.FC<GreetingHeaderProps> = ({
             margin: "var(--space-1) 0 0 0",
           }}
         >
-          Care made simpler — your healthcare journey at a glance.
+          Care that feels human — your healthcare journey at a glance.
         </p>
       </div>
     </div>

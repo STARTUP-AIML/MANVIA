@@ -5,7 +5,7 @@
 export const en = {
   common: {
     appName: "MANVIA",
-    tagline: "Care made simpler.",
+    tagline: "Care that feels human.",
     loading: "Loading...",
     retry: "Try again",
     cancel: "Cancel",

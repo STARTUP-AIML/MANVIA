@@ -12,7 +12,7 @@ describe("MANVIA i18n Foundation", () => {
     const { result } = renderHook(() => useTranslation(), { wrapper });
 
     expect(result.current.t("common.appName")).toBe("MANVIA");
-    expect(result.current.t("common.tagline")).toBe("Care made simpler.");
+    expect(result.current.t("common.tagline")).toBe("Care that feels human.");
     expect(result.current.t("common.loading")).toBe("Loading...");
   });
 

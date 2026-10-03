@@ -29,7 +29,7 @@ export class DoctorQueryDto {
   @IsInt()
   @Min(1)
   @Max(100)
-  limit?: number | undefined = 20;
+  limit?: number = 20;
 
   @ApiPropertyOptional({
     description: 'Offset for pagination',
@@ -40,5 +40,5 @@ export class DoctorQueryDto {
   @Type(() => Number)
   @IsInt()
   @Min(0)
-  offset?: number | undefined = 0;
+  offset?: number = 0;
 }

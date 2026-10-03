@@ -95,7 +95,7 @@ export const Header: React.FC = () => {
                 lineHeight: 1,
               }}
             >
-              Care made simpler.
+              Care that feels human.
             </div>
           </div>
         </Link>

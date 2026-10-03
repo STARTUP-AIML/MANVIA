@@ -50,7 +50,7 @@ describe("MANVIA Application Routes & Role-Aware Protection", () => {
   it("renders landing route on root /", async () => {
     renderWithProviders(<AppRoutes />, { initialEntries: ["/"] });
     expect(
-      screen.getByRole("heading", { level: 1, name: "Care made simpler." }),
+      screen.getByRole("heading", { level: 1, name: "Care that feels human." }),
     ).toBeInTheDocument();
   });
 

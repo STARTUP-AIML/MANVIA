@@ -519,7 +519,7 @@ export const PatientSettingsRoute: React.FC = () => {
           }}
         >
           <p>
-            Welcome to MANVIA (&ldquo;Care made simpler&rdquo;). By accessing or
+            Welcome to MANVIA (&ldquo;Care that feels human&rdquo;). By accessing or
             using our platform, you agree to comply with all applicable terms,
             medical disclaimers, and local healthcare regulations.
           </p>
@@ -571,7 +571,7 @@ export const PatientSettingsRoute: React.FC = () => {
         isOpen={activeModal === "about"}
         onClose={() => setActiveModal(null)}
         title="About MANVIA"
-        description="Care made simpler."
+        description="Care that feels human."
         footer={
           <Button variant="primary" onClick={() => setActiveModal(null)}>
             Close

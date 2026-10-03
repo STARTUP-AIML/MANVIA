@@ -37,7 +37,7 @@ export const Footer: React.FC = () => {
                 color: "var(--color-text-muted)",
               }}
             >
-              Care made simpler. All rights reserved.
+              Care that feels human. All rights reserved.
             </div>
           </div>
           <div

@@ -8,7 +8,7 @@ describe("MANVIA App Foundation", () => {
     renderWithProviders(<LandingRoute />);
 
     expect(
-      screen.getByRole("heading", { level: 1, name: "Care made simpler." }),
+      screen.getByRole("heading", { level: 1, name: "Care that feels human." }),
     ).toBeInTheDocument();
     expect(
       screen.getByText("Frontend Phase 0: Foundation & Project Setup"),

@@ -10,7 +10,7 @@ export function Logo() {
       </div>
       <div>
         <div className="logo-name">MANVIA</div>
-        <div className="logo-tag">Care made simpler</div>
+        <div className="logo-tag">Care that feels human</div>
       </div>
     </Link>
   );

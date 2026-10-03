@@ -238,7 +238,7 @@ export const LandingRoute: React.FC = () => {
               Frontend Phase 0: Foundation &amp; Project Setup
             </Badge>
             <h1 className="heading-display" style={{ marginBottom: "var(--space-4)" }}>
-              Care made simpler.
+              Care that feels human.
             </h1>
             <p className="hero-sub" style={{ marginBottom: "var(--space-6)" }}>
               Your health journey, with intelligence that cares. MANVIA connects people, healthcare professionals and intelligent healthcare services in one trusted experience.
@@ -350,7 +350,7 @@ export const LandingRoute: React.FC = () => {
               <img src="/manvia-logo-mark.png" alt="MANVIA" className="footer-logo-img" />
               <span>MANVIA</span>
             </div>
-            <p>Care made simpler. Next-generation healthcare intelligence platform.</p>
+            <p>Care that feels human. Next-generation healthcare intelligence platform.</p>
           </div>
           <div className="footer-bottom">
             <p>© 2026 MANVIA Health Technologies Inc. All rights reserved.</p>

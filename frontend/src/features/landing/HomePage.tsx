@@ -333,7 +333,7 @@ export function HomePage() {
             </div>
             <div>
               <span className="footer-name">MANVIA</span>
-              <span className="footer-tag">Care made simpler.</span>
+              <span className="footer-tag">Care that feels human.</span>
             </div>
           </div>
           <div className="footer-nav">
