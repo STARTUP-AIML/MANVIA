@@ -1,0 +1,116 @@
+name: MANVIA Integration CI
+
+on:
+  push:
+    branches:
+      - main
+      - developer
+      - "feature/**"
+  pull_request:
+    branches:
+      - main
+      - developer
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    name: Backend + Frontend Integration
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: manvia_dev
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d manvia_dev"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/manvia_dev?schema=public
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 24 LTS
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: "npm"
+
+      - name: Verify Node.js version
+        run: node backend/scripts/check-node-version.js
+
+      - name: Install dependencies
+        run: npm ci
+
+      # ─────────────────────────────────────────────
+      # DATABASE / PRISMA
+      # ─────────────────────────────────────────────
+
+      - name: Generate Prisma Client
+        run: npm run db:generate
+
+      - name: Validate Prisma Schema
+        run: npm run db:validate
+
+      - name: Apply Prisma migrations to CI database
+        run: npm run db:migrate:deploy
+
+      - name: Verify Prisma migration status
+        run: npm run db:migrate:status
+
+      # ─────────────────────────────────────────────
+      # BACKEND
+      # ─────────────────────────────────────────────
+
+      - name: Backend code formatting check
+        run: npm run format:check
+
+      - name: Backend ESLint
+        run: npm run lint:backend
+
+      - name: Backend TypeScript type check
+        run: npm run typecheck:backend
+
+      - name: Backend tests with coverage
+        run: npm run test:cov
+
+      - name: Backend production build
+        run: npm run build:backend
+
+      # ─────────────────────────────────────────────
+      # FRONTEND
+      # ─────────────────────────────────────────────
+
+      - name: Frontend ESLint
+        run: npm run lint:frontend
+
+      - name: Frontend TypeScript type check
+        run: npm run typecheck:frontend
+
+      - name: Frontend tests
+        run: npm run test:frontend
+
+      - name: Frontend production build
+        run: npm run build:frontend
+
+      # ─────────────────────────────────────────────
+      # DOCKER
+      # ─────────────────────────────────────────────
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Validate Docker container build
+        run: docker build -t manvia-backend:ci ./backend
