@@ -30,11 +30,12 @@ export const DoctorDiscoveryPage: React.FC = () => {
     offset,
   });
 
-  const doctorsList = doctorsResponse?.data || [];
   const totalBackendCount = doctorsResponse?.total || 0;
 
   // Client-side text search enhancement over current paginated dataset
   const filteredDoctors = useMemo(() => {
+    const doctorsList = doctorsResponse?.data || [];
+
     if (!searchQuery.trim()) return doctorsList;
     const q = searchQuery.toLowerCase().trim();
     return doctorsList.filter(
@@ -44,7 +45,7 @@ export const DoctorDiscoveryPage: React.FC = () => {
         (doc.bio && doc.bio.toLowerCase().includes(q)) ||
         doc.publicDoctorId.toLowerCase().includes(q)
     );
-  }, [doctorsList, searchQuery]);
+  }, [doctorsResponse?.data, searchQuery]);
 
   const isFiltered = Boolean(searchQuery || selectedSpecialty || selectedLanguage);
 

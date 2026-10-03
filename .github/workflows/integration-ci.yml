@@ -35,9 +35,6 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
-    env:
-      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/manvia_dev?schema=public
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -65,9 +62,13 @@ jobs:
         run: npm run db:validate
 
       - name: Apply Prisma migrations to CI database
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/manvia_dev?schema=public
         run: npm run db:migrate:deploy
 
       - name: Verify Prisma migration status
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/manvia_dev?schema=public
         run: npm run db:migrate:status
 
       # ─────────────────────────────────────────────
@@ -84,6 +85,8 @@ jobs:
         run: npm run typecheck:backend
 
       - name: Backend tests with coverage
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/manvia_dev?schema=public
         run: npm run test:cov
 
       - name: Backend production build
