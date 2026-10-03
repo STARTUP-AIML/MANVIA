@@ -1,0 +1,51 @@
+{
+  "name": "manvia-root",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MANVIA — Enterprise Healthcare and Wellness Platform",
+  "engines": {
+    "node": ">=24.0.0",
+    "npm": ">=10.0.0"
+  },
+  "workspaces": [
+    "backend"
+  ],
+  "scripts": {
+    "prepare": "husky || true",
+    "dev": "npm --prefix backend run dev",
+    "build": "npm --prefix backend run build",
+    "start": "npm --prefix backend run start",
+    "lint": "npm --prefix backend run lint",
+    "lint:fix": "npm --prefix backend run lint:fix",
+    "format": "npm --prefix backend run format",
+    "format:check": "npm --prefix backend run format:check",
+    "typecheck": "npm --prefix backend run typecheck",
+    "test": "npm --prefix backend run test",
+    "test:unit": "npm --prefix backend run test:unit",
+    "test:integration": "npm --prefix backend run test:integration",
+    "test:e2e": "npm --prefix backend run test:e2e",
+    "test:cov": "npm --prefix backend run test:cov",
+    "docker:up": "docker compose -f docker-compose.dev.yml up -d",
+    "docker:down": "docker compose -f docker-compose.dev.yml down",
+    "docker:build": "docker build -t manvia-backend:latest ./backend",
+    "db:generate": "npm --prefix backend run db:generate",
+    "db:migrate": "npm --prefix backend run db:migrate",
+    "db:migrate:deploy": "npm --prefix backend run db:migrate:deploy",
+    "db:migrate:status": "npm --prefix backend run db:migrate:status",
+    "db:validate": "npm --prefix backend run db:validate"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.7.1",
+    "@commitlint/config-conventional": "^19.7.1",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.4.3"
+  },
+  "lint-staged": {
+    "backend/**/*.{ts,js,mjs,json,md}": [
+      "prettier --write"
+    ],
+    "backend/**/*.{ts,js,mjs}": [
+      "eslint --config backend/eslint.config.mjs"
+    ]
+  }
+}
