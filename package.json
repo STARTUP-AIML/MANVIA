@@ -3,31 +3,59 @@
   "version": "0.1.0",
   "private": true,
   "description": "MANVIA — Enterprise Healthcare and Wellness Platform",
+  "type": "module",
   "engines": {
     "node": ">=24.0.0",
     "npm": ">=10.0.0"
   },
   "workspaces": [
-    "backend"
+    "backend",
+    "frontend"
   ],
   "scripts": {
     "prepare": "husky || true",
+
     "dev": "npm --prefix backend run dev",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+
     "build": "npm --prefix backend run build",
+    "build:backend": "npm --prefix backend run build",
+    "build:frontend": "npm --prefix frontend run build",
+
     "start": "npm --prefix backend run start",
+
+    "preview:frontend": "npm --prefix frontend run preview",
+
     "lint": "npm --prefix backend run lint",
+    "lint:backend": "npm --prefix backend run lint",
+    "lint:frontend": "npm --prefix frontend run lint",
+
     "lint:fix": "npm --prefix backend run lint:fix",
+    "lint:fix:backend": "npm --prefix backend run lint:fix",
+    "lint:fix:frontend": "npm --prefix frontend run lint:fix",
+
     "format": "npm --prefix backend run format",
     "format:check": "npm --prefix backend run format:check",
+
     "typecheck": "npm --prefix backend run typecheck",
+    "typecheck:backend": "npm --prefix backend run typecheck",
+    "typecheck:frontend": "npm --prefix frontend run typecheck",
+
     "test": "npm --prefix backend run test",
+    "test:backend": "npm --prefix backend run test",
+    "test:frontend": "npm --prefix frontend test",
+    "test:frontend:coverage": "npm --prefix frontend run test:coverage",
+
     "test:unit": "npm --prefix backend run test:unit",
     "test:integration": "npm --prefix backend run test:integration",
     "test:e2e": "npm --prefix backend run test:e2e",
     "test:cov": "npm --prefix backend run test:cov",
+
     "docker:up": "docker compose -f docker-compose.dev.yml up -d",
     "docker:down": "docker compose -f docker-compose.dev.yml down",
     "docker:build": "docker build -t manvia-backend:latest ./backend",
+
     "db:generate": "npm --prefix backend run db:generate",
     "db:migrate": "npm --prefix backend run db:migrate",
     "db:migrate:deploy": "npm --prefix backend run db:migrate:deploy",
