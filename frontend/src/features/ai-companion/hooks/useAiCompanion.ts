@@ -11,7 +11,7 @@ import {
   type UseMutationResult,
   type UseQueryResult,
 } from "@tanstack/react-query";
-import { aiCompanionService } from "../api/aiCompanionService";
+import { aiCompanionService } from '@/features/ai-companion/api/aiCompanionService';
 import {
   AIMessageRole,
   AIMessageStatus,

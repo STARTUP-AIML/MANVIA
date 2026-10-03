@@ -13,18 +13,32 @@ export class ApiError extends Error {
   public readonly details?: unknown;
   public readonly raw?: unknown;
 
+  public get status(): number {
+    return this.statusCode;
+  }
+
   constructor(
-    payload: Partial<ApiErrorResponse> & { message: string },
-    raw?: unknown,
+    payload: (Partial<ApiErrorResponse> & { message: string }) | string,
+    rawOrStatusCode?: unknown,
   ) {
-    super(payload.message);
-    this.name = "ApiError";
-    this.statusCode = payload.statusCode ?? 500;
-    this.error = payload.error ?? "INTERNAL_SERVER_ERROR";
-    this.requestId = payload.requestId ?? "unknown-request-id";
-    this.timestamp = payload.timestamp ?? new Date().toISOString();
-    this.details = payload.details;
-    this.raw = raw;
+    if (typeof payload === "string") {
+      super(payload);
+      this.name = "ApiError";
+      this.statusCode = typeof rawOrStatusCode === "number" ? rawOrStatusCode : 500;
+      this.error = typeof rawOrStatusCode === "number" ? `HTTP_${rawOrStatusCode}` : "INTERNAL_SERVER_ERROR";
+      this.requestId = `err-${Date.now()}`;
+      this.timestamp = new Date().toISOString();
+      this.raw = typeof rawOrStatusCode === "number" ? undefined : rawOrStatusCode;
+    } else {
+      super(payload.message);
+      this.name = "ApiError";
+      this.statusCode = payload.statusCode ?? 500;
+      this.error = payload.error ?? "INTERNAL_SERVER_ERROR";
+      this.requestId = payload.requestId ?? "unknown-request-id";
+      this.timestamp = payload.timestamp ?? new Date().toISOString();
+      this.details = payload.details;
+      this.raw = rawOrStatusCode;
+    }
 
     // Maintain proper prototype chain
     Object.setPrototypeOf(this, ApiError.prototype);

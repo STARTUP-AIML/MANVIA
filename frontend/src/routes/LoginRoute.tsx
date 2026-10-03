@@ -106,6 +106,9 @@ export const LoginRoute: React.FC = () => {
         <div style={{ width: "100%", maxWidth: 440 }}>
           <Card>
             <CardHeader>
+              <div style={{ fontSize: "11px", fontWeight: 700, letterSpacing: "1px", textTransform: "uppercase", color: "var(--color-primary-600)", marginBottom: "4px" }}>
+                Welcome to MANVIA
+              </div>
               <CardTitle>Sign in to MANVIA</CardTitle>
               <CardDescription>
                 Access your personalized clinical or patient healthcare
@@ -189,8 +192,9 @@ export const LoginRoute: React.FC = () => {
                   isLoading={isSubmitting || isLoading}
                   style={{ width: "100%", marginTop: "var(--space-2)" }}
                   data-testid="login-submit-button"
+                  aria-label="Sign In to Wellness & Timeline"
                 >
-                  {isSubmitting ? "Signing In..." : "Sign In"}
+                  {isSubmitting ? "Signing In..." : "Sign In to Wellness & Timeline"}
                 </Button>
               </form>
             </CardContent>

@@ -4,6 +4,7 @@
  */
 
 import { getUserTimeZone } from "./timezone";
+export { getUserTimeZone, getUserTimeZone as getUserTimezone } from "./timezone";
 
 export interface DateFormatOptions {
   timeZone?: string;
@@ -69,4 +70,17 @@ export function formatDateTime(
     timeStyle: "short",
     timeZone,
   }).format(date);
+}
+
+export function formatDurationMinutes(minutes?: number | null): string {
+  if (minutes === undefined || minutes === null) return "Not recorded";
+  const hrs = Math.floor(minutes / 60);
+  const mins = minutes % 60;
+  if (hrs > 0 && mins > 0) {
+    return `${hrs}h ${mins}m`;
+  }
+  if (hrs > 0) {
+    return `${hrs}h`;
+  }
+  return `${mins}m`;
 }

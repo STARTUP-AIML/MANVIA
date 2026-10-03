@@ -42,7 +42,24 @@ export interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [state, setState] = useState<AuthState>(initialAuthState);
+  const [state, setState] = useState<AuthState>(() => {
+    const storedUser = sessionStorageManager.getStoredUser();
+    const token = sessionStorageManager.getAccessToken();
+    if (storedUser && token) {
+      return {
+        status: "AUTHENTICATED",
+        user: storedUser,
+        tokens: {
+          accessToken: token,
+          refreshToken: sessionStorageManager.getRefreshToken() || "",
+          tokenType: "Bearer",
+          expiresIn: 900,
+        },
+        error: null,
+      };
+    }
+    return initialAuthState;
+  });
   const queryClient = useQueryClient();
 
   const clearError = useCallback(() => {
@@ -150,8 +167,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     async function bootstrap() {
       const refreshToken = sessionStorageManager.getRefreshToken();
       const accessToken = sessionStorageManager.getAccessToken();
+      const storedUser = sessionStorageManager.getStoredUser();
 
-      if (!refreshToken && !accessToken) {
+      if (!refreshToken && !accessToken && !storedUser) {
         if (mounted) {
           setState({
             status: "UNAUTHENTICATED",
@@ -159,6 +177,31 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             tokens: null,
             error: null,
           });
+        }
+        return;
+      }
+
+      if (storedUser && accessToken) {
+        if (mounted) {
+          setState({
+            status: "AUTHENTICATED",
+            user: storedUser,
+            tokens: {
+              accessToken,
+              refreshToken: refreshToken || "",
+              tokenType: "Bearer",
+              expiresIn: 900,
+            },
+            error: null,
+          });
+        }
+        try {
+          const user = await authService.getMe();
+          if (mounted && user) {
+            setState((prev) => ({ ...prev, user }));
+          }
+        } catch {
+          // Keep storedUser
         }
         return;
       }

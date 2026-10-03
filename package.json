@@ -1,33 +1,19 @@
 {
-  "name": "manvia-healthcare-frontend",
+  "name": "manvia-healthcare-frontend-root",
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "workspaces": [
+    "frontend"
+  ],
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "typecheck": "tsc --noEmit",
-    "lint": "tsc --noEmit",
-    "test": "vitest run"
-  },
-  "dependencies": {
-    "@tanstack/react-query": "^5.104.0",
-    "@vitejs/plugin-react": "^4.3.4",
-    "lucide-react": "^1.49.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "react-router-dom": "^7.1.1",
-    "typescript": "^5.7.2",
-    "vite": "^6.0.0"
-  },
-  "devDependencies": {
-    "@testing-library/jest-dom": "^7.0.1",
-    "@testing-library/react": "^16.3.3",
-    "@testing-library/user-event": "^14.6.7",
-    "@types/react": "^19.3.0",
-    "@types/react-dom": "^19.3.0",
-    "jsdom": "^29.1.1",
-    "vitest": "^5.0.3"
+    "dev": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "preview": "npm --prefix frontend run preview",
+    "test": "npm --prefix frontend test",
+    "test:coverage": "npm --prefix frontend run test:coverage",
+    "lint": "npm --prefix frontend run lint",
+    "lint:fix": "npm --prefix frontend run lint:fix",
+    "typecheck": "npm --prefix frontend run typecheck"
   }
 }

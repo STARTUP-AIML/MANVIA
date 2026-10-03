@@ -4,7 +4,7 @@
  */
 
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
-import { dashboardService } from "../api/dashboardService";
+import { dashboardService } from '@/features/dashboard/api/dashboardService';
 import type {
   AppointmentResponseDto,
   WellnessSummaryResponseDto,

@@ -10,7 +10,7 @@ import {
   type UseQueryResult,
   type UseMutationResult,
 } from "@tanstack/react-query";
-import { patientService } from "../api/patientService";
+import { patientService } from '@/features/patient/api/patientService';
 import type {
   PatientProfileResponseDto,
   CreatePatientProfileDto,

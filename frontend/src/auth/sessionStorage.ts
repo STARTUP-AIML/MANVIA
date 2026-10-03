@@ -5,10 +5,12 @@
  * with optional sessionStorage sync. Refresh tokens are kept in secure client storage.
  */
 
-import type { AuthSessionTokens } from "./types";
+import type { AuthSessionTokens, UserResponseDto } from "./types";
 
 const REFRESH_TOKEN_KEY = "manvia_refresh_token";
 const ACCESS_TOKEN_KEY = "manvia_access_token";
+const LEGACY_TOKEN_KEY = "manvia_auth_token";
+const LEGACY_USER_KEY = "manvia_auth_user";
 
 class SessionStorageManager {
   private inMemoryAccessToken: string | null = null;
@@ -18,7 +20,8 @@ class SessionStorageManager {
       // Initialize in-memory token from sessionStorage if present
       try {
         this.inMemoryAccessToken =
-          window.sessionStorage.getItem(ACCESS_TOKEN_KEY);
+          window.sessionStorage.getItem(ACCESS_TOKEN_KEY) ||
+          window.sessionStorage.getItem(LEGACY_TOKEN_KEY);
       } catch {
         this.inMemoryAccessToken = null;
       }
@@ -26,6 +29,15 @@ class SessionStorageManager {
   }
 
   public getAccessToken(): string | null {
+    if (!this.inMemoryAccessToken && typeof window !== "undefined") {
+      try {
+        this.inMemoryAccessToken =
+          window.sessionStorage.getItem(ACCESS_TOKEN_KEY) ||
+          window.sessionStorage.getItem(LEGACY_TOKEN_KEY);
+      } catch {
+        // ignore
+      }
+    }
     return this.inMemoryAccessToken;
   }
 
@@ -36,6 +48,29 @@ class SessionStorageManager {
     } catch {
       return null;
     }
+  }
+
+  public getStoredUser(): UserResponseDto | null {
+    if (typeof window === "undefined") return null;
+    try {
+      const raw = window.sessionStorage.getItem(LEGACY_USER_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        return {
+          id: parsed.id,
+          email: parsed.email || "",
+          phone: parsed.phone || null,
+          emailVerified: true,
+          phoneVerified: false,
+          status: "ACTIVE",
+          roles: parsed.roles || ["PATIENT"],
+          createdAt: new Date().toISOString(),
+        };
+      }
+    } catch {
+      return null;
+    }
+    return null;
   }
 
   public setTokens(
@@ -72,6 +107,17 @@ class SessionStorageManager {
   }
 
   public getUser(): { userId: string; activeRole: string } | null {
+    if (!this.cachedUserContext && typeof window !== "undefined") {
+      try {
+        const raw = window.sessionStorage.getItem(LEGACY_USER_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          return { userId: parsed.id, activeRole: parsed.roles?.[0] || "PATIENT" };
+        }
+      } catch {
+        // ignore
+      }
+    }
     return this.cachedUserContext;
   }
 
@@ -81,6 +127,8 @@ class SessionStorageManager {
     if (typeof window !== "undefined") {
       try {
         window.sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+        window.sessionStorage.removeItem(LEGACY_TOKEN_KEY);
+        window.sessionStorage.removeItem(LEGACY_USER_KEY);
         window.localStorage.removeItem(REFRESH_TOKEN_KEY);
       } catch {
         // Ignore
@@ -89,7 +137,7 @@ class SessionStorageManager {
   }
 
   public hasTokens(): boolean {
-    return Boolean(this.inMemoryAccessToken || this.getRefreshToken());
+    return Boolean(this.getAccessToken() || this.getRefreshToken());
   }
 }
 

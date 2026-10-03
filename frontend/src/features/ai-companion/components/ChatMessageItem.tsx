@@ -11,7 +11,7 @@ import {
   AIMessageRole,
   type AIMessageResponseDto,
 } from "../types";
-import { useSubmitFeedbackMutation } from "../hooks/useAiCompanion";
+import { useSubmitFeedbackMutation } from '@/features/ai-companion/hooks/useAiCompanion';
 
 export interface ChatMessageItemProps {
   message: AIMessageResponseDto;
