@@ -1,4 +1,5 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
+import { PrismaService } from '../../../database/prisma.service.js';
 import { NotFoundError } from '../../../common/errors/app-error.js';
 import type {
   CreateWellnessCheckInInput,
@@ -45,8 +46,12 @@ interface PrismaClientLike {
 export class PrismaWellnessRepository implements IWellnessRepository {
   private readonly prisma: PrismaClientLike | undefined;
 
-  constructor(@Optional() prisma?: PrismaClientLike | undefined) {
-    this.prisma = prisma;
+  constructor(
+    @Optional()
+    @Inject(PrismaService)
+    prisma?: PrismaClientLike | PrismaService,
+  ) {
+    this.prisma = (prisma ?? undefined) as unknown as PrismaClientLike | undefined;
   }
 
   private getClient(): PrismaClientLike {

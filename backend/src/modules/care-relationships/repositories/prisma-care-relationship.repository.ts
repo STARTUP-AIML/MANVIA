@@ -1,4 +1,5 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
+import { PrismaService } from '../../../database/prisma.service.js';
 import { NotFoundError } from '../../../common/errors/app-error.js';
 import type { ICareRelationshipRepository } from '../interfaces/care-relationship-repository.interface.js';
 import type {
@@ -16,8 +17,8 @@ interface RawPatientProfile {
   id: string;
   userId: string;
   publicPatientId: string;
-  legalFirstName: string;
-  legalLastName: string;
+  legalFirstName: string | null;
+  legalLastName: string | null;
   displayName: string | null;
   dateOfBirth: string | Date | null;
   gender: string | null;
@@ -90,8 +91,12 @@ interface PrismaClientLike {
 export class PrismaCareRelationshipRepository implements ICareRelationshipRepository {
   private readonly prisma: PrismaClientLike | undefined;
 
-  constructor(@Optional() prisma?: PrismaClientLike | undefined) {
-    this.prisma = prisma;
+  constructor(
+    @Optional()
+    @Inject(PrismaService)
+    prisma?: PrismaClientLike | PrismaService,
+  ) {
+    this.prisma = (prisma ?? undefined) as unknown as PrismaClientLike | undefined;
   }
 
   private getClient(): PrismaClientLike {
@@ -143,10 +148,15 @@ export class PrismaCareRelationshipRepository implements ICareRelationshipReposi
   }
 
   public async findPatientById(id: string): Promise<PatientProfileEntity | null> {
-    const raw = await this.getClient().patientProfile.findUnique({
-      where: { id },
-    });
-    return raw ? this.mapPatient(raw) : null;
+    try {
+      const raw = await this.getClient().patientProfile.findUnique({
+        where: { id },
+      });
+      if (raw) return this.mapPatient(raw);
+    } catch {
+      // In PostgreSQL, invalid UUID syntax throws; fallback to public ID lookup
+    }
+    return this.findPatientByPublicId(id);
   }
 
   public async findPatientByPublicId(publicId: string): Promise<PatientProfileEntity | null> {
@@ -179,10 +189,14 @@ export class PrismaCareRelationshipRepository implements ICareRelationshipReposi
   }
 
   public async findCareRelationshipById(id: string): Promise<CareRelationshipEntity | null> {
-    const raw = await this.getClient().careRelationship.findUnique({
-      where: { id },
-    });
-    return raw ? this.mapCareRelationship(raw) : null;
+    try {
+      const raw = await this.getClient().careRelationship.findUnique({
+        where: { id },
+      });
+      return raw ? this.mapCareRelationship(raw) : null;
+    } catch {
+      return null;
+    }
   }
 
   public async findCareRelationship(
@@ -279,10 +293,14 @@ export class PrismaCareRelationshipRepository implements ICareRelationshipReposi
   }
 
   public async findConsentById(id: string): Promise<ConsentEntity | null> {
-    const raw = await this.getClient().consent.findUnique({
-      where: { id },
-    });
-    return raw ? this.mapConsent(raw) : null;
+    try {
+      const raw = await this.getClient().consent.findUnique({
+        where: { id },
+      });
+      return raw ? this.mapConsent(raw) : null;
+    } catch {
+      return null;
+    }
   }
 
   public async findConsentsByPatientId(
@@ -383,6 +401,11 @@ export class PrismaCareRelationshipRepository implements ICareRelationshipReposi
   }
 
   public async getConsentHistory(consentId: string): Promise<ConsentHistoryEntity[]> {
+    if (
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(consentId)
+    ) {
+      return [];
+    }
     const raws = await this.getClient().consentHistory.findMany({
       where: { consentId },
       orderBy: { createdAt: 'asc' },
@@ -398,8 +421,8 @@ export class PrismaCareRelationshipRepository implements ICareRelationshipReposi
       id: r.id,
       userId: r.userId,
       publicPatientId: r.publicPatientId,
-      legalFirstName: r.legalFirstName,
-      legalLastName: r.legalLastName,
+      legalFirstName: r.legalFirstName ?? '',
+      legalLastName: r.legalLastName ?? '',
       displayName: r.displayName,
       dateOfBirth: r.dateOfBirth ? new Date(r.dateOfBirth) : null,
       gender: r.gender,

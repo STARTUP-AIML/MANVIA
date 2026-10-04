@@ -1,4 +1,5 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
+import { PrismaService } from '../../../database/prisma.service.js';
 import { NotFoundError } from '../../../common/errors/app-error.js';
 import type { HealthRecordEntity } from '../entities/health-record.entity.js';
 import { HealthRecordCategory } from '../enums/health-record-category.enum.js';
@@ -52,8 +53,12 @@ interface PrismaClientLike {
 export class PrismaHealthRecordRepository implements IHealthRecordRepository {
   private readonly prisma: PrismaClientLike | undefined;
 
-  constructor(@Optional() prisma?: PrismaClientLike | undefined) {
-    this.prisma = prisma;
+  constructor(
+    @Optional()
+    @Inject(PrismaService)
+    prisma?: PrismaClientLike | PrismaService,
+  ) {
+    this.prisma = (prisma ?? undefined) as unknown as PrismaClientLike | undefined;
   }
 
   private getClient(): PrismaClientLike {
@@ -113,6 +118,9 @@ export class PrismaHealthRecordRepository implements IHealthRecordRepository {
   }
 
   public async findById(id: string): Promise<HealthRecordEntity | null> {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+      return null;
+    }
     const client = this.getClient();
     const found = await client.healthRecord.findUnique({
       where: { id },
@@ -133,21 +141,27 @@ export class PrismaHealthRecordRepository implements IHealthRecordRepository {
     recordIdOrPublicId: string,
   ): Promise<HealthRecordEntity | null> {
     const client = this.getClient();
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        recordIdOrPublicId,
+      );
+
     if (!client.healthRecord.findFirst) {
-      const byId = await this.findById(recordIdOrPublicId);
-      if (byId && byId.patientId === patientId) return byId;
+      if (isUuid) {
+        const byId = await this.findById(recordIdOrPublicId);
+        if (byId && byId.patientId === patientId) return byId;
+      }
       const byPub = await this.findByPublicId(recordIdOrPublicId);
       if (byPub && byPub.patientId === patientId) return byPub;
       return null;
     }
 
-    const found = await client.healthRecord.findFirst({
-      where: {
-        patientId,
-        OR: [{ id: recordIdOrPublicId }, { publicRecordId: recordIdOrPublicId }],
-      },
-    });
+    const where: Record<string, unknown> = {
+      patientId,
+      ...(isUuid ? { id: recordIdOrPublicId } : { publicRecordId: recordIdOrPublicId }),
+    };
 
+    const found = await client.healthRecord.findFirst({ where });
     return found ? this.mapToEntity(found) : null;
   }
 
@@ -202,9 +216,18 @@ export class PrismaHealthRecordRepository implements IHealthRecordRepository {
 
   public async update(id: string, input: UpdateHealthRecordInput): Promise<HealthRecordEntity> {
     const client = this.getClient();
+    let targetId = id;
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+      const byPub = await this.findByPublicId(id);
+      if (!byPub) {
+        throw new NotFoundError(`Health record with ID ${id} not found.`);
+      }
+      targetId = byPub.id;
+    }
+
     try {
       const updated = await client.healthRecord.update({
-        where: { id },
+        where: { id: targetId },
         data: {
           ...(input.title !== undefined && { title: input.title }),
           ...(input.description !== undefined && { description: input.description }),
@@ -221,9 +244,18 @@ export class PrismaHealthRecordRepository implements IHealthRecordRepository {
 
   public async softDelete(id: string): Promise<HealthRecordEntity> {
     const client = this.getClient();
+    let targetId = id;
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+      const byPub = await this.findByPublicId(id);
+      if (!byPub) {
+        throw new NotFoundError(`Health record with ID ${id} not found.`);
+      }
+      targetId = byPub.id;
+    }
+
     try {
       const updated = await client.healthRecord.update({
-        where: { id },
+        where: { id: targetId },
         data: {
           status: HealthRecordStatus.DELETED,
         },

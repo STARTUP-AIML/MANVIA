@@ -660,6 +660,104 @@ export class HealthRecordsService {
     };
   }
 
+  /**
+   * Downloads the raw document buffer for an authenticated patient.
+   */
+  public async downloadPatientRecord(
+    userId: string,
+    recordIdOrPublicId: string,
+  ): Promise<{ buffer: Buffer; mimeType: string; originalFileName: string }> {
+    const patient = await this.careRelService.getOrCreatePatientProfile(userId);
+    const record = await this.healthRecordRepo.findPatientRecord(patient.id, recordIdOrPublicId);
+
+    if (!record || record.status === HealthRecordStatus.DELETED) {
+      throw new NotFoundError(`Health record '${recordIdOrPublicId}' not found`);
+    }
+
+    const buffer = await this.storageService.download(record.storageKey);
+
+    this.auditService.logEvent({
+      event: 'HEALTH_RECORD_FILE_ACCESSED',
+      actorId: userId,
+      role: 'PATIENT',
+      resource: `HEALTH_RECORD:${record.publicRecordId}`,
+      action: 'DOWNLOAD_RECORD',
+      metadata: { publicRecordId: record.publicRecordId, patientId: patient.id },
+    });
+
+    return {
+      buffer,
+      mimeType: record.mimeType,
+      originalFileName: record.originalFileName,
+    };
+  }
+
+  /**
+   * Downloads the raw document buffer for an authorized physician under explicit consent.
+   */
+  public async downloadDoctorPatientRecord(
+    doctorUserId: string,
+    targetPatientId: string,
+    recordIdOrPublicId: string,
+  ): Promise<{ buffer: Buffer; mimeType: string; originalFileName: string }> {
+    const doctor = await this.doctorsRepo.findByUserId(doctorUserId);
+    if (!doctor) {
+      throw new NotFoundError('Doctor profile not found for authenticated user');
+    }
+
+    if (doctor.verificationStatus !== VerificationStatus.VERIFIED) {
+      throw new ForbiddenError('Access denied: physician verification required');
+    }
+
+    const patient = await this.resolvePatient(targetPatientId);
+
+    const careRel = await this.careRelRepo.findCareRelationship(patient.id, doctor.id);
+    if (!careRel || careRel.status !== CareRelationshipStatus.ACTIVE) {
+      throw new ForbiddenError('Access denied: active care relationship required');
+    }
+
+    const activeConsents = await this.careRelRepo.findConsentsByPatientId(patient.id, true);
+    const hasConsent = activeConsents.some(
+      (c) =>
+        c.doctorId === doctor.id &&
+        c.scope === ConsentScope.HEALTH_RECORDS &&
+        c.status === ConsentStatus.ACTIVE &&
+        (!c.expiresAt || new Date(c.expiresAt).getTime() > Date.now()),
+    );
+
+    if (!hasConsent) {
+      throw new ForbiddenError(
+        'Access denied: explicit patient consent for HEALTH_RECORDS required',
+      );
+    }
+
+    const record = await this.healthRecordRepo.findPatientRecord(patient.id, recordIdOrPublicId);
+    if (!record || record.status === HealthRecordStatus.DELETED) {
+      throw new NotFoundError(`Health record '${recordIdOrPublicId}' not found`);
+    }
+
+    const buffer = await this.storageService.download(record.storageKey);
+
+    this.auditService.logEvent({
+      event: 'DOCTOR_ACCESSED_PATIENT_HEALTH_RECORD_FILE',
+      actorId: doctorUserId,
+      role: 'DOCTOR',
+      resource: `HEALTH_RECORD:${record.publicRecordId}`,
+      action: 'DOCTOR_DOWNLOAD_RECORD',
+      metadata: {
+        doctorId: doctor.id,
+        patientId: patient.id,
+        publicRecordId: record.publicRecordId,
+      },
+    });
+
+    return {
+      buffer,
+      mimeType: record.mimeType,
+      originalFileName: record.originalFileName,
+    };
+  }
+
   // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
