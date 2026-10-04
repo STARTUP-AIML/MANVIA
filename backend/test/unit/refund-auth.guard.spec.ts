@@ -32,7 +32,7 @@ describe('RefundAuthGuard (Unit Tests)', () => {
     expect(guard.canActivate(ctx)).toBe(true);
   });
 
-  it('should populate user from x-user-id and x-user-role headers', () => {
+  it('should reject forged x-user-id/x-user-role headers when request.user is absent', () => {
     const req: { headers: Record<string, string>; user?: { userId: string; activeRole: string } } =
       {
         headers: {
@@ -42,10 +42,8 @@ describe('RefundAuthGuard (Unit Tests)', () => {
       };
     const ctx = createMockContext(req as unknown as Record<string, unknown>);
 
-    expect(guard.canActivate(ctx)).toBe(true);
-    expect(req.user).toBeDefined();
-    expect(req.user?.userId).toBe('doc-123');
-    expect(req.user?.activeRole).toBe('DOCTOR');
+    expect(() => guard.canActivate(ctx)).toThrow(UnauthorizedError);
+    expect(req.user).toBeUndefined();
   });
 
   it('should throw UnauthorizedError when no credentials are provided', () => {
