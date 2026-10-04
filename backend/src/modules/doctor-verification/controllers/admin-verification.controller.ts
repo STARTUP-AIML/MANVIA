@@ -7,9 +7,15 @@ import {
   Param,
   Post,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+
+interface FastifyReplyLike {
+  header(name: string, value: string): unknown;
+  send(payload: unknown): unknown;
+}
 import { AdminAuthGuard } from '../guards/admin-auth.guard.js';
 import { CurrentUser } from '../../doctors/decorators/current-user.decorator.js';
 import type { CurrentUserContext } from '../../doctors/interfaces/auth-context.interface.js';
@@ -159,5 +165,28 @@ export class AdminVerificationController {
       documentId,
       adminUser.userId,
     );
+  }
+
+  @Get(':id/documents/:documentId/download')
+  @ApiOperation({
+    summary: 'Download physician verification document file (Admin Only)',
+    description:
+      'Streams the uploaded credential document file directly for administrative review.',
+  })
+  @ApiParam({ name: 'id', description: 'UUID of the verification submission' })
+  @ApiParam({ name: 'documentId', description: 'UUID of the credential document' })
+  @ApiResponse({ status: 200, description: 'Document binary stream' })
+  @ApiResponse({ status: 401, description: 'Authentication credentials required' })
+  @ApiResponse({ status: 403, description: 'Administrator role required' })
+  @ApiResponse({ status: 404, description: 'Verification submission or document not found' })
+  public async downloadDocument(
+    @Param('id') id: string,
+    @Param('documentId') documentId: string,
+    @Res() res: FastifyReplyLike,
+  ): Promise<void> {
+    const doc = await this.adminVerificationService.downloadDocument(id, documentId);
+    res.header('Content-Type', doc.mimeType);
+    res.header('Content-Disposition', `attachment; filename="${doc.originalFileName}"`);
+    res.send(doc.buffer);
   }
 }

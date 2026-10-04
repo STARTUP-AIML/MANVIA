@@ -165,7 +165,7 @@ describe('DoctorVerificationService (Unit Tests)', () => {
 
     const access = await service.getDocumentAccessUrl(DOCTOR_USER_ID, doc.id);
     expect(access.documentId).toBe(doc.id);
-    expect(access.accessUrl).toContain('vault.manvia.internal');
+    expect(access.accessUrl).toContain('/documents/access');
     expect(access.expiresInSeconds).toBe(300);
   });
 

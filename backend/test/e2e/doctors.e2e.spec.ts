@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
 import { DOCTORS_REPOSITORY } from '../../src/modules/doctors/interfaces/doctor-repository.interface.js';
 import type { IDoctorsRepository } from '../../src/modules/doctors/interfaces/doctor-repository.interface.js';
+import { VerificationStatus } from '../../src/modules/doctors/enums/verification-status.enum.js';
 import {
   setupE2EApp,
   createE2EUser,
@@ -11,6 +12,7 @@ import {
 
 describe('Doctor Platform HTTP API (E2E)', () => {
   let app: NestFastifyApplication;
+  let repo: IDoctorsRepository;
   let specialtyId: string;
   let languageId: string;
 
@@ -22,7 +24,7 @@ describe('Doctor Platform HTTP API (E2E)', () => {
     app = await setupE2EApp();
 
     // Fetch seeded taxonomy references
-    const repo = app.get<IDoctorsRepository>(DOCTORS_REPOSITORY);
+    repo = app.get<IDoctorsRepository>(DOCTORS_REPOSITORY);
     const specialties = await repo.findActiveSpecialties();
     const languages = await repo.findAllLanguages();
     specialtyId = specialties[0]!.id;
@@ -262,7 +264,20 @@ describe('Doctor Platform HTTP API (E2E)', () => {
     expect(res.statusCode).toBe(400);
   });
 
-  it('GET /api/v1/doctors/:doctorId should return public profile and strip sensitive fields', async () => {
+  it('GET /api/v1/doctors/:doctorId should return 404 when doctor is not yet VERIFIED', async () => {
+    const res = await app.inject({
+      method: 'GET',
+      url: `/api/v1/doctors/${doctorAPublicId}`,
+    });
+
+    expect(res.statusCode).toBe(404);
+  });
+
+  it('GET /api/v1/doctors/:doctorId should return public profile and strip sensitive fields once VERIFIED', async () => {
+    const docProfile = await repo.findByUserId(doctorA.id);
+    expect(docProfile).toBeDefined();
+    await repo.updateVerificationStatus(docProfile!.id, VerificationStatus.VERIFIED, new Date());
+
     const res = await app.inject({
       method: 'GET',
       url: `/api/v1/doctors/${doctorAPublicId}`,

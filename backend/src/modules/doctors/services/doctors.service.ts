@@ -1,5 +1,6 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { NotFoundError } from '../../../common/errors/app-error.js';
+import { ForbiddenError, NotFoundError } from '../../../common/errors/app-error.js';
+import { VerificationStatus } from '../enums/verification-status.enum.js';
 import {
   DOCTORS_REPOSITORY,
   type IDoctorsRepository,
@@ -87,6 +88,10 @@ export class DoctorsService {
       throw new NotFoundError('Doctor profile not found for authenticated user');
     }
 
+    if (existing.verificationStatus === VerificationStatus.SUSPENDED) {
+      throw new ForbiddenError('Suspended physicians cannot modify their profile');
+    }
+
     const updated = await this.repository.updateProfile(existing.id, {
       displayName: dto.displayName ? dto.displayName.trim() : undefined,
       bio: dto.bio !== undefined ? dto.bio.trim() : undefined,
@@ -127,7 +132,7 @@ export class DoctorsService {
       ? await this.repository.findByPublicId(identifier)
       : await this.repository.findById(identifier);
 
-    if (!profile) {
+    if (!profile || profile.verificationStatus !== VerificationStatus.VERIFIED) {
       throw new NotFoundError(`Doctor not found with identifier '${identifier}'`);
     }
 

@@ -165,11 +165,42 @@ export async function cleanupE2EUsers(
   if (!validEmails.length) return;
   try {
     const prisma = app.get(PrismaService);
-    await prisma.user.deleteMany({
-      where: {
-        email: { in: validEmails },
-      },
+    const users = await prisma.user.findMany({
+      where: { email: { in: validEmails } },
+      select: { id: true },
     });
+    const userIds = users.map((u) => u.id);
+    if (userIds.length > 0) {
+      const doctors = await prisma.doctorProfile.findMany({
+        where: { userId: { in: userIds } },
+        select: { id: true },
+      });
+      const doctorIds = doctors.map((d) => d.id);
+      if (doctorIds.length > 0) {
+        const verifications = await prisma.doctorVerification.findMany({
+          where: { doctorId: { in: doctorIds } },
+          select: { id: true },
+        });
+        const verifIds = verifications.map((v) => v.id);
+        if (verifIds.length > 0) {
+          await prisma.verificationReview.deleteMany({
+            where: { verificationId: { in: verifIds } },
+          });
+          await prisma.verificationDocument.deleteMany({
+            where: { verificationId: { in: verifIds } },
+          });
+          await prisma.doctorVerification.deleteMany({ where: { id: { in: verifIds } } });
+        }
+        await prisma.consultationOffer.deleteMany({ where: { doctorId: { in: doctorIds } } });
+        await prisma.doctorAvailability.deleteMany({ where: { doctorId: { in: doctorIds } } });
+        await prisma.doctorSpecialty.deleteMany({ where: { doctorId: { in: doctorIds } } });
+        await prisma.doctorLanguage.deleteMany({ where: { doctorId: { in: doctorIds } } });
+        await prisma.doctorQualification.deleteMany({ where: { doctorId: { in: doctorIds } } });
+        await prisma.doctorProfile.deleteMany({ where: { id: { in: doctorIds } } });
+      }
+      await prisma.patientProfile.deleteMany({ where: { userId: { in: userIds } } });
+      await prisma.user.deleteMany({ where: { id: { in: userIds } } });
+    }
   } catch {
     // Ignore cleanup errors during teardown
   }

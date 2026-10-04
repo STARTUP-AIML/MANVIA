@@ -1,4 +1,5 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
+import { PrismaService } from '../../../database/prisma.service.js';
 import { ConflictError, NotFoundError } from '../../../common/errors/app-error.js';
 import { DoctorVerificationStatus } from '../enums/doctor-verification-status.enum.js';
 import { DocumentStatus } from '../enums/document-status.enum.js';
@@ -101,8 +102,12 @@ interface PrismaClientLike {
 export class PrismaDoctorVerificationRepository implements IDoctorVerificationRepository {
   private readonly prisma: PrismaClientLike;
 
-  constructor(@Optional() prismaClient?: PrismaClientLike) {
-    this.prisma = prismaClient ?? (null as unknown as PrismaClientLike);
+  constructor(
+    @Optional()
+    @Inject(PrismaService)
+    prismaService?: PrismaService,
+  ) {
+    this.prisma = (prismaService ?? null) as unknown as PrismaClientLike;
   }
 
   public async findActiveByDoctorId(doctorId: string): Promise<DoctorVerificationEntity | null> {
@@ -234,7 +239,13 @@ export class PrismaDoctorVerificationRepository implements IDoctorVerificationRe
 
       return this.mapDocumentToEntity(created);
     } catch (err: unknown) {
-      if (err instanceof Error && err.message.includes('Unique constraint failed')) {
+      if (
+        (err instanceof Error && err.message.includes('Unique constraint')) ||
+        (err &&
+          typeof err === 'object' &&
+          'code' in err &&
+          (err as { code: string }).code === 'P2002')
+      ) {
         throw new ConflictError('A document with this storage key already exists');
       }
       throw err;

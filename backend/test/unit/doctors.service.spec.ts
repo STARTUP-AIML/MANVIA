@@ -204,6 +204,8 @@ describe('DoctorsService', () => {
       ],
     });
 
+    await repository.updateVerificationStatus(created.id, VerificationStatus.VERIFIED);
+
     const publicProfile = await service.getPublicDoctorById(created.publicDoctorId);
 
     expect(publicProfile.publicDoctorId).toBe(created.publicDoctorId);
@@ -246,6 +248,12 @@ describe('DoctorsService', () => {
       languages: [{ languageId: spanish.id }],
     });
 
+    const doc1 = await repository.findByUserId('user-doc-1');
+    await repository.updateVerificationStatus(doc1!.id, VerificationStatus.VERIFIED);
+
+    const doc2 = await repository.findByUserId('user-doc-2');
+    await repository.updateVerificationStatus(doc2!.id, VerificationStatus.VERIFIED);
+
     // Search by specialty
     const cardioResults = await service.searchPublicDoctors({ specialty: 'CARDIO' });
     expect(cardioResults.total).toBe(1);
@@ -260,5 +268,24 @@ describe('DoctorsService', () => {
     const allResults = await service.searchPublicDoctors({ limit: 1, offset: 0 });
     expect(allResults.total).toBe(2);
     expect(allResults.data.length).toBe(1);
+  });
+
+  it('SECURITY: should NOT expose unverified, draft, or suspended doctors in public directory or by ID', async () => {
+    const unverified = await service.initializeProfile('user-unverified', {
+      displayName: 'Dr. Unverified',
+      medicalRegistrationNumber: 'UNVERIFIED-REG',
+      licensingCouncil: 'Board',
+    });
+
+    // Should not be discoverable in public search
+    const searchResults = await service.searchPublicDoctors({ limit: 10, offset: 0 });
+    expect(searchResults.data.some((d) => d.publicDoctorId === unverified.publicDoctorId)).toBe(
+      false,
+    );
+
+    // Should throw NotFoundError when fetching by ID directly
+    await expect(service.getPublicDoctorById(unverified.publicDoctorId)).rejects.toThrow(
+      NotFoundError,
+    );
   });
 });

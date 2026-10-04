@@ -78,3 +78,126 @@ export interface PaginatedDoctorsResponse {
   limit: number;
   offset: number;
 }
+
+export interface DoctorSpecialtyLink {
+  id: string;
+  specialtyId: string;
+  isPrimary: boolean;
+  specialty?: Specialty;
+}
+
+export interface DoctorLanguageLink {
+  id: string;
+  languageId: string;
+  language?: Language;
+}
+
+export interface DoctorSelfProfile {
+  id: string;
+  userId: string;
+  publicDoctorId: string;
+  displayName: string;
+  bio?: string | null;
+  medicalRegistrationNumber: string;
+  licensingCouncil: string;
+  yearsOfExperience: number;
+  verificationStatus: DoctorVerificationStatus | string;
+  defaultConsultationFee: number;
+  currency: string;
+  verifiedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  specialties: DoctorSpecialtyLink[];
+  languages: DoctorLanguageLink[];
+  qualifications: DoctorQualification[];
+}
+
+export interface VerificationDocument {
+  id: string;
+  documentType: string;
+  originalFileName: string;
+  mimeType: string;
+  fileSizeBytes: number;
+  status: string;
+  createdAt: string;
+}
+
+export interface DoctorVerificationResponse {
+  id: string;
+  status: DoctorVerificationStatus | string;
+  submissionNotes?: string | null;
+  rejectionReason?: string | null;
+  submittedAt?: string | null;
+  reviewedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  documents: VerificationDocument[];
+}
+
+export interface DoctorAvailability {
+  id: string;
+  doctorId: string;
+  timezone: string;
+  dayOfWeek: DayOfWeek;
+  startTime: string;
+  endTime: string;
+  effectiveFrom?: string | null;
+  effectiveUntil?: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ConsultationOffer {
+  id: string;
+  doctorId: string;
+  title: string;
+  description?: string | null;
+  consultationType: ConsultationType;
+  durationMinutes: number;
+  fee: number;
+  currency: string;
+  status: 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface VerificationReview {
+  id: string;
+  reviewerAdminId: string;
+  action: 'APPROVED' | 'REJECTED';
+  reason?: string | null;
+  notes?: string | null;
+  createdAt: string;
+}
+
+export interface AdminVerificationDetail {
+  id: string;
+  doctorId: string;
+  status: DoctorVerificationStatus | string;
+  submissionNotes?: string | null;
+  rejectionReason?: string | null;
+  submittedAt?: string | null;
+  reviewedAt?: string | null;
+  reviewedBy?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  doctorProfile?: {
+    id: string;
+    userId: string;
+    publicDoctorId: string;
+    displayName: string;
+    medicalRegistrationNumber: string;
+    licensingCouncil: string;
+    yearsOfExperience: number;
+  };
+  documents: VerificationDocument[];
+  reviews: VerificationReview[];
+}
+
+export interface AdminVerificationListResponse {
+  items: AdminVerificationDetail[];
+  total: number;
+  limit: number;
+  offset: number;
+}

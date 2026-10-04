@@ -145,7 +145,7 @@ describe('Doctor Verification HTTP API (E2E)', () => {
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.body);
     expect(body.documentId).toBe(documentId);
-    expect(body.accessUrl).toContain('vault.manvia.internal');
+    expect(body.accessUrl).toContain('/api/v1/doctors/me/verification/documents/access');
     expect(body.expiresInSeconds).toBe(300);
   });
 

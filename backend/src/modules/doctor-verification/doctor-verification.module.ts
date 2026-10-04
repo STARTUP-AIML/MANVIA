@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { DatabaseModule } from '../../database/database.module.js';
 import { DoctorsModule } from '../doctors/doctors.module.js';
 import { DoctorVerificationController } from './controllers/doctor-verification.controller.js';
 import { AdminVerificationController } from './controllers/admin-verification.controller.js';
@@ -9,10 +10,10 @@ import { VerificationAuditService } from './services/verification-audit.service.
 import { VERIFICATION_AUDIT_SERVICE } from './interfaces/audit-service.interface.js';
 import { AdminAuthGuard } from './guards/admin-auth.guard.js';
 import { DOCTOR_VERIFICATION_REPOSITORY } from './interfaces/verification-repository.interface.js';
-import { InMemoryDoctorVerificationRepository } from './repositories/in-memory-verification.repository.js';
+import { PrismaDoctorVerificationRepository } from './repositories/prisma-verification.repository.js';
 
 @Module({
-  imports: [DoctorsModule],
+  imports: [DatabaseModule, DoctorsModule],
   controllers: [DoctorVerificationController, AdminVerificationController],
   providers: [
     DoctorVerificationService,
@@ -28,7 +29,7 @@ import { InMemoryDoctorVerificationRepository } from './repositories/in-memory-v
     },
     {
       provide: DOCTOR_VERIFICATION_REPOSITORY,
-      useClass: InMemoryDoctorVerificationRepository,
+      useClass: PrismaDoctorVerificationRepository,
     },
   ],
   exports: [

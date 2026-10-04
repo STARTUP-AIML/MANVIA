@@ -48,6 +48,10 @@ export class DoctorAvailabilityService {
       throw new NotFoundError('Doctor profile not found for authenticated user');
     }
 
+    if (doctor.verificationStatus === VerificationStatus.SUSPENDED) {
+      throw new ForbiddenError('Suspended physicians cannot modify availability schedules');
+    }
+
     // 1. Timezone validity check
     this.validationService.validateTimezone(dto.timezone);
 
@@ -88,6 +92,10 @@ export class DoctorAvailabilityService {
     const doctor = await this.doctorsRepo.findByUserId(userId);
     if (!doctor) {
       throw new NotFoundError('Doctor profile not found for authenticated user');
+    }
+
+    if (doctor.verificationStatus === VerificationStatus.SUSPENDED) {
+      throw new ForbiddenError('Suspended physicians cannot modify availability schedules');
     }
 
     const existing = await this.availabilityRepo.findAvailabilityById(availabilityId);
@@ -162,6 +170,10 @@ export class DoctorAvailabilityService {
     const doctor = await this.doctorsRepo.findByUserId(userId);
     if (!doctor) {
       throw new NotFoundError('Doctor profile not found for authenticated user');
+    }
+
+    if (doctor.verificationStatus === VerificationStatus.SUSPENDED) {
+      throw new ForbiddenError('Suspended physicians cannot modify availability schedules');
     }
 
     const existing = await this.availabilityRepo.findAvailabilityById(availabilityId);

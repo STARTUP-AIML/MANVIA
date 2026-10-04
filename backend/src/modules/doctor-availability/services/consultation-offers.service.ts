@@ -49,6 +49,10 @@ export class ConsultationOffersService {
       throw new NotFoundError('Doctor profile not found for authenticated user');
     }
 
+    if (doctor.verificationStatus === VerificationStatus.SUSPENDED) {
+      throw new ForbiddenError('Suspended physicians cannot modify consultation offers');
+    }
+
     if (dto.durationMinutes <= 0) {
       throw new ValidationError('Consultation duration must be greater than 0 minutes');
     }
@@ -99,6 +103,10 @@ export class ConsultationOffersService {
       throw new NotFoundError('Doctor profile not found for authenticated user');
     }
 
+    if (doctor.verificationStatus === VerificationStatus.SUSPENDED) {
+      throw new ForbiddenError('Suspended physicians cannot modify consultation offers');
+    }
+
     const existing = await this.availabilityRepo.findOfferById(offerId);
     if (!existing) {
       throw new NotFoundError(`Consultation offer with ID '${offerId}' not found`);
@@ -142,6 +150,10 @@ export class ConsultationOffersService {
     const doctor = await this.doctorsRepo.findByUserId(userId);
     if (!doctor) {
       throw new NotFoundError('Doctor profile not found for authenticated user');
+    }
+
+    if (doctor.verificationStatus === VerificationStatus.SUSPENDED) {
+      throw new ForbiddenError('Suspended physicians cannot modify consultation offers');
     }
 
     const existing = await this.availabilityRepo.findOfferById(offerId);

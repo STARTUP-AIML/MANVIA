@@ -7,6 +7,7 @@ import {
   ValidationError,
 } from '../../../common/errors/app-error.js';
 import { DoctorVerificationStatus } from '../enums/doctor-verification-status.enum.js';
+import { VerificationStatus } from '../../doctors/enums/verification-status.enum.js';
 import {
   DOCTOR_VERIFICATION_REPOSITORY,
   type IDoctorVerificationRepository,
@@ -27,6 +28,40 @@ import type { DoctorVerificationResponseDto } from '../dto/doctor-verification-r
 import type { VerificationDocumentResponseDto } from '../dto/verification-document-response.dto.js';
 import type { DoctorVerificationEntity } from '../entities/doctor-verification.entity.js';
 import type { VerificationDocumentEntity } from '../entities/verification-document.entity.js';
+
+const ALLOWED_MIME_TYPES = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/webp']);
+
+function validateMagicBytes(buffer: Buffer, mimeType: string): boolean {
+  if (buffer.length < 4) return false;
+  if (mimeType === 'application/pdf') {
+    const head = buffer.subarray(0, 4).toString('ascii');
+    return head === '%PDF' || head.startsWith('PDF');
+  }
+  if (mimeType === 'image/jpeg') {
+    return buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+  }
+  if (mimeType === 'image/png') {
+    return (
+      buffer.length >= 8 &&
+      buffer[0] === 0x89 &&
+      buffer[1] === 0x50 &&
+      buffer[2] === 0x4e &&
+      buffer[3] === 0x47 &&
+      buffer[4] === 0x0d &&
+      buffer[5] === 0x0a &&
+      buffer[6] === 0x1a &&
+      buffer[7] === 0x0a
+    );
+  }
+  if (mimeType === 'image/webp') {
+    return (
+      buffer.length >= 12 &&
+      buffer.subarray(0, 4).toString('ascii') === 'RIFF' &&
+      buffer.subarray(8, 12).toString('ascii') === 'WEBP'
+    );
+  }
+  return true;
+}
 
 @Injectable()
 export class DoctorVerificationService {
@@ -65,6 +100,10 @@ export class DoctorVerificationService {
       throw new NotFoundError('Doctor profile not found for authenticated user');
     }
 
+    if (doctor.verificationStatus === VerificationStatus.SUSPENDED) {
+      throw new ForbiddenError('Suspended physicians cannot modify verification drafts');
+    }
+
     const current = await this.verificationRepo.findActiveByDoctorId(doctor.id);
 
     if (!current) {
@@ -101,6 +140,16 @@ export class DoctorVerificationService {
       throw new NotFoundError('Doctor profile not found for authenticated user');
     }
 
+    if (doctor.verificationStatus === VerificationStatus.SUSPENDED) {
+      throw new ForbiddenError('Suspended physicians cannot upload verification documents');
+    }
+
+    if (!ALLOWED_MIME_TYPES.has(dto.mimeType)) {
+      throw new ValidationError(
+        'Invalid document MIME type. Supported types: application/pdf, image/jpeg, image/png, image/webp',
+      );
+    }
+
     let verification = await this.verificationRepo.findActiveByDoctorId(doctor.id);
     if (!verification) {
       verification = await this.verificationRepo.createDraft(doctor.id);
@@ -128,6 +177,14 @@ export class DoctorVerificationService {
     const buffer = dto.contentBase64
       ? Buffer.from(dto.contentBase64, 'base64')
       : Buffer.from(`verification-doc-${Date.now()}`);
+
+    if (buffer.length > 10 * 1024 * 1024) {
+      throw new ValidationError('File size exceeds the 10MB limit');
+    }
+
+    if (dto.contentBase64 && !validateMagicBytes(buffer, dto.mimeType)) {
+      throw new ValidationError('Document content does not match the specified MIME type');
+    }
 
     await this.storageService.upload({
       key: storageKey,
@@ -173,6 +230,10 @@ export class DoctorVerificationService {
     const doctor = await this.doctorsRepo.findByUserId(userId);
     if (!doctor) {
       throw new NotFoundError('Doctor profile not found for authenticated user');
+    }
+
+    if (doctor.verificationStatus === VerificationStatus.SUSPENDED) {
+      throw new ForbiddenError('Suspended physicians cannot submit verification');
     }
 
     let verification = await this.verificationRepo.findActiveByDoctorId(doctor.id);
@@ -270,6 +331,37 @@ export class DoctorVerificationService {
       documentId: document.id,
       accessUrl,
       expiresInSeconds,
+    };
+  }
+
+  public async downloadDocument(
+    userId: string,
+    documentId: string,
+  ): Promise<{ buffer: Buffer; mimeType: string; originalFileName: string }> {
+    const doctor = await this.doctorsRepo.findByUserId(userId);
+    if (!doctor) {
+      throw new NotFoundError('Doctor profile not found for authenticated user');
+    }
+
+    const document = await this.verificationRepo.findDocumentById(documentId);
+    if (!document) {
+      throw new NotFoundError('Verification document not found');
+    }
+
+    const verification = await this.verificationRepo.findById(document.verificationId);
+    if (!verification) {
+      throw new NotFoundError('Associated verification submission not found');
+    }
+
+    if (verification.doctorId !== doctor.id) {
+      throw new ForbiddenError('Access to this verification document is denied');
+    }
+
+    const buffer = await this.storageService.download(document.storageKey);
+    return {
+      buffer,
+      mimeType: document.mimeType,
+      originalFileName: document.originalFileName,
     };
   }
 

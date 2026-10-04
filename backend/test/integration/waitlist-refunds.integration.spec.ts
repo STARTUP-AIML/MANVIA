@@ -149,8 +149,8 @@ describe('Phase 14 End-to-End Integration Flow: Booking -> Cancellation -> Refun
     expect(bobWaitlist.status).toBe(WaitlistStatus.ACTIVE);
     expect(charlieWaitlist.status).toBe(WaitlistStatus.ACTIVE);
 
-    // 2. Alice books an appointment on Monday at 10:00 AM (e.g., 2026-10-05)
-    const slotStart = new Date('2026-10-05T10:00:00.000Z');
+    // 2. Alice books an appointment on Monday at 10:00 AM (e.g., 2026-10-12)
+    const slotStart = new Date('2026-10-12T10:00:00.000Z');
     const aliceAppointment = await appointmentsService.createAppointment(PATIENT_ALICE, {
       doctorId,
       consultationOfferId: offerId,

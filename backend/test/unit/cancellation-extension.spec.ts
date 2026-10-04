@@ -147,7 +147,7 @@ describe('Appointments Cancellation Extension (Unit Tests)', () => {
     });
 
     // 2. Alice books appointment >24h in advance (e.g. next Monday)
-    const slotStart = new Date('2026-10-05T10:00:00.000Z');
+    const slotStart = new Date('2026-10-12T10:00:00.000Z');
     const appt = await appointmentsService.createAppointment(PATIENT_USER, {
       doctorId,
       consultationOfferId: offerId,
