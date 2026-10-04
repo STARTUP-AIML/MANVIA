@@ -1,4 +1,5 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
+import { PrismaService } from '../../../database/prisma.service.js';
 import { ConflictError, NotFoundError } from '../../../common/errors/app-error.js';
 import { VerificationStatus } from '../enums/verification-status.enum.js';
 import type { DoctorProfileEntity } from '../entities/doctor-profile.entity.js';
@@ -114,8 +115,12 @@ export interface PrismaClientLike {
 export class PrismaDoctorsRepository implements IDoctorsRepository {
   private readonly prisma: PrismaClientLike;
 
-  constructor(@Optional() prismaClient?: PrismaClientLike) {
-    this.prisma = prismaClient ?? (null as unknown as PrismaClientLike);
+  constructor(
+    @Optional()
+    @Inject(PrismaService)
+    prismaClient?: PrismaService | PrismaClientLike,
+  ) {
+    this.prisma = (prismaClient ?? null) as unknown as PrismaClientLike;
   }
 
   public async createProfile(data: CreateDoctorProfileData): Promise<DoctorProfileEntity> {
@@ -188,6 +193,23 @@ export class PrismaDoctorsRepository implements IDoctorsRepository {
         }
         throw new ConflictError('Unique constraint violation on doctor profile');
       }
+
+      if (
+        error &&
+        typeof error === 'object' &&
+        'code' in error &&
+        (error as { code: string }).code === 'P2003'
+      ) {
+        const message = String((error as { message?: string }).message || '');
+        if (message.includes('specialty_id') || message.includes('doctor_specialties')) {
+          throw new NotFoundError('Referenced specialty does not exist');
+        }
+        if (message.includes('language_id') || message.includes('doctor_languages')) {
+          throw new NotFoundError('Referenced language does not exist');
+        }
+        throw new NotFoundError('Referenced foreign entity does not exist');
+      }
+
       throw error;
     }
   }
@@ -349,7 +371,9 @@ export class PrismaDoctorsRepository implements IDoctorsRepository {
   ): Promise<{ doctors: DoctorProfileEntity[]; total: number }> {
     this.ensurePrismaClient();
 
-    const where: Record<string, unknown> = {};
+    const where: Record<string, unknown> = {
+      verificationStatus: VerificationStatus.VERIFIED,
+    };
 
     if (criteria.specialty) {
       where.specialties = {

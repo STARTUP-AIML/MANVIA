@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { DatabaseModule } from '../../database/database.module.js';
 import { DoctorsModule } from '../doctors/doctors.module.js';
 import { DoctorAvailabilityController } from './controllers/doctor-availability.controller.js';
 import { ConsultationOffersController } from './controllers/consultation-offers.controller.js';
@@ -7,10 +8,10 @@ import { AvailabilityValidationService } from './services/availability-validatio
 import { DoctorAvailabilityService } from './services/doctor-availability.service.js';
 import { ConsultationOffersService } from './services/consultation-offers.service.js';
 import { DOCTOR_AVAILABILITY_REPOSITORY } from './interfaces/availability-repository.interface.js';
-import { InMemoryDoctorAvailabilityRepository } from './repositories/in-memory-doctor-availability.repository.js';
+import { PrismaDoctorAvailabilityRepository } from './repositories/prisma-doctor-availability.repository.js';
 
 @Module({
-  imports: [DoctorsModule],
+  imports: [DatabaseModule, DoctorsModule],
   controllers: [
     DoctorAvailabilityController,
     ConsultationOffersController,
@@ -22,7 +23,7 @@ import { InMemoryDoctorAvailabilityRepository } from './repositories/in-memory-d
     ConsultationOffersService,
     {
       provide: DOCTOR_AVAILABILITY_REPOSITORY,
-      useClass: InMemoryDoctorAvailabilityRepository,
+      useClass: PrismaDoctorAvailabilityRepository,
     },
   ],
   exports: [

@@ -18,7 +18,7 @@ export class AdminAuthGuard implements CanActivate {
       throw new UnauthorizedError('Authentication credentials required');
     }
 
-    const activeRole = user?.activeRole ?? (Array.isArray(user?.roles) ? user.roles[0] : undefined);
+    const activeRole = user?.activeRole;
     if (activeRole !== 'ADMIN') {
       throw new ForbiddenError('Administrator role required to access this resource');
     }

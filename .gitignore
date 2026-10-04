@@ -54,6 +54,8 @@ Thumbs.db
 .temp/
 tmp/
 *.tmp
+uploads/
+backend/uploads/
 
 # Docker local overrides
 docker-compose.override.yml

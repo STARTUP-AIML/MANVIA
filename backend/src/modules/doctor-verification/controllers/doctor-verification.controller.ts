@@ -6,9 +6,15 @@ import {
   HttpStatus,
   Param,
   Post,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+
+interface FastifyReplyLike {
+  header(name: string, value: string): unknown;
+  send(payload: unknown): unknown;
+}
 import { DoctorAuthGuard } from '../../doctors/guards/doctor-auth.guard.js';
 import { CurrentUser } from '../../doctors/decorators/current-user.decorator.js';
 import type { CurrentUserContext } from '../../doctors/interfaces/auth-context.interface.js';
@@ -149,5 +155,26 @@ export class DoctorVerificationController {
     @Param('documentId') documentId: string,
   ): Promise<{ documentId: string; accessUrl: string; expiresInSeconds: number }> {
     return this.verificationService.getDocumentAccessUrl(user.userId, documentId);
+  }
+
+  @Get('documents/:documentId/download')
+  @ApiOperation({
+    summary: 'Download physician own verification document file',
+    description: 'Streams the uploaded document directly with appropriate Content-Type.',
+  })
+  @ApiParam({ name: 'documentId', description: 'UUID of the verification document' })
+  @ApiResponse({ status: 200, description: 'Document binary stream' })
+  @ApiResponse({ status: 401, description: 'Authentication credentials required' })
+  @ApiResponse({ status: 403, description: 'Doctor role required or cross-doctor access denied' })
+  @ApiResponse({ status: 404, description: 'Document not found' })
+  public async downloadDocument(
+    @CurrentUser() user: CurrentUserContext,
+    @Param('documentId') documentId: string,
+    @Res() res: FastifyReplyLike,
+  ): Promise<void> {
+    const doc = await this.verificationService.downloadDocument(user.userId, documentId);
+    res.header('Content-Type', doc.mimeType);
+    res.header('Content-Disposition', `attachment; filename="${doc.originalFileName}"`);
+    res.send(doc.buffer);
   }
 }

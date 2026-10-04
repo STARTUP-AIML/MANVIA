@@ -283,7 +283,9 @@ export class InMemoryDoctorsRepository implements IDoctorsRepository {
   public async findPublicDoctors(
     criteria: DoctorFilterCriteria,
   ): Promise<{ doctors: DoctorProfileEntity[]; total: number }> {
-    let filtered = Array.from(this.profiles.values());
+    let filtered = Array.from(this.profiles.values()).filter(
+      (doc) => doc.verificationStatus === VerificationStatus.VERIFIED,
+    );
 
     // Filter by specialty if requested
     if (criteria.specialty) {

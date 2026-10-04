@@ -202,6 +202,25 @@ export class AdminVerificationService {
     };
   }
 
+  public async downloadDocument(
+    verificationId: string,
+    documentId: string,
+  ): Promise<{ buffer: Buffer; mimeType: string; originalFileName: string }> {
+    const document = await this.verificationRepo.findDocumentById(documentId);
+    if (!document || document.verificationId !== verificationId) {
+      throw new NotFoundError(
+        `Verification document '${documentId}' not found for verification '${verificationId}'`,
+      );
+    }
+
+    const buffer = await this.storageService.download(document.storageKey);
+    return {
+      buffer,
+      mimeType: document.mimeType,
+      originalFileName: document.originalFileName,
+    };
+  }
+
   private mapToAdminDetail(v: DoctorVerificationEntity): AdminVerificationDetailResponseDto {
     return {
       id: v.id,

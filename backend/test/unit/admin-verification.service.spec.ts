@@ -194,7 +194,7 @@ describe('AdminVerificationService (Unit Tests)', () => {
     const access = await adminService.getAdminDocumentAccessUrl(submitted.id, docId, ADMIN_USER_ID);
 
     expect(access.documentId).toBe(docId);
-    expect(access.accessUrl).toContain('vault.manvia.internal');
+    expect(access.accessUrl).toContain('/documents/access');
     expect(access.expiresInSeconds).toBe(600);
   });
 
