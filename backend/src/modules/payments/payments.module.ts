@@ -22,12 +22,14 @@ import { InMemoryPaymentRepository } from './repositories/in-memory-payment.repo
 import { PrismaPaymentRepository } from './repositories/prisma-payment.repository.js';
 import { PAYMENT_REPOSITORY } from './interfaces/payment-repository.interface.js';
 import { PAYMENT_PROVIDER } from './interfaces/payment-provider.interface.js';
+import { DatabaseModule } from '../../database/database.module.js';
 import { PAYOUT_PROVIDER } from './interfaces/payout-provider.interface.js';
 import { PRICING_STRATEGY } from './interfaces/pricing-strategy.interface.js';
 import { PAYMENT_AUDIT_SERVICE } from './interfaces/payment-audit-service.interface.js';
 
 @Module({
   imports: [
+    DatabaseModule,
     forwardRef(() => AppointmentsModule),
     DoctorsModule,
     DoctorAvailabilityModule,
@@ -55,7 +57,7 @@ import { PAYMENT_AUDIT_SERVICE } from './interfaces/payment-audit-service.interf
     PrismaPaymentRepository,
     {
       provide: PAYMENT_REPOSITORY,
-      useClass: InMemoryPaymentRepository,
+      useClass: PrismaPaymentRepository,
     },
     {
       provide: PAYMENT_PROVIDER,

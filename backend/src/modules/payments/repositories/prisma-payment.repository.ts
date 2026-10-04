@@ -1,4 +1,5 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
+import { PrismaService } from '../../../database/prisma.service.js';
 import type {
   IPaymentRepository,
   FindPaymentsQuery,
@@ -51,8 +52,12 @@ interface PrismaClientLike {
 export class PrismaPaymentRepository implements IPaymentRepository {
   private readonly prisma?: PrismaClientLike | undefined;
 
-  public constructor(@Optional() prisma?: PrismaClientLike | undefined) {
-    this.prisma = prisma;
+  public constructor(
+    @Optional()
+    @Inject(PrismaService)
+    prisma?: PrismaClientLike | PrismaService | undefined,
+  ) {
+    this.prisma = (prisma ?? undefined) as unknown as PrismaClientLike | undefined;
   }
 
   private getClient(): PrismaClientLike {

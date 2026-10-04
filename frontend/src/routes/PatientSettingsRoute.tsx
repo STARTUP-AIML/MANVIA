@@ -26,6 +26,10 @@ import { Badge } from "@/components/ui/Badge";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { useToast } from "@/components/feedback/Toast/ToastContext";
+import {
+  useNotificationPreferences,
+  useUpdateNotificationPreferences,
+} from "@/hooks";
 
 export const PatientSettingsRoute: React.FC = () => {
   const { user, activeRole, logout } = useAuth();
@@ -44,6 +48,32 @@ export const PatientSettingsRoute: React.FC = () => {
   const [activeModal, setActiveModal] = useState<
     "terms" | "privacy" | "about" | "support" | null
   >(null);
+
+  const { data: notifPrefs } = useNotificationPreferences();
+  const updatePrefs = useUpdateNotificationPreferences();
+
+  const handleTogglePref = (
+    key:
+      | "inAppEnabled"
+      | "emailEnabled"
+      | "smsEnabled"
+      | "pushEnabled"
+      | "appointmentReminders"
+      | "marketingUpdates",
+    currentValue: boolean
+  ) => {
+    updatePrefs.mutate(
+      { [key]: !currentValue },
+      {
+        onSuccess: () => {
+          toast.success("Notification preference updated.");
+        },
+        onError: () => {
+          toast.error("Failed to update preference.");
+        },
+      }
+    );
+  };
 
   const handleLogout = async () => {
     await logout();
@@ -293,19 +323,87 @@ export const PatientSettingsRoute: React.FC = () => {
               gap: "var(--space-3)",
             }}
           >
-            <div className="settings-field-row">
-              <span className="settings-field-label">Security Alerts</span>
-              <Badge variant="primary">Mandatory</Badge>
+            <div className="settings-field-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <span className="settings-field-label" style={{ display: "block", fontWeight: 600 }}>Security Alerts</span>
+                <span style={{ fontSize: "12px", color: "var(--color-text-secondary)" }}>Critical account and safety notifications</span>
+              </div>
+              <Badge variant="primary">Mandatory (Active)</Badge>
             </div>
-            <div className="settings-field-row">
-              <span className="settings-field-label">
-                Appointment Reminders
-              </span>
-              <Badge variant="success">Enabled</Badge>
+
+            <div className="settings-field-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <span className="settings-field-label" style={{ display: "block", fontWeight: 600 }}>In-App Notifications</span>
+                <span style={{ fontSize: "12px", color: "var(--color-text-secondary)" }}>Alerts in your notification drawer</span>
+              </div>
+              <Button
+                variant={notifPrefs?.inAppEnabled ?? true ? "secondary" : "outline"}
+                size="sm"
+                data-testid="toggle-in-app"
+                onClick={() => handleTogglePref("inAppEnabled", notifPrefs?.inAppEnabled ?? true)}
+              >
+                {notifPrefs?.inAppEnabled ?? true ? "Enabled" : "Disabled"}
+              </Button>
             </div>
-            <div className="settings-field-row">
-              <span className="settings-field-label">Care Team Messages</span>
-              <Badge variant="success">Enabled</Badge>
+
+            <div className="settings-field-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <span className="settings-field-label" style={{ display: "block", fontWeight: 600 }}>Email Notifications</span>
+                <span style={{ fontSize: "12px", color: "var(--color-text-secondary)" }}>Invoices, receipts, and consultation summaries</span>
+              </div>
+              <Button
+                variant={notifPrefs?.emailEnabled ?? true ? "secondary" : "outline"}
+                size="sm"
+                data-testid="toggle-email"
+                onClick={() => handleTogglePref("emailEnabled", notifPrefs?.emailEnabled ?? true)}
+              >
+                {notifPrefs?.emailEnabled ?? true ? "Enabled" : "Disabled"}
+              </Button>
+            </div>
+
+            <div className="settings-field-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <span className="settings-field-label" style={{ display: "block", fontWeight: 600 }}>SMS Notifications</span>
+                <span style={{ fontSize: "12px", color: "var(--color-text-secondary)" }}>Urgent appointment updates and timing alerts</span>
+              </div>
+              <Button
+                variant={notifPrefs?.smsEnabled ?? false ? "secondary" : "outline"}
+                size="sm"
+                data-testid="toggle-sms"
+                onClick={() => handleTogglePref("smsEnabled", notifPrefs?.smsEnabled ?? false)}
+              >
+                {notifPrefs?.smsEnabled ?? false ? "Enabled" : "Disabled"}
+              </Button>
+            </div>
+
+            <div className="settings-field-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <span className="settings-field-label" style={{ display: "block", fontWeight: 600 }}>Appointment Reminders</span>
+                <span style={{ fontSize: "12px", color: "var(--color-text-secondary)" }}>Reminders 24 hours and 1 hour before consult</span>
+              </div>
+              <Button
+                variant={notifPrefs?.appointmentReminders ?? true ? "secondary" : "outline"}
+                size="sm"
+                data-testid="toggle-reminders"
+                onClick={() => handleTogglePref("appointmentReminders", notifPrefs?.appointmentReminders ?? true)}
+              >
+                {notifPrefs?.appointmentReminders ?? true ? "Enabled" : "Disabled"}
+              </Button>
+            </div>
+
+            <div className="settings-field-row" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <div>
+                <span className="settings-field-label" style={{ display: "block", fontWeight: 600 }}>Platform Updates</span>
+                <span style={{ fontSize: "12px", color: "var(--color-text-secondary)" }}>New wellness resources and care guides</span>
+              </div>
+              <Button
+                variant={notifPrefs?.marketingUpdates ?? false ? "secondary" : "outline"}
+                size="sm"
+                data-testid="toggle-marketing"
+                onClick={() => handleTogglePref("marketingUpdates", notifPrefs?.marketingUpdates ?? false)}
+              >
+                {notifPrefs?.marketingUpdates ?? false ? "Enabled" : "Disabled"}
+              </Button>
             </div>
             <p
               className="body-secondary"
