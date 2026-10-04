@@ -1,5 +1,10 @@
-import { Controller, Get, Param, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Param, Query, Res, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+
+interface FastifyReplyLike {
+  header(name: string, value: string): unknown;
+  send(payload: unknown): unknown;
+}
 import { DoctorAuthGuard } from '../../doctors/guards/doctor-auth.guard.js';
 import { CareRelationshipGuard } from '../../care-relationships/guards/care-relationship.guard.js';
 import { ConsentGuard } from '../../care-relationships/guards/consent.guard.js';
@@ -123,6 +128,40 @@ export class DoctorHealthRecordsController {
       patientId,
       recordId,
     );
+  }
+
+  @Get('health-records/:recordId/download')
+  @RequireConsent(ConsentScope.HEALTH_RECORDS)
+  @ApiOperation({
+    summary: 'Download patient health record document binary stream (Physician Access)',
+    description: 'Directly streams the health record document under valid consent.',
+  })
+  @ApiParam({
+    name: 'patientId',
+    description: 'Internal patient profile UUID or public ID (PAT-XXXXXXXX)',
+  })
+  @ApiParam({
+    name: 'recordId',
+    description: 'Health record internal UUID or public ID (REC-XXXXXXXX)',
+  })
+  @ApiResponse({ status: 200, description: 'Health record binary stream' })
+  @ApiResponse({ status: 401, description: 'Authentication credentials required' })
+  @ApiResponse({ status: 403, description: 'Access denied' })
+  @ApiResponse({ status: 404, description: 'Record not found' })
+  public async downloadPatientRecord(
+    @CurrentUser() user: CurrentUserContext,
+    @Param('patientId') patientId: string,
+    @Param('recordId') recordId: string,
+    @Res() res: FastifyReplyLike,
+  ): Promise<void> {
+    const file = await this.healthRecordsService.downloadDoctorPatientRecord(
+      user.userId,
+      patientId,
+      recordId,
+    );
+    res.header('Content-Type', file.mimeType);
+    res.header('Content-Disposition', `attachment; filename="${file.originalFileName}"`);
+    res.send(file.buffer);
   }
 
   @Get('health-timeline')

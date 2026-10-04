@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { DatabaseModule } from '../../database/database.module.js';
 import { DoctorsModule } from '../doctors/doctors.module.js';
 import { CareRelationshipsModule } from '../care-relationships/care-relationships.module.js';
 import { PatientHealthRecordsController } from './controllers/patient-health-records.controller.js';
@@ -18,7 +19,7 @@ import { HEALTH_RECORDS_AUDIT_SERVICE } from './interfaces/health-records-audit-
 import { HEALTH_RECORDS_STORAGE_SERVICE } from './interfaces/health-records-storage-service.interface.js';
 
 @Module({
-  imports: [DoctorsModule, CareRelationshipsModule],
+  imports: [DatabaseModule, DoctorsModule, CareRelationshipsModule],
   controllers: [
     PatientHealthRecordsController,
     PatientHealthTimelineController,
@@ -35,11 +36,11 @@ import { HEALTH_RECORDS_STORAGE_SERVICE } from './interfaces/health-records-stor
     PrismaHealthTimelineRepository,
     {
       provide: HEALTH_RECORD_REPOSITORY,
-      useClass: InMemoryHealthRecordRepository,
+      useClass: PrismaHealthRecordRepository,
     },
     {
       provide: HEALTH_TIMELINE_REPOSITORY,
-      useClass: InMemoryHealthTimelineRepository,
+      useClass: PrismaHealthTimelineRepository,
     },
     {
       provide: HEALTH_RECORDS_AUDIT_SERVICE,

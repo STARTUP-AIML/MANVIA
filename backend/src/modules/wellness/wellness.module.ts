@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { DatabaseModule } from '../../database/database.module.js';
 import { DoctorsModule } from '../doctors/doctors.module.js';
 import { CareRelationshipsModule } from '../care-relationships/care-relationships.module.js';
 import { PatientWellnessController } from './controllers/patient-wellness.controller.js';
@@ -11,7 +12,7 @@ import { WELLNESS_REPOSITORY } from './interfaces/wellness-repository.interface.
 import { WELLNESS_AUDIT_SERVICE } from './interfaces/wellness-audit-service.interface.js';
 
 @Module({
-  imports: [DoctorsModule, CareRelationshipsModule],
+  imports: [DatabaseModule, DoctorsModule, CareRelationshipsModule],
   controllers: [PatientWellnessController, DoctorWellnessController],
   providers: [
     WellnessService,
@@ -20,7 +21,7 @@ import { WELLNESS_AUDIT_SERVICE } from './interfaces/wellness-audit-service.inte
     PrismaWellnessRepository,
     {
       provide: WELLNESS_REPOSITORY,
-      useClass: InMemoryWellnessRepository,
+      useClass: PrismaWellnessRepository,
     },
     {
       provide: WELLNESS_AUDIT_SERVICE,

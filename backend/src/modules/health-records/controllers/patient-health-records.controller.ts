@@ -9,9 +9,15 @@ import {
   Patch,
   Post,
   Query,
+  Res,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
+
+interface FastifyReplyLike {
+  header(name: string, value: string): unknown;
+  send(payload: unknown): unknown;
+}
 import { PatientAuthGuard } from '../../care-relationships/guards/patient-auth.guard.js';
 import { CurrentUser } from '../../doctors/decorators/current-user.decorator.js';
 import type { CurrentUserContext } from '../../doctors/interfaces/auth-context.interface.js';
@@ -171,6 +177,30 @@ export class PatientHealthRecordsController {
     @Param('recordId') recordId: string,
   ): Promise<DownloadUrlResponseDto> {
     return this.healthRecordsService.getRecordDownloadUrl(user.userId, recordId);
+  }
+
+  @Get(':recordId/download')
+  @ApiOperation({
+    summary: 'Download health record document binary file',
+    description: 'Directly streams the health record binary document with proper Content-Type.',
+  })
+  @ApiParam({
+    name: 'recordId',
+    description: 'Health record internal UUID or public ID (REC-XXXXXXXX)',
+  })
+  @ApiResponse({ status: 200, description: 'Health record binary stream' })
+  @ApiResponse({ status: 401, description: 'Authentication credentials required' })
+  @ApiResponse({ status: 403, description: 'Patient role required' })
+  @ApiResponse({ status: 404, description: 'Health record not found' })
+  public async downloadRecord(
+    @CurrentUser() user: CurrentUserContext,
+    @Param('recordId') recordId: string,
+    @Res() res: FastifyReplyLike,
+  ): Promise<void> {
+    const file = await this.healthRecordsService.downloadPatientRecord(user.userId, recordId);
+    res.header('Content-Type', file.mimeType);
+    res.header('Content-Disposition', `attachment; filename="${file.originalFileName}"`);
+    res.send(file.buffer);
   }
 
   @Patch(':recordId')

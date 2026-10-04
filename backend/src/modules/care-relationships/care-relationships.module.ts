@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { DatabaseModule } from '../../database/database.module.js';
 import { DoctorsModule } from '../doctors/doctors.module.js';
 import { PatientCareRelationshipsController } from './controllers/patient-care-relationships.controller.js';
 import { PatientConsentsController } from './controllers/patient-consents.controller.js';
@@ -17,7 +18,7 @@ import { RESOURCE_AUTHORIZATION_SERVICE } from './interfaces/resource-authorizat
 import { CONSENT_AUDIT_SERVICE } from './interfaces/consent-audit-service.interface.js';
 
 @Module({
-  imports: [DoctorsModule],
+  imports: [DatabaseModule, DoctorsModule],
   controllers: [
     PatientCareRelationshipsController,
     PatientConsentsController,
@@ -35,7 +36,7 @@ import { CONSENT_AUDIT_SERVICE } from './interfaces/consent-audit-service.interf
     PrismaCareRelationshipRepository,
     {
       provide: CARE_RELATIONSHIP_REPOSITORY,
-      useClass: InMemoryCareRelationshipRepository,
+      useClass: PrismaCareRelationshipRepository,
     },
     {
       provide: RESOURCE_AUTHORIZATION_SERVICE,

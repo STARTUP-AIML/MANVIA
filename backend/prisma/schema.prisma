@@ -582,6 +582,7 @@ model ConsentHistory {
   @@index([consentId])
   @@index([actorId])
   @@index([createdAt])
+  @@map("consent_histories")
 }
 
 

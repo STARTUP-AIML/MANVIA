@@ -1,4 +1,5 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
+import { PrismaService } from '../../../database/prisma.service.js';
 import type { TimelineEventEntity } from '../entities/timeline-event.entity.js';
 import { TimelineEventType } from '../enums/timeline-event-type.enum.js';
 import type {
@@ -44,8 +45,12 @@ interface PrismaClientLike {
 export class PrismaHealthTimelineRepository implements IHealthTimelineRepository {
   private readonly prisma: PrismaClientLike | undefined;
 
-  constructor(@Optional() prisma?: PrismaClientLike | undefined) {
-    this.prisma = prisma;
+  constructor(
+    @Optional()
+    @Inject(PrismaService)
+    prisma?: PrismaClientLike | PrismaService,
+  ) {
+    this.prisma = (prisma ?? undefined) as unknown as PrismaClientLike | undefined;
   }
 
   private getClient(): PrismaClientLike {
@@ -106,6 +111,9 @@ export class PrismaHealthTimelineRepository implements IHealthTimelineRepository
   }
 
   public async findById(id: string): Promise<TimelineEventEntity | null> {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+      return null;
+    }
     const client = this.getClient();
     const found = await client.timelineEvent.findUnique({
       where: { id },
@@ -126,20 +134,27 @@ export class PrismaHealthTimelineRepository implements IHealthTimelineRepository
     eventIdOrPublicId: string,
   ): Promise<TimelineEventEntity | null> {
     const client = this.getClient();
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        eventIdOrPublicId,
+      );
+
     if (!client.timelineEvent.findFirst) {
-      const byId = await this.findById(eventIdOrPublicId);
-      if (byId && byId.patientId === patientId) return byId;
+      if (isUuid) {
+        const byId = await this.findById(eventIdOrPublicId);
+        if (byId && byId.patientId === patientId) return byId;
+      }
       const byPub = await this.findByPublicId(eventIdOrPublicId);
       if (byPub && byPub.patientId === patientId) return byPub;
       return null;
     }
 
-    const found = await client.timelineEvent.findFirst({
-      where: {
-        patientId,
-        OR: [{ id: eventIdOrPublicId }, { publicEventId: eventIdOrPublicId }],
-      },
-    });
+    const where: Record<string, unknown> = {
+      patientId,
+      ...(isUuid ? { id: eventIdOrPublicId } : { publicEventId: eventIdOrPublicId }),
+    };
+
+    const found = await client.timelineEvent.findFirst({ where });
 
     return found ? this.mapToEntity(found) : null;
   }
