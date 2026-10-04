@@ -1,19 +1,25 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { createApp } from '../../src/main.js';
 import { DOCTORS_REPOSITORY } from '../../src/modules/doctors/interfaces/doctor-repository.interface.js';
 import type { IDoctorsRepository } from '../../src/modules/doctors/interfaces/doctor-repository.interface.js';
+import {
+  setupE2EApp,
+  createE2EUser,
+  cleanupE2EUsers,
+  type E2EUser,
+} from './helpers/auth.helper.js';
 
 describe('Doctor Platform HTTP API (E2E)', () => {
   let app: NestFastifyApplication;
   let specialtyId: string;
   let languageId: string;
 
+  let doctorA: E2EUser;
+  let patientUser: E2EUser;
+  let doctorAPublicId: string;
+
   beforeAll(async () => {
-    process.env.NODE_ENV = 'test';
-    app = await createApp();
-    await app.init();
-    await app.getHttpAdapter().getInstance().ready();
+    app = await setupE2EApp();
 
     // Fetch seeded taxonomy references
     const repo = app.get<IDoctorsRepository>(DOCTORS_REPOSITORY);
@@ -21,10 +27,15 @@ describe('Doctor Platform HTTP API (E2E)', () => {
     const languages = await repo.findAllLanguages();
     specialtyId = specialties[0]!.id;
     languageId = languages[0]!.id;
-  });
+
+    // Create real authenticated users through the trusted auth path
+    doctorA = await createE2EUser(app, { role: 'DOCTOR' });
+    patientUser = await createE2EUser(app, { role: 'PATIENT' });
+  }, 60000);
 
   afterAll(async () => {
     if (app) {
+      await cleanupE2EUsers(app, [doctorA?.email, patientUser?.email]);
       await app.close();
     }
   });
@@ -86,10 +97,7 @@ describe('Doctor Platform HTTP API (E2E)', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/api/v1/doctors/profile',
-      headers: {
-        'x-user-id': 'patient-uuid-1234',
-        'x-user-role': 'PATIENT',
-      },
+      headers: patientUser.headers,
       payload: {
         displayName: 'Dr. Impostor Patient',
         medicalRegistrationNumber: 'REG-PATIENT-01',
@@ -102,14 +110,34 @@ describe('Doctor Platform HTTP API (E2E)', () => {
     expect(body.error).toBe('FORBIDDEN');
   });
 
-  it('POST /api/v1/doctors/profile should reject mass assignment of verificationStatus with 400 Bad Request', async () => {
+  it('POST /api/v1/doctors/profile should reject forged identity headers and enforce token identity', async () => {
     const res = await app.inject({
       method: 'POST',
       url: '/api/v1/doctors/profile',
       headers: {
-        'x-user-id': 'doctor-uuid-exploit',
+        ...patientUser.headers,
+        'x-user-id': doctorA.id,
         'x-user-role': 'DOCTOR',
+        'x-active-role': 'DOCTOR',
       },
+      payload: {
+        displayName: 'Dr. Forger',
+        medicalRegistrationNumber: 'REG-FORGE-01',
+        licensingCouncil: 'Board',
+      },
+    });
+
+    // Caller identity is derived from verified token (PATIENT), ignoring forged headers
+    expect(res.statusCode).toBe(403);
+    const body = JSON.parse(res.body);
+    expect(body.error).toBe('FORBIDDEN');
+  });
+
+  it('POST /api/v1/doctors/profile should reject mass assignment of verificationStatus with 400 Bad Request', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/v1/doctors/profile',
+      headers: doctorA.headers,
       payload: {
         displayName: 'Dr. Hacker',
         medicalRegistrationNumber: 'REG-HACK-01',
@@ -127,17 +155,11 @@ describe('Doctor Platform HTTP API (E2E)', () => {
   // Doctor Profile Lifecycle: Create, Get Self, Patch, Public Retrieval
   // ----------------------------------------------------------------------------
 
-  const doctorAUserId = 'doctor-user-aaaa-1111';
-  let doctorAPublicId: string;
-
   it('POST /api/v1/doctors/profile should initialize doctor profile with 201 Created', async () => {
     const res = await app.inject({
       method: 'POST',
       url: '/api/v1/doctors/profile',
-      headers: {
-        'x-user-id': doctorAUserId,
-        'x-user-role': 'DOCTOR',
-      },
+      headers: doctorA.headers,
       payload: {
         displayName: 'Dr. Alice Smith, MD',
         medicalRegistrationNumber: 'MCI-STATE-88392',
@@ -161,7 +183,7 @@ describe('Doctor Platform HTTP API (E2E)', () => {
     expect(res.statusCode).toBe(201);
     const body = JSON.parse(res.body);
     expect(body.id).toBeDefined();
-    expect(body.userId).toBe(doctorAUserId);
+    expect(body.userId).toBe(doctorA.id);
     expect(body.publicDoctorId).toMatch(/^DOC-[A-Z0-9]{8}$/);
     expect(body.displayName).toBe('Dr. Alice Smith, MD');
     expect(body.verificationStatus).toBe('DRAFT');
@@ -177,10 +199,7 @@ describe('Doctor Platform HTTP API (E2E)', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/api/v1/doctors/profile',
-      headers: {
-        'x-user-id': doctorAUserId,
-        'x-user-role': 'DOCTOR',
-      },
+      headers: doctorA.headers,
       payload: {
         displayName: 'Dr. Alice Smith (Duplicate)',
         medicalRegistrationNumber: 'MCI-STATE-99999',
@@ -197,15 +216,12 @@ describe('Doctor Platform HTTP API (E2E)', () => {
     const res = await app.inject({
       method: 'GET',
       url: '/api/v1/doctors/me',
-      headers: {
-        'x-user-id': doctorAUserId,
-        'x-user-role': 'DOCTOR',
-      },
+      headers: doctorA.headers,
     });
 
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.body);
-    expect(body.userId).toBe(doctorAUserId);
+    expect(body.userId).toBe(doctorA.id);
     expect(body.publicDoctorId).toBe(doctorAPublicId);
     expect(body.medicalRegistrationNumber).toBe('MCI-STATE-88392');
     expect(body.licensingCouncil).toBe('Medical Council of California');
@@ -215,10 +231,7 @@ describe('Doctor Platform HTTP API (E2E)', () => {
     const res = await app.inject({
       method: 'PATCH',
       url: '/api/v1/doctors/me',
-      headers: {
-        'x-user-id': doctorAUserId,
-        'x-user-role': 'DOCTOR',
-      },
+      headers: doctorA.headers,
       payload: {
         displayName: 'Dr. Alice Smith, MD, FACC',
         yearsOfExperience: 11,
@@ -240,10 +253,7 @@ describe('Doctor Platform HTTP API (E2E)', () => {
     const res = await app.inject({
       method: 'PATCH',
       url: '/api/v1/doctors/me',
-      headers: {
-        'x-user-id': doctorAUserId,
-        'x-user-role': 'DOCTOR',
-      },
+      headers: doctorA.headers,
       payload: {
         verificationStatus: 'VERIFIED', // Non-whitelisted field
       },

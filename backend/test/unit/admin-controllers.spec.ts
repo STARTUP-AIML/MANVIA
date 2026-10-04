@@ -43,13 +43,17 @@ describe('Admin Controllers & Guards (Unit)', () => {
               'x-user-id': 'u-pat',
               'x-user-role': 'PATIENT',
             },
+            user: {
+              userId: 'u-pat',
+              activeRole: 'PATIENT',
+            },
           }),
         }),
       } as unknown as ExecutionContext;
       expect(() => guard.canActivate(mockContext)).toThrow(ForbiddenError);
     });
 
-    it('should allow access when activeRole === ADMIN', () => {
+    it('should allow access when authenticated user activeRole === ADMIN', () => {
       const mockRequest: {
         headers: Record<string, string>;
         user?: CurrentUserContext;
@@ -57,6 +61,10 @@ describe('Admin Controllers & Guards (Unit)', () => {
         headers: {
           'x-user-id': 'u-adm',
           'x-user-role': 'ADMIN',
+        },
+        user: {
+          userId: 'u-adm',
+          activeRole: 'ADMIN',
         },
       };
       const mockContext = {

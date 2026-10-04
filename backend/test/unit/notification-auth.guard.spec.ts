@@ -32,7 +32,7 @@ describe('NotificationAuthGuard (Unit Tests)', () => {
     expect(guard.canActivate(ctx)).toBe(true);
   });
 
-  it('should populate user from x-user-id and x-user-role headers', () => {
+  it('should reject forged x-user-id/x-user-role headers when request.user is absent', () => {
     const req: { headers: Record<string, string>; user?: { userId: string; activeRole: string } } =
       {
         headers: {
@@ -42,13 +42,11 @@ describe('NotificationAuthGuard (Unit Tests)', () => {
       };
     const ctx = createMockContext(req as unknown as Record<string, unknown>);
 
-    expect(guard.canActivate(ctx)).toBe(true);
-    expect(req.user).toBeDefined();
-    expect(req.user?.userId).toBe('usr-456');
-    expect(req.user?.activeRole).toBe('DOCTOR');
+    expect(() => guard.canActivate(ctx)).toThrow(UnauthorizedError);
+    expect(req.user).toBeUndefined();
   });
 
-  it('should support array headers and alternative role header names', () => {
+  it('should reject array/alternative forged role headers when request.user is absent', () => {
     const req: {
       headers: Record<string, string | string[]>;
       user?: { userId: string; activeRole: string };
@@ -60,12 +58,11 @@ describe('NotificationAuthGuard (Unit Tests)', () => {
     };
     const ctx = createMockContext(req as unknown as Record<string, unknown>);
 
-    expect(guard.canActivate(ctx)).toBe(true);
-    expect(req.user?.userId).toBe('usr-789');
-    expect(req.user?.activeRole).toBe('ADMIN');
+    expect(() => guard.canActivate(ctx)).toThrow(UnauthorizedError);
+    expect(req.user).toBeUndefined();
   });
 
-  it('should default role to PATIENT when role header is omitted', () => {
+  it('should reject forged x-user-id even when no role header is present', () => {
     const req: { headers: Record<string, string>; user?: { userId: string; activeRole: string } } =
       {
         headers: {
@@ -74,8 +71,8 @@ describe('NotificationAuthGuard (Unit Tests)', () => {
       };
     const ctx = createMockContext(req as unknown as Record<string, unknown>);
 
-    expect(guard.canActivate(ctx)).toBe(true);
-    expect(req.user?.activeRole).toBe('PATIENT');
+    expect(() => guard.canActivate(ctx)).toThrow(UnauthorizedError);
+    expect(req.user).toBeUndefined();
   });
 
   it('should throw UnauthorizedError when no credentials or empty userId provided', () => {

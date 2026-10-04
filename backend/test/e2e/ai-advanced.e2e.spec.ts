@@ -1,64 +1,38 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { createApp } from '../../src/main.js';
 import { PrismaService } from '../../src/database/prisma.service.js';
+import {
+  setupE2EApp,
+  createE2EUser,
+  cleanupE2EUsers,
+  type E2EUser,
+} from './helpers/auth.helper.js';
 
 describe('AI Medical RAG, Safety, Memory, Realtime & Handoff (E2E)', () => {
   let app: NestFastifyApplication;
   let prisma: PrismaService;
 
-  const PATIENT_A = '11111111-1111-4111-8111-111111111111';
-  const PATIENT_B = '22222222-2222-4222-8222-222222222222';
-  const DOCTOR_USER_ID = '33333333-3333-4333-8333-333333333333';
+  let patientA: E2EUser;
+  let patientB: E2EUser;
+  let doctorUser: E2EUser;
 
   let memoryId: string;
   let realtimeSessionId: string;
   let handoffId: string;
 
   beforeAll(async () => {
-    process.env.NODE_ENV = 'test';
-    app = await createApp();
-    await app.init();
-    await app.getHttpAdapter().getInstance().ready();
-
+    app = await setupE2EApp();
     prisma = app.get(PrismaService);
 
-    // Seed test users & doctor profiles if not present
-    await prisma.user.upsert({
-      where: { id: PATIENT_A },
-      update: {},
-      create: {
-        id: PATIENT_A,
-        email: 'patient_a_advanced@manvia.test',
-        roles: ['PATIENT'],
-      },
-    });
-
-    await prisma.user.upsert({
-      where: { id: PATIENT_B },
-      update: {},
-      create: {
-        id: PATIENT_B,
-        email: 'patient_b_advanced@manvia.test',
-        roles: ['PATIENT'],
-      },
-    });
-
-    await prisma.user.upsert({
-      where: { id: DOCTOR_USER_ID },
-      update: {},
-      create: {
-        id: DOCTOR_USER_ID,
-        email: 'doctor_verified_advanced@manvia.test',
-        roles: ['DOCTOR'],
-      },
-    });
+    patientA = await createE2EUser(app, { role: 'PATIENT' });
+    patientB = await createE2EUser(app, { role: 'PATIENT' });
+    doctorUser = await createE2EUser(app, { role: 'DOCTOR' });
 
     await prisma.doctorProfile.upsert({
-      where: { userId: DOCTOR_USER_ID },
+      where: { userId: doctorUser.id },
       update: { verificationStatus: 'VERIFIED' },
       create: {
-        userId: DOCTOR_USER_ID,
+        userId: doctorUser.id,
         publicDoctorId: 'DOC-ADV01',
         displayName: 'Dr. Test Clinician',
         medicalRegistrationNumber: 'REG-ADV-001',
@@ -67,25 +41,32 @@ describe('AI Medical RAG, Safety, Memory, Realtime & Handoff (E2E)', () => {
         verificationStatus: 'VERIFIED',
       },
     });
-  });
+  }, 60000);
 
   afterAll(async () => {
-    // Clean up created resources in reverse dependency order
     try {
-      await prisma.aIHumanHandoff.deleteMany({ where: { userId: { in: [PATIENT_A, PATIENT_B] } } });
-      await prisma.aIRealtimeSession.deleteMany({
-        where: { userId: { in: [PATIENT_A, PATIENT_B] } },
-      });
-      await prisma.aIMemory.deleteMany({ where: { userId: { in: [PATIENT_A, PATIENT_B] } } });
-      await prisma.aISafetyEvent.deleteMany({ where: { userId: { in: [PATIENT_A, PATIENT_B] } } });
-      await prisma.doctorProfile.deleteMany({ where: { userId: DOCTOR_USER_ID } });
-      await prisma.user.deleteMany({
-        where: { id: { in: [PATIENT_A, PATIENT_B, DOCTOR_USER_ID] } },
-      });
+      if (patientA && patientB && doctorUser) {
+        await prisma.aIHumanHandoff.deleteMany({
+          where: { userId: { in: [patientA.id, patientB.id] } },
+        });
+        await prisma.aIRealtimeSession.deleteMany({
+          where: { userId: { in: [patientA.id, patientB.id] } },
+        });
+        await prisma.aIMemory.deleteMany({
+          where: { userId: { in: [patientA.id, patientB.id] } },
+        });
+        await prisma.aISafetyEvent.deleteMany({
+          where: { userId: { in: [patientA.id, patientB.id] } },
+        });
+        await prisma.doctorProfile.deleteMany({ where: { userId: doctorUser.id } });
+        await cleanupE2EUsers(app, [patientA.email, patientB.email, doctorUser.email]);
+      }
     } catch {
       // Ignore cleanup error
     }
-    await app.close();
+    if (app) {
+      await app.close();
+    }
   });
 
   // ==========================================
@@ -96,7 +77,7 @@ describe('AI Medical RAG, Safety, Memory, Realtime & Handoff (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/ai/safety/check',
-        headers: { 'x-user-id': PATIENT_A, 'x-user-role': 'PATIENT' },
+        headers: patientA.headers,
         payload: { text: 'What is a good evening wind-down routine?' },
       });
 
@@ -111,7 +92,7 @@ describe('AI Medical RAG, Safety, Memory, Realtime & Handoff (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/ai/safety/check',
-        headers: { 'x-user-id': PATIENT_A, 'x-user-role': 'PATIENT' },
+        headers: patientA.headers,
         payload: { text: 'I am experiencing crushing chest pain and cant breathe' },
       });
 
@@ -127,7 +108,7 @@ describe('AI Medical RAG, Safety, Memory, Realtime & Handoff (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/ai/safety/check',
-        headers: { 'x-user-id': PATIENT_A, 'x-user-role': 'PATIENT' },
+        headers: patientA.headers,
         payload: { text: 'I feel overwhelmed and want to kill myself' },
       });
 
@@ -147,7 +128,7 @@ describe('AI Medical RAG, Safety, Memory, Realtime & Handoff (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/ai/rag/retrieve',
-        headers: { 'x-user-id': PATIENT_A, 'x-user-role': 'PATIENT' },
+        headers: patientA.headers,
         payload: { query: 'hypertension blood pressure guidance' },
       });
 
@@ -165,7 +146,7 @@ describe('AI Medical RAG, Safety, Memory, Realtime & Handoff (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/ai/rag/retrieve',
-        headers: { 'x-user-id': PATIENT_A, 'x-user-role': 'PATIENT' },
+        headers: patientA.headers,
         payload: { query: 'Tell me a good morning greeting' },
       });
 
@@ -186,7 +167,7 @@ describe('AI Medical RAG, Safety, Memory, Realtime & Handoff (E2E)', () => {
       const convRes = await app.inject({
         method: 'POST',
         url: '/api/v1/ai/conversations',
-        headers: { 'x-user-id': PATIENT_A, 'x-user-role': 'PATIENT' },
+        headers: patientA.headers,
         payload: { title: 'Health Habits' },
       });
       expect(convRes.statusCode).toBe(201);
@@ -196,7 +177,7 @@ describe('AI Medical RAG, Safety, Memory, Realtime & Handoff (E2E)', () => {
       const msgRes = await app.inject({
         method: 'POST',
         url: `/api/v1/ai/conversations/${conversationId}/messages`,
-        headers: { 'x-user-id': PATIENT_A, 'x-user-role': 'PATIENT' },
+        headers: patientA.headers,
         payload: { content: 'What is the guideline for blood pressure management?' },
       });
 
@@ -219,7 +200,7 @@ describe('AI Medical RAG, Safety, Memory, Realtime & Handoff (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/ai/memories',
-        headers: { 'x-user-id': PATIENT_A, 'x-user-role': 'PATIENT' },
+        headers: patientA.headers,
         payload: {
           category: 'PREFERENCE',
           key: 'wake_up_time',
@@ -240,7 +221,7 @@ describe('AI Medical RAG, Safety, Memory, Realtime & Handoff (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: '/api/v1/ai/memories',
-        headers: { 'x-user-id': PATIENT_A, 'x-user-role': 'PATIENT' },
+        headers: patientA.headers,
       });
 
       expect(res.statusCode).toBe(200);
@@ -255,7 +236,7 @@ describe('AI Medical RAG, Safety, Memory, Realtime & Handoff (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: '/api/v1/ai/memories',
-        headers: { 'x-user-id': PATIENT_B, 'x-user-role': 'PATIENT' },
+        headers: patientB.headers,
       });
 
       expect(res.statusCode).toBe(200);
@@ -269,7 +250,21 @@ describe('AI Medical RAG, Safety, Memory, Realtime & Handoff (E2E)', () => {
       const res = await app.inject({
         method: 'DELETE',
         url: `/api/v1/ai/memories/${memoryId}`,
-        headers: { 'x-user-id': PATIENT_B, 'x-user-role': 'PATIENT' },
+        headers: patientB.headers,
+      });
+
+      expect(res.statusCode).toBe(403);
+    });
+
+    it('SECURITY: Forged identity headers cannot authorize Patient B to delete Patient A memory', async () => {
+      const res = await app.inject({
+        method: 'DELETE',
+        url: `/api/v1/ai/memories/${memoryId}`,
+        headers: {
+          ...patientB.headers,
+          'x-user-id': patientA.id,
+          'x-user-role': 'PATIENT',
+        },
       });
 
       expect(res.statusCode).toBe(403);
@@ -279,7 +274,7 @@ describe('AI Medical RAG, Safety, Memory, Realtime & Handoff (E2E)', () => {
       const res = await app.inject({
         method: 'DELETE',
         url: `/api/v1/ai/memories/${memoryId}`,
-        headers: { 'x-user-id': PATIENT_A, 'x-user-role': 'PATIENT' },
+        headers: patientA.headers,
       });
 
       expect(res.statusCode).toBe(200);
@@ -296,7 +291,7 @@ describe('AI Medical RAG, Safety, Memory, Realtime & Handoff (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/ai/realtime/session',
-        headers: { 'x-user-id': PATIENT_A, 'x-user-role': 'PATIENT' },
+        headers: patientA.headers,
         payload: {
           modalities: ['AUDIO', 'TEXT'],
           locale: 'en-US',
@@ -317,7 +312,7 @@ describe('AI Medical RAG, Safety, Memory, Realtime & Handoff (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: `/api/v1/ai/realtime/session/${realtimeSessionId}`,
-        headers: { 'x-user-id': PATIENT_A, 'x-user-role': 'PATIENT' },
+        headers: patientA.headers,
       });
 
       expect(res.statusCode).toBe(200);
@@ -329,7 +324,7 @@ describe('AI Medical RAG, Safety, Memory, Realtime & Handoff (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: `/api/v1/ai/realtime/session/${realtimeSessionId}/transition`,
-        headers: { 'x-user-id': PATIENT_A, 'x-user-role': 'PATIENT' },
+        headers: patientA.headers,
         payload: { state: 'LISTENING' },
       });
 
@@ -342,7 +337,7 @@ describe('AI Medical RAG, Safety, Memory, Realtime & Handoff (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: `/api/v1/ai/realtime/session/${realtimeSessionId}/transition`,
-        headers: { 'x-user-id': PATIENT_B, 'x-user-role': 'PATIENT' },
+        headers: patientB.headers,
         payload: { state: 'PROCESSING' },
       });
 
@@ -354,7 +349,7 @@ describe('AI Medical RAG, Safety, Memory, Realtime & Handoff (E2E)', () => {
       await app.inject({
         method: 'POST',
         url: `/api/v1/ai/realtime/session/${realtimeSessionId}/transition`,
-        headers: { 'x-user-id': PATIENT_A, 'x-user-role': 'PATIENT' },
+        headers: patientA.headers,
         payload: { state: 'PROCESSING' },
       });
 
@@ -362,7 +357,7 @@ describe('AI Medical RAG, Safety, Memory, Realtime & Handoff (E2E)', () => {
       await app.inject({
         method: 'POST',
         url: `/api/v1/ai/realtime/session/${realtimeSessionId}/transition`,
-        headers: { 'x-user-id': PATIENT_A, 'x-user-role': 'PATIENT' },
+        headers: patientA.headers,
         payload: { state: 'SPEAKING' },
       });
 
@@ -370,7 +365,7 @@ describe('AI Medical RAG, Safety, Memory, Realtime & Handoff (E2E)', () => {
       const intRes = await app.inject({
         method: 'POST',
         url: `/api/v1/ai/realtime/session/${realtimeSessionId}/interrupt`,
-        headers: { 'x-user-id': PATIENT_A, 'x-user-role': 'PATIENT' },
+        headers: patientA.headers,
       });
 
       expect(intRes.statusCode).toBe(200);
@@ -382,7 +377,7 @@ describe('AI Medical RAG, Safety, Memory, Realtime & Handoff (E2E)', () => {
       const checkRes = await app.inject({
         method: 'GET',
         url: `/api/v1/ai/realtime/session/${realtimeSessionId}`,
-        headers: { 'x-user-id': PATIENT_A, 'x-user-role': 'PATIENT' },
+        headers: patientA.headers,
       });
       expect(JSON.parse(checkRes.body).state).toBe('INTERRUPTED');
     });
@@ -391,7 +386,7 @@ describe('AI Medical RAG, Safety, Memory, Realtime & Handoff (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: `/api/v1/ai/realtime/session/${realtimeSessionId}/end`,
-        headers: { 'x-user-id': PATIENT_A, 'x-user-role': 'PATIENT' },
+        headers: patientA.headers,
       });
 
       expect(res.statusCode).toBe(200);
@@ -407,7 +402,7 @@ describe('AI Medical RAG, Safety, Memory, Realtime & Handoff (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/ai/handoffs',
-        headers: { 'x-user-id': PATIENT_A, 'x-user-role': 'PATIENT' },
+        headers: patientA.headers,
         payload: {
           reason: 'Patient requests clinical consultation for recurring migraines',
           requestedUrgency: 'URGENT',
@@ -428,7 +423,7 @@ describe('AI Medical RAG, Safety, Memory, Realtime & Handoff (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: '/api/v1/ai/handoffs',
-        headers: { 'x-user-id': PATIENT_A, 'x-user-role': 'PATIENT' },
+        headers: patientA.headers,
       });
 
       expect(res.statusCode).toBe(200);
@@ -442,7 +437,7 @@ describe('AI Medical RAG, Safety, Memory, Realtime & Handoff (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: `/api/v1/ai/handoffs/${handoffId}`,
-        headers: { 'x-user-id': PATIENT_B, 'x-user-role': 'PATIENT' },
+        headers: patientB.headers,
       });
 
       expect(res.statusCode).toBe(403);
@@ -452,7 +447,7 @@ describe('AI Medical RAG, Safety, Memory, Realtime & Handoff (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: '/api/v1/ai/doctor/handoffs',
-        headers: { 'x-user-id': PATIENT_A, 'x-user-role': 'PATIENT' },
+        headers: patientA.headers,
       });
 
       expect(res.statusCode).toBe(403);
@@ -462,7 +457,7 @@ describe('AI Medical RAG, Safety, Memory, Realtime & Handoff (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: '/api/v1/ai/doctor/handoffs',
-        headers: { 'x-user-id': DOCTOR_USER_ID, 'x-user-role': 'DOCTOR' },
+        headers: doctorUser.headers,
       });
 
       expect(res.statusCode).toBe(200);
@@ -477,7 +472,7 @@ describe('AI Medical RAG, Safety, Memory, Realtime & Handoff (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: `/api/v1/ai/doctor/handoffs/${handoffId}/accept`,
-        headers: { 'x-user-id': DOCTOR_USER_ID, 'x-user-role': 'DOCTOR' },
+        headers: doctorUser.headers,
       });
 
       expect(res.statusCode).toBe(200);
@@ -491,7 +486,7 @@ describe('AI Medical RAG, Safety, Memory, Realtime & Handoff (E2E)', () => {
       const createRes = await app.inject({
         method: 'POST',
         url: '/api/v1/ai/handoffs',
-        headers: { 'x-user-id': PATIENT_A, 'x-user-role': 'PATIENT' },
+        headers: patientA.headers,
         payload: {
           reason: 'Routine question about diet',
           requestedUrgency: 'ROUTINE',
@@ -504,7 +499,7 @@ describe('AI Medical RAG, Safety, Memory, Realtime & Handoff (E2E)', () => {
       const cancelRes = await app.inject({
         method: 'POST',
         url: `/api/v1/ai/handoffs/${newHandoff.publicHandoffId}/cancel`,
-        headers: { 'x-user-id': PATIENT_A, 'x-user-role': 'PATIENT' },
+        headers: patientA.headers,
       });
 
       expect(cancelRes.statusCode).toBe(200);

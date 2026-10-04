@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { createApp } from '../../src/main.js';
 import { DOCTORS_REPOSITORY } from '../../src/modules/doctors/interfaces/doctor-repository.interface.js';
 import type { IDoctorsRepository } from '../../src/modules/doctors/interfaces/doctor-repository.interface.js';
 import { VerificationStatus } from '../../src/modules/doctors/enums/verification-status.enum.js';
@@ -11,25 +10,32 @@ import { CARE_RELATIONSHIP_REPOSITORY } from '../../src/modules/care-relationshi
 import type { ICareRelationshipRepository } from '../../src/modules/care-relationships/interfaces/care-relationship-repository.interface.js';
 import { HealthRecordCategory } from '../../src/modules/health-records/enums/health-record-category.enum.js';
 import { HealthRecordStatus } from '../../src/modules/health-records/enums/health-record-status.enum.js';
+import {
+  setupE2EApp,
+  createE2EUser,
+  cleanupE2EUsers,
+  type E2EUser,
+} from './helpers/auth.helper.js';
 
 describe('Health Records & Health Timeline HTTP API (E2E)', () => {
   let app: NestFastifyApplication;
   let doctorsRepo: IDoctorsRepository;
   let careRelRepo: ICareRelationshipRepository;
 
-  const DOCTOR_VERIFIED_USER = 'usr-e2e-hr-doc-ver';
-  const PATIENT_A_USER = 'usr-e2e-hr-pat-a';
-  const PATIENT_B_USER = 'usr-e2e-hr-pat-b';
+  let doctorVerified: E2EUser;
+  let patientAUser: E2EUser;
+  let patientBUser: E2EUser;
 
   let doctorAInternalId: string;
   let patientAInternalId: string;
   let patientAPublicId: string;
 
   beforeAll(async () => {
-    process.env.NODE_ENV = 'test';
-    app = await createApp();
-    await app.init();
-    await app.getHttpAdapter().getInstance().ready();
+    app = await setupE2EApp();
+
+    doctorVerified = await createE2EUser(app, { role: 'DOCTOR' });
+    patientAUser = await createE2EUser(app, { role: 'PATIENT' });
+    patientBUser = await createE2EUser(app, { role: 'PATIENT' });
 
     doctorsRepo = app.get<IDoctorsRepository>(DOCTORS_REPOSITORY);
     careRelRepo = app.get<ICareRelationshipRepository>(CARE_RELATIONSHIP_REPOSITORY);
@@ -41,10 +47,7 @@ describe('Health Records & Health Timeline HTTP API (E2E)', () => {
     const resDocA = await app.inject({
       method: 'POST',
       url: '/api/v1/doctors/profile',
-      headers: {
-        'x-user-id': DOCTOR_VERIFIED_USER,
-        'x-user-role': 'DOCTOR',
-      },
+      headers: doctorVerified.headers,
       payload: {
         displayName: 'Dr. Allison Cameron, MD',
         medicalRegistrationNumber: 'MED-E2E-HR-01',
@@ -55,7 +58,7 @@ describe('Health Records & Health Timeline HTTP API (E2E)', () => {
       },
     });
     expect(resDocA.statusCode).toBe(201);
-    const docAProfile = await doctorsRepo.findByUserId(DOCTOR_VERIFIED_USER);
+    const docAProfile = await doctorsRepo.findByUserId(doctorVerified.id);
     await doctorsRepo.updateVerificationStatus(
       docAProfile!.id,
       VerificationStatus.VERIFIED,
@@ -64,7 +67,7 @@ describe('Health Records & Health Timeline HTTP API (E2E)', () => {
     doctorAInternalId = docAProfile!.id;
 
     // 2. Create Patient A profile
-    const patA = await careRelRepo.createPatientProfile(PATIENT_A_USER, {
+    const patA = await careRelRepo.createPatientProfile(patientAUser.id, {
       publicPatientId: 'PAT-HRE2E001',
       legalFirstName: 'Alice',
       legalLastName: 'Smith',
@@ -74,22 +77,23 @@ describe('Health Records & Health Timeline HTTP API (E2E)', () => {
     patientAPublicId = patA.publicPatientId;
 
     // 3. Create Patient B profile
-    await careRelRepo.createPatientProfile(PATIENT_B_USER, {
+    await careRelRepo.createPatientProfile(patientBUser.id, {
       publicPatientId: 'PAT-HRE2E002',
       legalFirstName: 'Bob',
       legalLastName: 'Jones',
       displayName: 'Bob J.',
     });
-  });
+  }, 60000);
 
   afterAll(async () => {
     if (app) {
+      await cleanupE2EUsers(app, [doctorVerified?.email, patientAUser?.email, patientBUser?.email]);
       await app.close();
     }
   });
 
   describe('Unauthenticated & Role Guard Protections', () => {
-    it('should return 401 when x-user-id is missing', async () => {
+    it('should return 401 when unauthenticated', async () => {
       const res = await app.inject({
         method: 'GET',
         url: '/api/v1/health-records',
@@ -101,9 +105,20 @@ describe('Health Records & Health Timeline HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: '/api/v1/health-records',
+        headers: doctorVerified.headers,
+      });
+      expect(res.statusCode).toBe(403);
+    });
+
+    it('SECURITY: Forged identity headers cannot grant DOCTOR access to patient health-records', async () => {
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/v1/health-records',
         headers: {
-          'x-user-id': DOCTOR_VERIFIED_USER,
-          'x-user-role': 'DOCTOR',
+          ...doctorVerified.headers,
+          'x-user-id': patientAUser.id,
+          'x-user-role': 'PATIENT',
+          'x-active-role': 'PATIENT',
         },
       });
       expect(res.statusCode).toBe(403);
@@ -117,10 +132,7 @@ describe('Health Records & Health Timeline HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/health-records/upload-intent',
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
         payload: {
           fileName: 'comprehensive_metabolic_panel.pdf',
           mimeType: 'application/pdf',
@@ -145,10 +157,7 @@ describe('Health Records & Health Timeline HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: `/api/v1/health-records/${createdRecordPublicId}/finalize`,
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
       });
 
       expect(res.statusCode).toBe(200);
@@ -161,10 +170,7 @@ describe('Health Records & Health Timeline HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/health-records',
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
         payload: {
           category: HealthRecordCategory.PRESCRIPTION,
           title: 'Metformin 500mg Rx',
@@ -184,10 +190,7 @@ describe('Health Records & Health Timeline HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: '/api/v1/health-records?limit=10',
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
       });
 
       expect(res.statusCode).toBe(200);
@@ -200,10 +203,7 @@ describe('Health Records & Health Timeline HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: `/api/v1/health-records/${createdRecordPublicId}`,
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
       });
 
       expect(res.statusCode).toBe(200);
@@ -216,10 +216,7 @@ describe('Health Records & Health Timeline HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: `/api/v1/health-records/${createdRecordPublicId}/download-url`,
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
       });
 
       expect(res.statusCode).toBe(200);
@@ -232,10 +229,7 @@ describe('Health Records & Health Timeline HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'PATCH',
         url: `/api/v1/health-records/${createdRecordPublicId}`,
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
         payload: {
           title: 'Comprehensive Metabolic Panel (Updated)',
         },
@@ -250,10 +244,7 @@ describe('Health Records & Health Timeline HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'DELETE',
         url: `/api/v1/health-records/${createdRecordPublicId}`,
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
       });
 
       expect(res.statusCode).toBe(200);
@@ -264,10 +255,7 @@ describe('Health Records & Health Timeline HTTP API (E2E)', () => {
       const listRes = await app.inject({
         method: 'GET',
         url: '/api/v1/health-records',
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
       });
       const listBody = JSON.parse(listRes.body);
       expect(listBody.total).toBe(1);
@@ -279,10 +267,7 @@ describe('Health Records & Health Timeline HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: '/api/v1/health-timeline',
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
       });
 
       expect(res.statusCode).toBe(200);
@@ -300,10 +285,7 @@ describe('Health Records & Health Timeline HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/health-records',
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
         payload: {
           category: HealthRecordCategory.LAB_REPORT,
           title: 'Active Cholesterol Panel',
@@ -320,10 +302,7 @@ describe('Health Records & Health Timeline HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: `/api/v1/doctors/me/patients/${patientAPublicId}/health-records`,
-        headers: {
-          'x-user-id': DOCTOR_VERIFIED_USER,
-          'x-user-role': 'DOCTOR',
-        },
+        headers: doctorVerified.headers,
       });
       expect(res.statusCode).toBe(403);
     });
@@ -338,10 +317,7 @@ describe('Health Records & Health Timeline HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: `/api/v1/doctors/me/patients/${patientAPublicId}/health-records`,
-        headers: {
-          'x-user-id': DOCTOR_VERIFIED_USER,
-          'x-user-role': 'DOCTOR',
-        },
+        headers: doctorVerified.headers,
       });
       expect(res.statusCode).toBe(403);
     });
@@ -357,10 +333,7 @@ describe('Health Records & Health Timeline HTTP API (E2E)', () => {
       const listRes = await app.inject({
         method: 'GET',
         url: `/api/v1/doctors/me/patients/${patientAPublicId}/health-records`,
-        headers: {
-          'x-user-id': DOCTOR_VERIFIED_USER,
-          'x-user-role': 'DOCTOR',
-        },
+        headers: doctorVerified.headers,
       });
       expect(listRes.statusCode).toBe(200);
       const listBody = JSON.parse(listRes.body);
@@ -369,20 +342,14 @@ describe('Health Records & Health Timeline HTTP API (E2E)', () => {
       const recordRes = await app.inject({
         method: 'GET',
         url: `/api/v1/doctors/me/patients/${patientAPublicId}/health-records/${activeRecordPublicId}`,
-        headers: {
-          'x-user-id': DOCTOR_VERIFIED_USER,
-          'x-user-role': 'DOCTOR',
-        },
+        headers: doctorVerified.headers,
       });
       expect(recordRes.statusCode).toBe(200);
 
       const downloadRes = await app.inject({
         method: 'GET',
         url: `/api/v1/doctors/me/patients/${patientAPublicId}/health-records/${activeRecordPublicId}/download-url`,
-        headers: {
-          'x-user-id': DOCTOR_VERIFIED_USER,
-          'x-user-role': 'DOCTOR',
-        },
+        headers: doctorVerified.headers,
       });
       expect(downloadRes.statusCode).toBe(200);
     });
@@ -392,10 +359,7 @@ describe('Health Records & Health Timeline HTTP API (E2E)', () => {
       const timelineResWithoutConsent = await app.inject({
         method: 'GET',
         url: `/api/v1/doctors/me/patients/${patientAPublicId}/health-timeline`,
-        headers: {
-          'x-user-id': DOCTOR_VERIFIED_USER,
-          'x-user-role': 'DOCTOR',
-        },
+        headers: doctorVerified.headers,
       });
       expect(timelineResWithoutConsent.statusCode).toBe(403);
 
@@ -410,10 +374,7 @@ describe('Health Records & Health Timeline HTTP API (E2E)', () => {
       const timelineResWithConsent = await app.inject({
         method: 'GET',
         url: `/api/v1/doctors/me/patients/${patientAPublicId}/health-timeline`,
-        headers: {
-          'x-user-id': DOCTOR_VERIFIED_USER,
-          'x-user-role': 'DOCTOR',
-        },
+        headers: doctorVerified.headers,
       });
       expect(timelineResWithConsent.statusCode).toBe(200);
       const timelineBody = JSON.parse(timelineResWithConsent.body);
@@ -424,10 +385,7 @@ describe('Health Records & Health Timeline HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: `/api/v1/health-records/${activeRecordPublicId}`,
-        headers: {
-          'x-user-id': PATIENT_B_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientBUser.headers,
       });
       expect(res.statusCode).toBe(404);
     });

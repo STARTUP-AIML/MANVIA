@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { createApp } from '../../src/main.js';
 import { DOCTORS_REPOSITORY } from '../../src/modules/doctors/interfaces/doctor-repository.interface.js';
 import type { IDoctorsRepository } from '../../src/modules/doctors/interfaces/doctor-repository.interface.js';
 import { VerificationStatus } from '../../src/modules/doctors/enums/verification-status.enum.js';
@@ -9,16 +8,22 @@ import { CareRelationshipStatus } from '../../src/modules/care-relationships/enu
 import { ConsentStatus } from '../../src/modules/care-relationships/enums/consent-status.enum.js';
 import { CARE_RELATIONSHIP_REPOSITORY } from '../../src/modules/care-relationships/interfaces/care-relationship-repository.interface.js';
 import type { ICareRelationshipRepository } from '../../src/modules/care-relationships/interfaces/care-relationship-repository.interface.js';
+import {
+  setupE2EApp,
+  createE2EUser,
+  cleanupE2EUsers,
+  type E2EUser,
+} from './helpers/auth.helper.js';
 
 describe('Wellness Engine HTTP API (E2E)', () => {
   let app: NestFastifyApplication;
   let doctorsRepo: IDoctorsRepository;
   let careRelRepo: ICareRelationshipRepository;
 
-  const DOCTOR_VERIFIED_USER = 'usr-e2e-well-doc-ver';
-  const DOCTOR_UNVERIFIED_USER = 'usr-e2e-well-doc-unver';
-  const PATIENT_A_USER = 'usr-e2e-well-pat-a';
-  const PATIENT_B_USER = 'usr-e2e-well-pat-b';
+  let doctorVerified: E2EUser;
+  let doctorUnverified: E2EUser;
+  let patientAUser: E2EUser;
+  let patientBUser: E2EUser;
 
   let doctorAInternalId: string;
   let patientAInternalId: string;
@@ -26,10 +31,12 @@ describe('Wellness Engine HTTP API (E2E)', () => {
   let careRelAId: string;
 
   beforeAll(async () => {
-    process.env.NODE_ENV = 'test';
-    app = await createApp();
-    await app.init();
-    await app.getHttpAdapter().getInstance().ready();
+    app = await setupE2EApp();
+
+    doctorVerified = await createE2EUser(app, { role: 'DOCTOR' });
+    doctorUnverified = await createE2EUser(app, { role: 'DOCTOR' });
+    patientAUser = await createE2EUser(app, { role: 'PATIENT' });
+    patientBUser = await createE2EUser(app, { role: 'PATIENT' });
 
     doctorsRepo = app.get<IDoctorsRepository>(DOCTORS_REPOSITORY);
     careRelRepo = app.get<ICareRelationshipRepository>(CARE_RELATIONSHIP_REPOSITORY);
@@ -41,10 +48,7 @@ describe('Wellness Engine HTTP API (E2E)', () => {
     const resDocA = await app.inject({
       method: 'POST',
       url: '/api/v1/doctors/profile',
-      headers: {
-        'x-user-id': DOCTOR_VERIFIED_USER,
-        'x-user-role': 'DOCTOR',
-      },
+      headers: doctorVerified.headers,
       payload: {
         displayName: 'Dr. Gregory House, MD',
         medicalRegistrationNumber: 'MED-E2E-WELL-01',
@@ -55,7 +59,7 @@ describe('Wellness Engine HTTP API (E2E)', () => {
       },
     });
     expect(resDocA.statusCode).toBe(201);
-    const docAProfile = await doctorsRepo.findByUserId(DOCTOR_VERIFIED_USER);
+    const docAProfile = await doctorsRepo.findByUserId(doctorVerified.id);
     await doctorsRepo.updateVerificationStatus(
       docAProfile!.id,
       VerificationStatus.VERIFIED,
@@ -67,10 +71,7 @@ describe('Wellness Engine HTTP API (E2E)', () => {
     await app.inject({
       method: 'POST',
       url: '/api/v1/doctors/profile',
-      headers: {
-        'x-user-id': DOCTOR_UNVERIFIED_USER,
-        'x-user-role': 'DOCTOR',
-      },
+      headers: doctorUnverified.headers,
       payload: {
         displayName: 'Dr. John Watson, MD',
         medicalRegistrationNumber: 'MED-E2E-WELL-02',
@@ -82,7 +83,7 @@ describe('Wellness Engine HTTP API (E2E)', () => {
     });
 
     // 3. Establish Patient A Profile
-    const patA = await careRelRepo.createPatientProfile(PATIENT_A_USER, {
+    const patA = await careRelRepo.createPatientProfile(patientAUser.id, {
       publicPatientId: 'PAT-WELL001',
       legalFirstName: 'Jane',
       legalLastName: 'Doe',
@@ -98,10 +99,18 @@ describe('Wellness Engine HTTP API (E2E)', () => {
       status: CareRelationshipStatus.ACTIVE,
     });
     careRelAId = careRel.id;
-  });
+  }, 60000);
 
   afterAll(async () => {
-    await app.close();
+    if (app) {
+      await cleanupE2EUsers(app, [
+        doctorVerified?.email,
+        doctorUnverified?.email,
+        patientAUser?.email,
+        patientBUser?.email,
+      ]);
+      await app.close();
+    }
   });
 
   describe('Unauthenticated & Role Boundary Checks', () => {
@@ -117,9 +126,26 @@ describe('Wellness Engine HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/wellness/check-ins',
+        headers: doctorVerified.headers,
+        payload: {
+          mood: 4,
+          stress: 2,
+          energy: 4,
+          sleepQuality: 4,
+        },
+      });
+      expect(res.statusCode).toBe(403);
+    });
+
+    it('SECURITY: Forged identity headers cannot grant DOCTOR access to patient wellness endpoints', async () => {
+      const res = await app.inject({
+        method: 'POST',
+        url: '/api/v1/wellness/check-ins',
         headers: {
-          'x-user-id': DOCTOR_VERIFIED_USER,
-          'x-user-role': 'DOCTOR',
+          ...doctorVerified.headers,
+          'x-user-id': patientAUser.id,
+          'x-user-role': 'PATIENT',
+          'x-active-role': 'PATIENT',
         },
         payload: {
           mood: 4,
@@ -139,10 +165,7 @@ describe('Wellness Engine HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/wellness/check-ins',
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
         payload: {
           mood: 6, // invalid > 5
           stress: 0, // invalid < 1
@@ -160,10 +183,7 @@ describe('Wellness Engine HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/wellness/check-ins',
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
         payload: {
           mood: 4,
           stress: 2,
@@ -192,10 +212,7 @@ describe('Wellness Engine HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/wellness/checkins',
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
         payload: {
           mood: 5,
           stress: 1,
@@ -219,10 +236,7 @@ describe('Wellness Engine HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: '/api/v1/wellness/check-ins',
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
       });
 
       expect(res.statusCode).toBe(200);
@@ -236,10 +250,7 @@ describe('Wellness Engine HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: `/api/v1/wellness/check-ins/${createdCheckInId}`,
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
       });
 
       expect(res.statusCode).toBe(200);
@@ -252,10 +263,7 @@ describe('Wellness Engine HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: `/api/v1/wellness/check-ins/${createdCheckInId}`,
-        headers: {
-          'x-user-id': PATIENT_B_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientBUser.headers,
       });
 
       expect(res.statusCode).toBe(404);
@@ -265,10 +273,7 @@ describe('Wellness Engine HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'PATCH',
         url: `/api/v1/wellness/check-ins/${createdCheckInId}`,
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
         payload: {
           mood: 5,
           note: 'Updated note after evening walk.',
@@ -285,10 +290,7 @@ describe('Wellness Engine HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: '/api/v1/wellness/summary',
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
       });
 
       expect(res.statusCode).toBe(200);
@@ -302,10 +304,7 @@ describe('Wellness Engine HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: '/api/v1/wellness/trends?period=7d',
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
       });
 
       expect(res.statusCode).toBe(200);
@@ -319,10 +318,7 @@ describe('Wellness Engine HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'DELETE',
         url: `/api/v1/wellness/check-ins/${createdCheckInId}`,
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
       });
 
       expect(res.statusCode).toBe(204);
@@ -331,10 +327,7 @@ describe('Wellness Engine HTTP API (E2E)', () => {
       const verifyRes = await app.inject({
         method: 'GET',
         url: `/api/v1/wellness/check-ins/${createdCheckInId}`,
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
       });
       expect(verifyRes.statusCode).toBe(404);
     });
@@ -345,10 +338,7 @@ describe('Wellness Engine HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: `/api/v1/doctors/me/patients/${patientAPublicId}/wellness/check-ins`,
-        headers: {
-          'x-user-id': DOCTOR_VERIFIED_USER,
-          'x-user-role': 'DOCTOR',
-        },
+        headers: doctorVerified.headers,
       });
 
       expect(res.statusCode).toBe(403);
@@ -369,10 +359,7 @@ describe('Wellness Engine HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: `/api/v1/doctors/me/patients/${patientAPublicId}/wellness/check-ins`,
-        headers: {
-          'x-user-id': DOCTOR_VERIFIED_USER,
-          'x-user-role': 'DOCTOR',
-        },
+        headers: doctorVerified.headers,
       });
 
       expect(res.statusCode).toBe(403);
@@ -398,10 +385,7 @@ describe('Wellness Engine HTTP API (E2E)', () => {
       const checkInsRes = await app.inject({
         method: 'GET',
         url: `/api/v1/doctors/me/patients/${patientAPublicId}/wellness/check-ins`,
-        headers: {
-          'x-user-id': DOCTOR_VERIFIED_USER,
-          'x-user-role': 'DOCTOR',
-        },
+        headers: doctorVerified.headers,
       });
 
       expect(checkInsRes.statusCode).toBe(200);
@@ -412,10 +396,7 @@ describe('Wellness Engine HTTP API (E2E)', () => {
       const trendsRes = await app.inject({
         method: 'GET',
         url: `/api/v1/doctors/me/patients/${patientAPublicId}/wellness/trends`,
-        headers: {
-          'x-user-id': DOCTOR_VERIFIED_USER,
-          'x-user-role': 'DOCTOR',
-        },
+        headers: doctorVerified.headers,
       });
 
       expect(trendsRes.statusCode).toBe(200);
@@ -426,17 +407,14 @@ describe('Wellness Engine HTTP API (E2E)', () => {
       await careRelRepo.updateConsent(consent.id, {
         status: ConsentStatus.REVOKED,
         revokedAt: new Date(),
-        revokedBy: PATIENT_A_USER,
+        revokedBy: patientAUser.id,
       });
 
       // Query again -> must be 403 Forbidden!
       const afterRevokeRes = await app.inject({
         method: 'GET',
         url: `/api/v1/doctors/me/patients/${patientAPublicId}/wellness/check-ins`,
-        headers: {
-          'x-user-id': DOCTOR_VERIFIED_USER,
-          'x-user-role': 'DOCTOR',
-        },
+        headers: doctorVerified.headers,
       });
 
       expect(afterRevokeRes.statusCode).toBe(403);
@@ -456,10 +434,7 @@ describe('Wellness Engine HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: `/api/v1/doctors/me/patients/${patientAPublicId}/wellness/check-ins`,
-        headers: {
-          'x-user-id': DOCTOR_VERIFIED_USER,
-          'x-user-role': 'DOCTOR',
-        },
+        headers: doctorVerified.headers,
       });
 
       expect(res.statusCode).toBe(403);
@@ -475,10 +450,7 @@ describe('Wellness Engine HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: `/api/v1/doctors/me/patients/${patientAPublicId}/wellness/check-ins`,
-        headers: {
-          'x-user-id': DOCTOR_UNVERIFIED_USER,
-          'x-user-role': 'DOCTOR',
-        },
+        headers: doctorUnverified.headers,
       });
 
       expect(res.statusCode).toBe(403);

@@ -33,7 +33,7 @@ describe('AdminAuthGuard (Unit Tests)', () => {
     expect(result).toBe(true);
   });
 
-  it('should allow access when headers contain valid ADMIN credentials', () => {
+  it('should reject forged admin headers when request.user is absent', () => {
     const ctx = createMockContext({
       headers: {
         'x-user-id': 'admin-456',
@@ -41,8 +41,7 @@ describe('AdminAuthGuard (Unit Tests)', () => {
       },
     });
 
-    const result = guard.canActivate(ctx);
-    expect(result).toBe(true);
+    expect(() => guard.canActivate(ctx)).toThrow(UnauthorizedError);
   });
 
   it('should reject unauthenticated request with UnauthorizedError', () => {

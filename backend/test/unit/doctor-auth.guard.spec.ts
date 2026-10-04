@@ -40,7 +40,7 @@ describe('DoctorAuthGuard', () => {
     expect(result).toBe(true);
   });
 
-  it('should allow access via test x-user-id and x-user-role headers', () => {
+  it('should reject forged x-user-id/x-user-role headers when request.user is absent', () => {
     const req: Record<string, unknown> = {
       headers: {
         'x-user-id': '22222222-2222-2222-2222-222222222222',
@@ -49,12 +49,8 @@ describe('DoctorAuthGuard', () => {
     };
     const context = createMockExecutionContext(req);
 
-    const result = guard.canActivate(context);
-    expect(result).toBe(true);
-    expect(req.user).toEqual({
-      userId: '22222222-2222-2222-2222-222222222222',
-      activeRole: 'DOCTOR',
-    });
+    expect(() => guard.canActivate(context)).toThrow(UnauthorizedError);
+    expect(req.user).toBeUndefined();
   });
 
   it('should throw UnauthorizedError when no credentials or user context are present', () => {
@@ -77,14 +73,18 @@ describe('DoctorAuthGuard', () => {
     expect(() => guard.canActivate(context)).toThrow(ForbiddenError);
   });
 
-  it('should throw ForbiddenError when x-user-role header is PATIENT', () => {
+  it('should reject forged x-user-role header even when it claims PATIENT', () => {
     const context = createMockExecutionContext({
       headers: {
         'x-user-id': '44444444-4444-4444-4444-444444444444',
         'x-user-role': 'PATIENT',
       },
+      user: {
+        userId: '55555555-5555-5555-5555-555555555555',
+        activeRole: 'DOCTOR',
+      },
     });
 
-    expect(() => guard.canActivate(context)).toThrow(ForbiddenError);
+    expect(() => guard.canActivate(context)).not.toThrow();
   });
 });

@@ -1,12 +1,17 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { createApp } from '../../src/main.js';
+import {
+  setupE2EApp,
+  createE2EUser,
+  cleanupE2EUsers,
+  type E2EUser,
+} from './helpers/auth.helper.js';
 
 describe('AI Companion Core HTTP API (E2E)', () => {
   let app: NestFastifyApplication;
 
-  const USER_A = 'usr-e2e-ai-user-a';
-  const USER_B = 'usr-e2e-ai-user-b';
+  let userA: E2EUser;
+  let userB: E2EUser;
 
   let conversationAId: string;
   let conversationAPublicId: string;
@@ -14,14 +19,17 @@ describe('AI Companion Core HTTP API (E2E)', () => {
   let userMessageId: string;
 
   beforeAll(async () => {
-    process.env.NODE_ENV = 'test';
-    app = await createApp();
-    await app.init();
-    await app.getHttpAdapter().getInstance().ready();
-  });
+    app = await setupE2EApp();
+
+    userA = await createE2EUser(app, { role: 'PATIENT' });
+    userB = await createE2EUser(app, { role: 'PATIENT' });
+  }, 60000);
 
   afterAll(async () => {
-    await app.close();
+    if (app) {
+      await cleanupE2EUsers(app, [userA?.email, userB?.email]);
+      await app.close();
+    }
   });
 
   describe('Authentication & Authorization Boundaries', () => {
@@ -39,10 +47,7 @@ describe('AI Companion Core HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/ai/conversations',
-        headers: {
-          'x-user-id': USER_A,
-          'x-user-role': 'PATIENT',
-        },
+        headers: userA.headers,
         payload: {},
       });
 
@@ -52,7 +57,7 @@ describe('AI Companion Core HTTP API (E2E)', () => {
       expect(body.publicConversationId).toMatch(/^AIC-[2-9A-Z]{8}$/);
       expect(body.title).toBe('Wellness Conversation');
       expect(body.status).toBe('ACTIVE');
-      expect(body.userId).toBe(USER_A);
+      expect(body.userId).toBe(userA.id);
 
       conversationAId = body.id;
       conversationAPublicId = body.publicConversationId;
@@ -62,10 +67,7 @@ describe('AI Companion Core HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/ai/conversations',
-        headers: {
-          'x-user-id': USER_A,
-          'x-user-role': 'PATIENT',
-        },
+        headers: userA.headers,
         payload: {
           title: 'Sleep Optimization Routine',
         },
@@ -80,10 +82,7 @@ describe('AI Companion Core HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: '/api/v1/ai/conversations?page=1&limit=10',
-        headers: {
-          'x-user-id': USER_A,
-          'x-user-role': 'PATIENT',
-        },
+        headers: userA.headers,
       });
 
       expect(res.statusCode).toBe(200);
@@ -97,10 +96,7 @@ describe('AI Companion Core HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: `/api/v1/ai/conversations/${conversationAPublicId}`,
-        headers: {
-          'x-user-id': USER_A,
-          'x-user-role': 'PATIENT',
-        },
+        headers: userA.headers,
       });
 
       expect(res.statusCode).toBe(200);
@@ -114,8 +110,19 @@ describe('AI Companion Core HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: `/api/v1/ai/conversations/${conversationAId}`,
+        headers: userB.headers,
+      });
+
+      expect(res.statusCode).toBe(403);
+    });
+
+    it('SECURITY: Forged identity headers cannot grant User B access to User A conversation', async () => {
+      const res = await app.inject({
+        method: 'GET',
+        url: `/api/v1/ai/conversations/${conversationAId}`,
         headers: {
-          'x-user-id': USER_B,
+          ...userB.headers,
+          'x-user-id': userA.id,
           'x-user-role': 'PATIENT',
         },
       });
@@ -130,8 +137,7 @@ describe('AI Companion Core HTTP API (E2E)', () => {
         method: 'POST',
         url: `/api/v1/ai/conversations/${conversationAId}/messages`,
         headers: {
-          'x-user-id': USER_A,
-          'x-user-role': 'PATIENT',
+          ...userA.headers,
           'x-correlation-id': 'corr-e2e-12345',
         },
         payload: {
@@ -176,10 +182,7 @@ describe('AI Companion Core HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: `/api/v1/ai/conversations/${conversationAId}/messages`,
-        headers: {
-          'x-user-id': USER_A,
-          'x-user-role': 'PATIENT',
-        },
+        headers: userA.headers,
         payload: {
           content: 'Please diagnose my sharp chest pain',
         },
@@ -196,10 +199,7 @@ describe('AI Companion Core HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: `/api/v1/ai/conversations/${conversationAId}/messages`,
-        headers: {
-          'x-user-id': USER_B,
-          'x-user-role': 'PATIENT',
-        },
+        headers: userB.headers,
         payload: {
           content: 'Hello unauthorized',
         },
@@ -214,10 +214,7 @@ describe('AI Companion Core HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: `/api/v1/ai/messages/${assistantMessageId}/feedback`,
-        headers: {
-          'x-user-id': USER_A,
-          'x-user-role': 'PATIENT',
-        },
+        headers: userA.headers,
         payload: {
           rating: 'POSITIVE',
           comment: 'Very helpful and comforting guidance.',
@@ -228,7 +225,7 @@ describe('AI Companion Core HTTP API (E2E)', () => {
       const body = JSON.parse(res.body);
       expect(body.rating).toBe('POSITIVE');
       expect(body.comment).toBe('Very helpful and comforting guidance.');
-      expect(body.userId).toBe(USER_A);
+      expect(body.userId).toBe(userA.id);
       expect(body.messageId).toBe(assistantMessageId);
     });
 
@@ -236,10 +233,7 @@ describe('AI Companion Core HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: `/api/v1/ai/messages/${assistantMessageId}/feedback`,
-        headers: {
-          'x-user-id': USER_A,
-          'x-user-role': 'PATIENT',
-        },
+        headers: userA.headers,
         payload: {
           rating: 'NEGATIVE',
           comment: 'Changed mind, needed more detail.',
@@ -255,10 +249,7 @@ describe('AI Companion Core HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: `/api/v1/ai/messages/${userMessageId}/feedback`,
-        headers: {
-          'x-user-id': USER_A,
-          'x-user-role': 'PATIENT',
-        },
+        headers: userA.headers,
         payload: {
           rating: 'POSITIVE',
         },
@@ -271,10 +262,7 @@ describe('AI Companion Core HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: `/api/v1/ai/messages/${assistantMessageId}/feedback`,
-        headers: {
-          'x-user-id': USER_B,
-          'x-user-role': 'PATIENT',
-        },
+        headers: userB.headers,
         payload: {
           rating: 'POSITIVE',
         },
@@ -289,10 +277,7 @@ describe('AI Companion Core HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'DELETE',
         url: `/api/v1/ai/conversations/${conversationAId}`,
-        headers: {
-          'x-user-id': USER_B,
-          'x-user-role': 'PATIENT',
-        },
+        headers: userB.headers,
       });
 
       expect(res.statusCode).toBe(403);
@@ -302,10 +287,7 @@ describe('AI Companion Core HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'DELETE',
         url: `/api/v1/ai/conversations/${conversationAId}`,
-        headers: {
-          'x-user-id': USER_A,
-          'x-user-role': 'PATIENT',
-        },
+        headers: userA.headers,
       });
 
       expect(res.statusCode).toBe(200);
@@ -318,10 +300,7 @@ describe('AI Companion Core HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: `/api/v1/ai/conversations/${conversationAId}/messages`,
-        headers: {
-          'x-user-id': USER_A,
-          'x-user-role': 'PATIENT',
-        },
+        headers: userA.headers,
         payload: {
           content: 'Are you still active?',
         },

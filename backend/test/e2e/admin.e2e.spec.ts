@@ -1,34 +1,30 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { createApp } from '../../src/main.js';
+import {
+  setupE2EApp,
+  createE2EUser,
+  cleanupE2EUsers,
+  type E2EUser,
+} from './helpers/auth.helper.js';
 
 describe('Admin Platform & Governance (E2E)', () => {
   let app: NestFastifyApplication;
 
-  const adminHeaders = {
-    'x-user-id': '00000000-0000-0000-0000-000000000001',
-    'x-user-role': 'ADMIN',
-  };
-
-  const patientHeaders = {
-    'x-user-id': '00000000-0000-0000-0000-000000000002',
-    'x-user-role': 'PATIENT',
-  };
-
-  const doctorHeaders = {
-    'x-user-id': '00000000-0000-0000-0000-000000000003',
-    'x-user-role': 'DOCTOR',
-  };
+  let adminUser: E2EUser;
+  let patientUser: E2EUser;
+  let doctorUser: E2EUser;
 
   beforeAll(async () => {
-    process.env.NODE_ENV = 'test';
-    app = await createApp();
-    await app.init();
-    await app.getHttpAdapter().getInstance().ready();
-  });
+    app = await setupE2EApp();
+
+    adminUser = await createE2EUser(app, { role: 'ADMIN' });
+    patientUser = await createE2EUser(app, { role: 'PATIENT' });
+    doctorUser = await createE2EUser(app, { role: 'DOCTOR' });
+  }, 60000);
 
   afterAll(async () => {
     if (app) {
+      await cleanupE2EUsers(app, [adminUser?.email, patientUser?.email, doctorUser?.email]);
       await app.close();
     }
   });
@@ -48,7 +44,7 @@ describe('Admin Platform & Governance (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: '/api/v1/admin/users',
-        headers: patientHeaders,
+        headers: patientUser.headers,
       });
       expect(res.statusCode).toBe(403);
       const body = JSON.parse(res.body);
@@ -59,7 +55,23 @@ describe('Admin Platform & Governance (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: '/api/v1/admin/users',
-        headers: doctorHeaders,
+        headers: doctorUser.headers,
+      });
+      expect(res.statusCode).toBe(403);
+      const body = JSON.parse(res.body);
+      expect(body.statusCode).toBe(403);
+    });
+
+    it('SECURITY: Forged identity headers cannot grant ADMIN access to non-admin user', async () => {
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/v1/admin/users',
+        headers: {
+          ...patientUser.headers,
+          'x-user-id': adminUser.id,
+          'x-user-role': 'ADMIN',
+          'x-active-role': 'ADMIN',
+        },
       });
       expect(res.statusCode).toBe(403);
       const body = JSON.parse(res.body);
@@ -70,7 +82,7 @@ describe('Admin Platform & Governance (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: '/api/v1/admin/users?page=1&limit=10',
-        headers: adminHeaders,
+        headers: adminUser.headers,
       });
       expect(res.statusCode).toBe(200);
       const body = JSON.parse(res.body);
@@ -84,7 +96,7 @@ describe('Admin Platform & Governance (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: '/api/v1/admin/patients?page=1&limit=5',
-        headers: adminHeaders,
+        headers: adminUser.headers,
       });
       expect(res.statusCode).toBe(200);
       const body = JSON.parse(res.body);
@@ -95,7 +107,7 @@ describe('Admin Platform & Governance (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: '/api/v1/admin/doctors?page=1&limit=5',
-        headers: adminHeaders,
+        headers: adminUser.headers,
       });
       expect(res.statusCode).toBe(200);
       const body = JSON.parse(res.body);
@@ -106,7 +118,7 @@ describe('Admin Platform & Governance (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: '/api/v1/admin/appointments?page=1&limit=5',
-        headers: adminHeaders,
+        headers: adminUser.headers,
       });
       expect(res.statusCode).toBe(200);
       const body = JSON.parse(res.body);
@@ -117,7 +129,7 @@ describe('Admin Platform & Governance (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: '/api/v1/admin/care-relationships?page=1&limit=5',
-        headers: adminHeaders,
+        headers: adminUser.headers,
       });
       expect(res.statusCode).toBe(200);
       const body = JSON.parse(res.body);
@@ -128,7 +140,7 @@ describe('Admin Platform & Governance (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: '/api/v1/admin/payments/overview?page=1&limit=5',
-        headers: adminHeaders,
+        headers: adminUser.headers,
       });
       expect(res.statusCode).toBe(200);
       const body = JSON.parse(res.body);
@@ -139,7 +151,7 @@ describe('Admin Platform & Governance (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: '/api/v1/admin/notifications/overview',
-        headers: adminHeaders,
+        headers: adminUser.headers,
       });
       expect(res.statusCode).toBe(200);
       const body = JSON.parse(res.body);
@@ -151,7 +163,7 @@ describe('Admin Platform & Governance (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: '/api/v1/admin/ai/safety-events?page=1&limit=5',
-        headers: adminHeaders,
+        headers: adminUser.headers,
       });
       expect(res.statusCode).toBe(200);
       const body = JSON.parse(res.body);
@@ -162,7 +174,7 @@ describe('Admin Platform & Governance (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: '/api/v1/admin/ai/human-handoffs?page=1&limit=5',
-        headers: adminHeaders,
+        headers: adminUser.headers,
       });
       expect(res.statusCode).toBe(200);
       const body = JSON.parse(res.body);
@@ -173,7 +185,7 @@ describe('Admin Platform & Governance (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: '/api/v1/admin/audit-logs?page=1&limit=10',
-        headers: adminHeaders,
+        headers: adminUser.headers,
       });
       expect(res.statusCode).toBe(200);
       const body = JSON.parse(res.body);
@@ -186,7 +198,7 @@ describe('Admin Platform & Governance (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: '/api/v1/admin/system/status',
-        headers: adminHeaders,
+        headers: adminUser.headers,
       });
       expect(res.statusCode).toBe(200);
       const body = JSON.parse(res.body);
@@ -198,7 +210,7 @@ describe('Admin Platform & Governance (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/admin/system/kill-switches',
-        headers: adminHeaders,
+        headers: adminUser.headers,
         payload: {
           subsystem: 'REALTIME_VOICE_GATEWAY',
           enabled: false,
@@ -214,7 +226,7 @@ describe('Admin Platform & Governance (E2E)', () => {
       const statusRes = await app.inject({
         method: 'GET',
         url: '/api/v1/admin/system/status',
-        headers: adminHeaders,
+        headers: adminUser.headers,
       });
       const statusBody = JSON.parse(statusRes.body);
       expect(statusBody.status).toBe('DEGRADED_EMERGENCY_SHUTDOWN');
@@ -223,7 +235,7 @@ describe('Admin Platform & Governance (E2E)', () => {
       await app.inject({
         method: 'POST',
         url: '/api/v1/admin/system/kill-switches',
-        headers: adminHeaders,
+        headers: adminUser.headers,
         payload: {
           subsystem: 'REALTIME_VOICE_GATEWAY',
           enabled: true,
@@ -236,7 +248,7 @@ describe('Admin Platform & Governance (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/admin/system/kill-switches',
-        headers: adminHeaders,
+        headers: adminUser.headers,
         payload: {
           subsystem: 'PAYMENTS_GATEWAY',
           enabled: false,
@@ -252,9 +264,9 @@ describe('Admin Platform & Governance (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/admin/clinical-incidents/break-glass',
-        headers: adminHeaders,
+        headers: adminUser.headers,
         payload: {
-          patientId: '00000000-0000-0000-0000-000000000002',
+          patientId: patientUser.id,
           incidentTicketId: 'INC-2026-0001',
           justification:
             'Critical safety review for adverse interaction with prescribed treatment.',
@@ -268,9 +280,9 @@ describe('Admin Platform & Governance (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/admin/clinical-incidents/break-glass',
-        headers: adminHeaders,
+        headers: adminUser.headers,
         payload: {
-          patientId: '00000000-0000-0000-0000-000000000002',
+          patientId: patientUser.id,
           incidentTicketId: 'INC-2026-0001',
           justification: 'Short note',
           acknowledgedTerms: true,
@@ -283,7 +295,7 @@ describe('Admin Platform & Governance (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/admin/clinical-incidents/break-glass',
-        headers: adminHeaders,
+        headers: adminUser.headers,
         payload: {
           patientId: 'e9999999-9999-4999-a999-999999999999',
           incidentTicketId: 'INC-2026-0002',
@@ -300,7 +312,7 @@ describe('Admin Platform & Governance (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/admin/users/e9999999-9999-4999-a999-999999999999/status',
-        headers: adminHeaders,
+        headers: adminUser.headers,
         payload: {
           status: 'SUSPENDED',
           reason: 'Compromised account reported via IT support hotline',
@@ -313,7 +325,7 @@ describe('Admin Platform & Governance (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/admin/users/e9999999-9999-4999-a999-999999999999/status',
-        headers: adminHeaders,
+        headers: adminUser.headers,
         payload: {
           status: 'SUSPENDED',
           reason: 'bad',
