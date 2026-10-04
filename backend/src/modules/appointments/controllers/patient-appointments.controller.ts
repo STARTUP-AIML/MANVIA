@@ -85,6 +85,43 @@ export class PatientAppointmentsController {
     return this.appointmentsService.createAppointment(user.userId, dto);
   }
 
+  @Post(':appointmentId/confirm-reservation')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Confirm a held slot reservation into a requested appointment',
+    description: 'Transitions slot from RESERVED to REQUESTED.',
+  })
+  @ApiParam({
+    name: 'appointmentId',
+    description: 'Internal appointment UUID or public ID (APT-XXXXXXXX)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Reservation successfully confirmed into REQUESTED appointment',
+    type: AppointmentResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Not in RESERVED status' })
+  @ApiResponse({ status: 404, description: 'Reservation not found' })
+  @ApiResponse({ status: 409, description: 'Reservation has expired' })
+  public async confirmReservation(
+    @CurrentUser() user: CurrentUserContext,
+    @Param('appointmentId') appointmentId: string,
+    @Body() body?: { notes?: string },
+  ): Promise<AppointmentResponseDto> {
+    return this.appointmentsService.confirmReservation(user.userId, appointmentId, body?.notes);
+  }
+
+  @Post('expire-stale')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Expire stale slot reservations',
+    description: 'Triggers cleanup of reservations whose hold duration has elapsed.',
+  })
+  @ApiResponse({ status: 200, description: 'Stale reservations expired' })
+  public async expireStale(): Promise<{ expiredCount: number }> {
+    return this.appointmentsService.expireStaleReservations();
+  }
+
   @Get()
   @ApiOperation({
     summary: 'List appointments for authenticated patient',

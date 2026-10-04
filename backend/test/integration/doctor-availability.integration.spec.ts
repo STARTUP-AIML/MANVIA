@@ -30,6 +30,7 @@ describe('Doctor Availability & Consultation Offers Integration Tests with Postg
 
   afterAll(async () => {
     if (createdUserIds.length > 0) {
+      await prismaService.appointment.deleteMany({});
       await prismaService.consultationOffer.deleteMany({});
       await prismaService.doctorAvailability.deleteMany({});
       await prismaService.doctorProfile.deleteMany({

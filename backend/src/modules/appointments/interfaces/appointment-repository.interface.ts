@@ -111,6 +111,7 @@ export interface IAppointmentRepository {
   findCancellationByAppointmentId(
     appointmentId: string,
   ): Promise<AppointmentCancellationEntity | null>;
+  expireStaleReservations(cutoffDate?: Date): Promise<number>;
 }
 
 export const APPOINTMENT_REPOSITORY = Symbol('APPOINTMENT_REPOSITORY');

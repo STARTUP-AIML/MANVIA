@@ -1,4 +1,5 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
+import { PrismaService } from '../../../database/prisma.service.js';
 import { ConflictError, NotFoundError } from '../../../common/errors/app-error.js';
 import type { AppointmentEntity } from '../entities/appointment.entity.js';
 import type { PreConsultationEntity } from '../entities/pre-consultation.entity.js';
@@ -84,6 +85,10 @@ interface PrismaModelDelegate<T = Record<string, unknown>> {
     take?: number;
   }): Promise<T[]>;
   update(args: { where: Record<string, unknown>; data: Record<string, unknown> }): Promise<T>;
+  updateMany?(args: {
+    where: Record<string, unknown>;
+    data: Record<string, unknown>;
+  }): Promise<{ count: number }>;
   count?(args?: { where?: Record<string, unknown> }): Promise<number>;
 }
 
@@ -97,8 +102,12 @@ interface PrismaClientLike {
 export class PrismaAppointmentRepository implements IAppointmentRepository {
   private readonly prisma: PrismaClientLike | undefined;
 
-  constructor(@Optional() prisma?: PrismaClientLike | undefined) {
-    this.prisma = prisma;
+  constructor(
+    @Optional()
+    @Inject(PrismaService)
+    prisma?: PrismaClientLike | PrismaService,
+  ) {
+    this.prisma = (prisma ?? undefined) as unknown as PrismaClientLike | undefined;
   }
 
   private getClient(): PrismaClientLike {
@@ -161,6 +170,75 @@ export class PrismaAppointmentRepository implements IAppointmentRepository {
     const startAt = new Date(input.startAt);
     const endAt = new Date(input.endAt);
 
+    // If real Prisma client with $transaction is available, execute inside transaction with row-level locking
+    const maybePrisma = this.prisma as unknown as {
+      $transaction?: <T>(fn: (tx: unknown) => Promise<T>) => Promise<T>;
+      $executeRaw?: (...args: unknown[]) => Promise<unknown>;
+    };
+    if (maybePrisma && typeof maybePrisma.$transaction === 'function') {
+      try {
+        return await (this.prisma as unknown as PrismaService).$transaction(async (tx) => {
+          // 1. Acquire row-level lock on doctor_profiles row for this doctor to serialize concurrent booking
+          try {
+            await tx.$executeRaw`SELECT id FROM doctor_profiles WHERE id = ${input.doctorId}::uuid FOR UPDATE`;
+          } catch {
+            // Ignore if row or table cannot be locked in non-standard environment
+          }
+
+          // 2. Authoritative database-level active overlapping appointment check under row lock
+          const inactiveStatuses = [
+            AppointmentStatus.CANCELLED,
+            AppointmentStatus.DECLINED,
+            AppointmentStatus.EXPIRED,
+          ];
+          const overlapping = await tx.appointment.findFirst({
+            where: {
+              doctorId: input.doctorId,
+              status: { notIn: inactiveStatuses },
+              startAt: { lt: endAt },
+              endAt: { gt: startAt },
+              OR: [
+                { status: { not: AppointmentStatus.RESERVED } },
+                { reservedUntil: { gt: new Date() } },
+              ],
+            },
+          });
+
+          if (overlapping) {
+            throw new ConflictError('The requested doctor time slot is already reserved or booked');
+          }
+
+          const created = await tx.appointment.create({
+            data: {
+              publicAppointmentId,
+              patientId: input.patientId,
+              doctorId: input.doctorId,
+              consultationOfferId: input.consultationOfferId,
+              startAt,
+              endAt,
+              status: input.status ?? AppointmentStatus.REQUESTED,
+              reservationState: input.reservationState ?? SlotReservationState.BOOKED,
+              reservedUntil: input.reservedUntil ? new Date(input.reservedUntil) : null,
+              notes: input.notes ?? null,
+            },
+          });
+
+          return this.mapAppointmentToEntity(created as RawAppointment);
+        });
+      } catch (error: unknown) {
+        if (
+          typeof error === 'object' &&
+          error !== null &&
+          'code' in error &&
+          (error as { code: string }).code === 'P2002'
+        ) {
+          throw new ConflictError('The requested doctor time slot is already reserved or booked');
+        }
+        throw error;
+      }
+    }
+
+    // Fallback for mocked delegates in unit tests
     try {
       const created = await client.appointment.create({
         data: {
@@ -192,10 +270,15 @@ export class PrismaAppointmentRepository implements IAppointmentRepository {
 
   public async findAppointmentById(id: string): Promise<AppointmentEntity | null> {
     const client = this.getClient();
-    const found = await client.appointment.findUnique({
-      where: { id },
-    });
-    return found ? this.mapAppointmentToEntity(found) : null;
+    try {
+      const found = await client.appointment.findUnique({
+        where: { id },
+      });
+      if (found) return this.mapAppointmentToEntity(found);
+    } catch {
+      // In PostgreSQL, invalid UUID syntax throws; fallback to public ID lookup
+    }
+    return this.findAppointmentByPublicId(id);
   }
 
   public async findAppointmentByPublicId(
@@ -212,21 +295,12 @@ export class PrismaAppointmentRepository implements IAppointmentRepository {
     patientId: string,
     idOrPublicId: string,
   ): Promise<AppointmentEntity | null> {
-    const client = this.getClient();
-    if (client.appointment.findFirst) {
-      const found = await client.appointment.findFirst({
-        where: {
-          patientId,
-          OR: [{ id: idOrPublicId }, { publicAppointmentId: idOrPublicId }],
-        },
-      });
-      return found ? this.mapAppointmentToEntity(found) : null;
-    }
+    const byPub = await this.findAppointmentByPublicId(idOrPublicId);
+    if (byPub && byPub.patientId === patientId) return byPub;
 
     const byId = await this.findAppointmentById(idOrPublicId);
     if (byId && byId.patientId === patientId) return byId;
-    const byPub = await this.findAppointmentByPublicId(idOrPublicId);
-    if (byPub && byPub.patientId === patientId) return byPub;
+
     return null;
   }
 
@@ -234,21 +308,12 @@ export class PrismaAppointmentRepository implements IAppointmentRepository {
     doctorId: string,
     idOrPublicId: string,
   ): Promise<AppointmentEntity | null> {
-    const client = this.getClient();
-    if (client.appointment.findFirst) {
-      const found = await client.appointment.findFirst({
-        where: {
-          doctorId,
-          OR: [{ id: idOrPublicId }, { publicAppointmentId: idOrPublicId }],
-        },
-      });
-      return found ? this.mapAppointmentToEntity(found) : null;
-    }
+    const byPub = await this.findAppointmentByPublicId(idOrPublicId);
+    if (byPub && byPub.doctorId === doctorId) return byPub;
 
     const byId = await this.findAppointmentById(idOrPublicId);
     if (byId && byId.doctorId === doctorId) return byId;
-    const byPub = await this.findAppointmentByPublicId(idOrPublicId);
-    if (byPub && byPub.doctorId === doctorId) return byPub;
+
     return null;
   }
 
@@ -355,6 +420,10 @@ export class PrismaAppointmentRepository implements IAppointmentRepository {
         status: { notIn: inactiveStatuses },
         startAt: { lt: endAt },
         endAt: { gt: startAt },
+        OR: [
+          { status: { not: AppointmentStatus.RESERVED } },
+          { reservedUntil: { gt: new Date() } },
+        ],
       };
       if (excludeAppointmentId) {
         where.id = { not: excludeAppointmentId };
@@ -375,6 +444,14 @@ export class PrismaAppointmentRepository implements IAppointmentRepository {
 
     for (const c of candidates) {
       if (excludeAppointmentId && c.id === excludeAppointmentId) continue;
+      // If RESERVED and reservedUntil has passed, it has expired
+      if (
+        c.status === AppointmentStatus.RESERVED &&
+        c.reservedUntil &&
+        new Date(c.reservedUntil) <= new Date()
+      ) {
+        continue;
+      }
       const cStart = new Date(c.startAt).getTime();
       const cEnd = new Date(c.endAt).getTime();
       if (cStart < targetEnd && cEnd > targetStart) {
@@ -490,5 +567,25 @@ export class PrismaAppointmentRepository implements IAppointmentRepository {
           createdAt: new Date(raw.createdAt),
         }
       : null;
+  }
+
+  public async expireStaleReservations(cutoffDate = new Date()): Promise<number> {
+    const maybePrisma = this.prisma as unknown as {
+      appointment?: { updateMany?: (args: unknown) => Promise<{ count: number }> };
+    };
+    if (maybePrisma?.appointment?.updateMany) {
+      const res = await maybePrisma.appointment.updateMany({
+        where: {
+          status: AppointmentStatus.RESERVED,
+          reservedUntil: { lte: cutoffDate },
+        },
+        data: {
+          status: AppointmentStatus.EXPIRED,
+          reservationState: SlotReservationState.AVAILABLE,
+        },
+      });
+      return typeof res?.count === 'number' ? res.count : 0;
+    }
+    return 0;
   }
 }

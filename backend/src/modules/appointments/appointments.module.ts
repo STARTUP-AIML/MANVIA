@@ -1,4 +1,5 @@
 import { Module, forwardRef } from '@nestjs/common';
+import { DatabaseModule } from '../../database/database.module.js';
 import { DoctorsModule } from '../doctors/doctors.module.js';
 import { CareRelationshipsModule } from '../care-relationships/care-relationships.module.js';
 import { DoctorAvailabilityModule } from '../doctor-availability/doctor-availability.module.js';
@@ -18,6 +19,7 @@ import { APPOINTMENT_AUDIT_SERVICE } from './interfaces/appointment-audit-servic
 
 @Module({
   imports: [
+    DatabaseModule,
     DoctorsModule,
     CareRelationshipsModule,
     DoctorAvailabilityModule,
@@ -35,7 +37,7 @@ import { APPOINTMENT_AUDIT_SERVICE } from './interfaces/appointment-audit-servic
     PrismaAppointmentRepository,
     {
       provide: APPOINTMENT_REPOSITORY,
-      useClass: InMemoryAppointmentRepository,
+      useClass: PrismaAppointmentRepository,
     },
     {
       provide: APPOINTMENT_AUDIT_SERVICE,

@@ -50,6 +50,7 @@ import type { DoctorProfileEntity } from '../../doctors/entities/doctor-profile.
 import type { ConsultationOfferEntity } from '../../doctor-availability/entities/consultation-offer.entity.js';
 import type { PatientProfileEntity } from '../../care-relationships/entities/patient-profile.entity.js';
 import type { PreConsultationResponseDto } from '../dto/pre-consultation-response.dto.js';
+import type { PreConsultationDraftDto } from '../dto/pre-consultation-draft.dto.js';
 import {
   NOTIFICATION_SERVICE,
   type INotificationService,
@@ -172,20 +173,41 @@ export class AppointmentsService {
       startAt,
       endAt,
     );
-    if (overlapping) {
-      throw new ConflictError('The requested doctor time slot is already reserved or booked');
-    }
 
-    const appointment = await this.appointmentRepo.createAppointment({
-      patientId: patient.id,
-      doctorId: doctor.id,
-      consultationOfferId: offer.id,
-      startAt,
-      endAt,
-      status: AppointmentStatus.REQUESTED,
-      reservationState: SlotReservationState.BOOKED,
-      notes: dto.notes?.trim() ?? null,
-    });
+    let appointment: AppointmentEntity;
+    if (
+      overlapping &&
+      overlapping.patientId === patient.id &&
+      overlapping.status === AppointmentStatus.RESERVED &&
+      overlapping.reservedUntil &&
+      new Date(overlapping.reservedUntil) > new Date()
+    ) {
+      // Patient is converting their own held slot reservation into a requested appointment
+      this.stateMachine.validateTransition(
+        overlapping.status,
+        AppointmentStatus.REQUESTED,
+        'PATIENT',
+      );
+      appointment = await this.appointmentRepo.updateAppointment(overlapping.id, {
+        status: AppointmentStatus.REQUESTED,
+        reservationState: SlotReservationState.BOOKED,
+        reservedUntil: null,
+        notes: dto.notes?.trim() ?? null,
+      });
+    } else if (overlapping) {
+      throw new ConflictError('The requested doctor time slot is already reserved or booked');
+    } else {
+      appointment = await this.appointmentRepo.createAppointment({
+        patientId: patient.id,
+        doctorId: doctor.id,
+        consultationOfferId: offer.id,
+        startAt,
+        endAt,
+        status: AppointmentStatus.REQUESTED,
+        reservationState: SlotReservationState.BOOKED,
+        notes: dto.notes?.trim() ?? null,
+      });
+    }
 
     // Establish care relationship if not present
     const existingCareRel = await this.careRelRepo.findCareRelationship(patient.id, doctor.id);
@@ -522,6 +544,19 @@ export class AppointmentsService {
     }
 
     this.stateMachine.validateTransition(appointment.status, AppointmentStatus.CONFIRMED, 'DOCTOR');
+
+    // Concurrency / double-booking check before confirming:
+    const overlapping = await this.appointmentRepo.findOverlappingActiveAppointment(
+      doctor.id,
+      appointment.startAt,
+      appointment.endAt,
+      appointment.id,
+    );
+    if (overlapping && overlapping.status === AppointmentStatus.CONFIRMED) {
+      throw new ConflictError(
+        'Cannot confirm appointment: overlapping confirmed appointment already exists',
+      );
+    }
 
     const updated = await this.appointmentRepo.updateAppointment(appointment.id, {
       status: AppointmentStatus.CONFIRMED,
@@ -1035,6 +1070,124 @@ export class AppointmentsService {
     const patient = await this.careRelRepo.findPatientById(updated.patientId);
     const offer = await this.availabilityRepo.findOfferById(updated.consultationOfferId);
     return this.buildResponseDto(updated, patient ?? undefined, doctor, offer ?? undefined);
+  }
+
+  /**
+   * Confirms a held slot reservation into a requested appointment.
+   */
+  public async confirmReservation(
+    patientUserId: string,
+    appointmentIdOrPublicId: string,
+    notes?: string,
+    preConsultation?: PreConsultationDraftDto,
+  ): Promise<AppointmentResponseDto> {
+    const patient = await this.careRelService.getOrCreatePatientProfile(patientUserId);
+    const appointment = await this.appointmentRepo.findPatientAppointment(
+      patient.id,
+      appointmentIdOrPublicId,
+    );
+
+    if (!appointment) {
+      throw new NotFoundError(
+        `Reservation '${appointmentIdOrPublicId}' not found for the authenticated patient`,
+      );
+    }
+
+    if (appointment.status !== AppointmentStatus.RESERVED) {
+      throw new ValidationError(
+        `Cannot confirm reservation in '${appointment.status}' status (must be RESERVED)`,
+      );
+    }
+
+    if (appointment.reservedUntil && new Date(appointment.reservedUntil) <= new Date()) {
+      await this.appointmentRepo.updateAppointment(appointment.id, {
+        status: AppointmentStatus.EXPIRED,
+        reservationState: SlotReservationState.AVAILABLE,
+      });
+      throw new ConflictError('This slot reservation has expired');
+    }
+
+    this.stateMachine.validateTransition(
+      appointment.status,
+      AppointmentStatus.REQUESTED,
+      'PATIENT',
+    );
+
+    const updated = await this.appointmentRepo.updateAppointment(appointment.id, {
+      status: AppointmentStatus.REQUESTED,
+      reservationState: SlotReservationState.BOOKED,
+      reservedUntil: null,
+      notes: notes?.trim() ?? appointment.notes,
+    });
+
+    const doctor = await this.doctorsRepo.findById(updated.doctorId);
+    const offer = await this.availabilityRepo.findOfferById(updated.consultationOfferId);
+
+    // Establish care relationship if not present
+    const existingCareRel = await this.careRelRepo.findCareRelationship(
+      patient.id,
+      updated.doctorId,
+    );
+    if (!existingCareRel) {
+      await this.careRelRepo.createCareRelationship({
+        patientId: patient.id,
+        doctorId: updated.doctorId,
+        status: CareRelationshipStatus.ACTIVE,
+        establishedAt: new Date(),
+        notes: `Care relationship initiated through appointment booking ${updated.publicAppointmentId}`,
+      });
+    }
+
+    let preConsultationResponse = undefined;
+    if (preConsultation) {
+      preConsultationResponse = await this.preConsultationService.saveDraft(
+        patientUserId,
+        updated.id,
+        preConsultation,
+      );
+    }
+
+    this.auditService.logEvent({
+      event: 'APPOINTMENT_REQUESTED',
+      actorId: patientUserId,
+      role: 'PATIENT',
+      resource: `APPOINTMENT:${updated.id}`,
+      action: 'CONFIRM_RESERVATION',
+      metadata: {
+        publicAppointmentId: updated.publicAppointmentId,
+        doctorId: updated.doctorId,
+        patientId: patient.id,
+      },
+    });
+
+    return this.buildResponseDto(
+      updated,
+      patient,
+      doctor ?? undefined,
+      offer ?? undefined,
+      preConsultationResponse ?? null,
+    );
+  }
+
+  /**
+   * Idempotently expires stale slot reservations whose hold time has passed.
+   */
+  public async expireStaleReservations(cutoffDate = new Date()): Promise<{ expiredCount: number }> {
+    const expiredCount = await this.appointmentRepo.expireStaleReservations(cutoffDate);
+    if (expiredCount > 0) {
+      this.auditService.logEvent({
+        event: 'RESERVATION_EXPIRED',
+        actorId: 'SYSTEM',
+        role: 'SYSTEM',
+        resource: 'APPOINTMENTS',
+        action: 'EXPIRE_STALE_RESERVATIONS',
+        metadata: {
+          expiredCount,
+          cutoffDate: cutoffDate.toISOString(),
+        },
+      });
+    }
+    return { expiredCount };
   }
 
   // --- Helper validation methods ---

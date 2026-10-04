@@ -229,6 +229,14 @@ export class InMemoryAppointmentRepository implements IAppointmentRepository {
       if (appt.doctorId !== doctorId) continue;
       if (excludeAppointmentId && appt.id === excludeAppointmentId) continue;
       if (inactiveStatuses.includes(appt.status)) continue;
+      // Expired reservations do not block the slot
+      if (
+        appt.status === AppointmentStatus.RESERVED &&
+        appt.reservedUntil &&
+        appt.reservedUntil.getTime() <= Date.now()
+      ) {
+        continue;
+      }
 
       const apptStart = appt.startAt.getTime();
       const apptEnd = appt.endAt.getTime();
@@ -338,6 +346,27 @@ export class InMemoryAppointmentRepository implements IAppointmentRepository {
       }
     }
     return null;
+  }
+
+  public async expireStaleReservations(cutoffDate = new Date()): Promise<number> {
+    let count = 0;
+    const cutoffTime = cutoffDate.getTime();
+    for (const [id, appt] of this.appointments.entries()) {
+      if (
+        appt.status === AppointmentStatus.RESERVED &&
+        appt.reservedUntil &&
+        appt.reservedUntil.getTime() <= cutoffTime
+      ) {
+        this.appointments.set(id, {
+          ...appt,
+          status: AppointmentStatus.EXPIRED,
+          reservationState: SlotReservationState.AVAILABLE,
+          updatedAt: new Date(),
+        });
+        count++;
+      }
+    }
+    return count;
   }
 
   public clear(): void {
