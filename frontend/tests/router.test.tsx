@@ -120,7 +120,7 @@ describe("MANVIA Application Routes & Role-Aware Protection", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole("heading", { name: /System Administration Console/i }),
+        screen.getByRole("heading", { name: /Practitioner Vetting Console/i }),
       ).toBeInTheDocument();
     });
   });
@@ -139,3 +139,4 @@ describe("MANVIA Application Routes & Role-Aware Protection", () => {
     expect(screen.getByText("Page Not Found")).toBeInTheDocument();
   });
 });
+
