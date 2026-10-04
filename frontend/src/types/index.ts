@@ -5,3 +5,5 @@ export * from "./timeline";
 export * from "./doctors";
 export * from "./appointments";
 export * from "./healthRecords";
+export * from "./payments";
+export * from "./notifications";

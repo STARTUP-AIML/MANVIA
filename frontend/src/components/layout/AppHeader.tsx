@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/auth/AuthContext';
+import { NotificationCenter } from '../notifications/NotificationCenter';
 
 export function Logo() {
   return (
@@ -100,6 +101,7 @@ export function AppHeader() {
       <div className="header-actions">
         {isAuthenticated ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <NotificationCenter />
             <span
               style={{
                 fontSize: '11px',

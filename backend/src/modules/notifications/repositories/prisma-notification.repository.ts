@@ -1,4 +1,5 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
+import { PrismaService } from '../../../database/prisma.service.js';
 import { randomBytes } from 'node:crypto';
 import type {
   INotificationRepository,
@@ -129,8 +130,12 @@ interface PrismaNotificationClientLike {
 export class PrismaNotificationRepository implements INotificationRepository {
   private readonly prisma: PrismaNotificationClientLike | undefined;
 
-  public constructor(@Optional() prisma?: PrismaNotificationClientLike | undefined) {
-    this.prisma = prisma;
+  public constructor(
+    @Optional()
+    @Inject(PrismaService)
+    prisma?: PrismaNotificationClientLike | PrismaService | undefined,
+  ) {
+    this.prisma = (prisma ?? undefined) as unknown as PrismaNotificationClientLike | undefined;
   }
 
   private getClient(): PrismaNotificationClientLike {

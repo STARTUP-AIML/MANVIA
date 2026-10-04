@@ -30,15 +30,26 @@ describe('Doctor Availability & Consultation Offers Integration Tests with Postg
 
   afterAll(async () => {
     if (createdUserIds.length > 0) {
-      await prismaService.appointment.deleteMany({});
-      await prismaService.consultationOffer.deleteMany({});
-      await prismaService.doctorAvailability.deleteMany({});
-      await prismaService.doctorProfile.deleteMany({
-        where: { userId: { in: createdUserIds } },
-      });
-      await prismaService.user.deleteMany({
-        where: { id: { in: createdUserIds } },
-      });
+      try {
+        await prismaService.refund.deleteMany({});
+        await prismaService.doctorPayout.deleteMany({});
+        await prismaService.invoice.deleteMany({});
+        await prismaService.paymentAttempt.deleteMany({});
+        await prismaService.payment.deleteMany({});
+        await prismaService.appointmentCancellation.deleteMany({});
+        await prismaService.preConsultation.deleteMany({});
+        await prismaService.appointment.deleteMany({});
+        await prismaService.consultationOffer.deleteMany({});
+        await prismaService.doctorAvailability.deleteMany({});
+        await prismaService.doctorProfile.deleteMany({
+          where: { userId: { in: createdUserIds } },
+        });
+        await prismaService.user.deleteMany({
+          where: { id: { in: createdUserIds } },
+        });
+      } catch {
+        // Safe teardown
+      }
     }
     await prismaService.onApplicationShutdown();
   });

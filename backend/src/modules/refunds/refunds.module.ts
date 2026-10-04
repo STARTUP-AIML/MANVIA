@@ -12,10 +12,16 @@ import { REFUND_REPOSITORY } from './interfaces/refund-repository.interface.js';
 import { REFUND_PROVIDER } from './interfaces/refund-provider.interface.js';
 import { REFUND_AUDIT_SERVICE } from './interfaces/refund-audit-service.interface.js';
 import { NOTIFICATION_SERVICE } from '../../common/notifications/notification.interface.js';
+import { DatabaseModule } from '../../database/database.module.js';
 import { NotificationService } from '../../common/notifications/notification.service.js';
 
 @Module({
-  imports: [CareRelationshipsModule, DoctorsModule, forwardRef(() => AppointmentsModule)],
+  imports: [
+    DatabaseModule,
+    CareRelationshipsModule,
+    DoctorsModule,
+    forwardRef(() => AppointmentsModule),
+  ],
   controllers: [RefundsController],
   providers: [
     RefundsService,
@@ -26,7 +32,7 @@ import { NotificationService } from '../../common/notifications/notification.ser
     PrismaRefundRepository,
     {
       provide: REFUND_REPOSITORY,
-      useClass: InMemoryRefundRepository,
+      useClass: PrismaRefundRepository,
     },
     {
       provide: REFUND_PROVIDER,
