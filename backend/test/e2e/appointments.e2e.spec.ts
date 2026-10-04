@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { createApp } from '../../src/main.js';
 import { DOCTORS_REPOSITORY } from '../../src/modules/doctors/interfaces/doctor-repository.interface.js';
 import type { IDoctorsRepository } from '../../src/modules/doctors/interfaces/doctor-repository.interface.js';
 import { DOCTOR_AVAILABILITY_REPOSITORY } from '../../src/modules/doctor-availability/interfaces/availability-repository.interface.js';
@@ -11,24 +10,31 @@ import { OfferStatus } from '../../src/modules/doctor-availability/enums/offer-s
 import { DayOfWeek } from '../../src/modules/doctor-availability/enums/day-of-week.enum.js';
 import { AppointmentStatus } from '../../src/modules/appointments/enums/appointment-status.enum.js';
 import { PreConsultationStatus } from '../../src/modules/appointments/enums/pre-consultation-status.enum.js';
+import {
+  setupE2EApp,
+  createE2EUser,
+  cleanupE2EUsers,
+  type E2EUser,
+} from './helpers/auth.helper.js';
 
 describe('Appointments & Pre-consultation HTTP API (E2E)', () => {
   let app: NestFastifyApplication;
   let doctorsRepo: IDoctorsRepository;
   let availabilityRepo: IDoctorAvailabilityRepository;
 
-  const DOCTOR_USER = 'usr-e2e-appt-doc';
-  const PATIENT_A_USER = 'usr-e2e-appt-pat-a';
-  const PATIENT_B_USER = 'usr-e2e-appt-pat-b';
+  let doctorUser: E2EUser;
+  let patientAUser: E2EUser;
+  let patientBUser: E2EUser;
 
   let doctorId: string;
   let offerId: string;
 
   beforeAll(async () => {
-    process.env.NODE_ENV = 'test';
-    app = await createApp();
-    await app.init();
-    await app.getHttpAdapter().getInstance().ready();
+    app = await setupE2EApp();
+
+    doctorUser = await createE2EUser(app, { role: 'DOCTOR' });
+    patientAUser = await createE2EUser(app, { role: 'PATIENT' });
+    patientBUser = await createE2EUser(app, { role: 'PATIENT' });
 
     doctorsRepo = app.get<IDoctorsRepository>(DOCTORS_REPOSITORY);
     availabilityRepo = app.get<IDoctorAvailabilityRepository>(DOCTOR_AVAILABILITY_REPOSITORY);
@@ -38,7 +44,7 @@ describe('Appointments & Pre-consultation HTTP API (E2E)', () => {
     const languages = await doctorsRepo.findAllLanguages();
 
     const doc = await doctorsRepo.createProfile({
-      userId: DOCTOR_USER,
+      userId: doctorUser.id,
       publicDoctorId: 'DOC-55443322',
       displayName: 'Dr. Gregory House, MD',
       medicalRegistrationNumber: 'MED-E2E-APPT-01',
@@ -72,10 +78,11 @@ describe('Appointments & Pre-consultation HTTP API (E2E)', () => {
       status: OfferStatus.ACTIVE,
     });
     offerId = offer.id;
-  });
+  }, 60000);
 
   afterAll(async () => {
     if (app) {
+      await cleanupE2EUsers(app, [doctorUser?.email, patientAUser?.email, patientBUser?.email]);
       await app.close();
     }
   });
@@ -87,10 +94,7 @@ describe('Appointments & Pre-consultation HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/appointments/reserve',
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
         payload: {
           doctorId,
           consultationOfferId: offerId,
@@ -116,10 +120,7 @@ describe('Appointments & Pre-consultation HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/appointments',
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
         payload: {
           doctorId,
           consultationOfferId: offerId,
@@ -145,10 +146,7 @@ describe('Appointments & Pre-consultation HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/appointments',
-        headers: {
-          'x-user-id': PATIENT_B_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientBUser.headers,
         payload: {
           doctorId,
           consultationOfferId: offerId,
@@ -166,10 +164,7 @@ describe('Appointments & Pre-consultation HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/appointments',
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
         payload: {
           doctorId: '00000000-0000-0000-0000-000000000000',
           consultationOfferId: offerId,
@@ -188,10 +183,7 @@ describe('Appointments & Pre-consultation HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/appointments',
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
         payload: {
           doctorId,
           consultationOfferId: offerId,
@@ -206,10 +198,7 @@ describe('Appointments & Pre-consultation HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: `/api/v1/appointments/${apptId}/pre-consultation`,
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
         payload: {
           reasonForVisit: 'Persistent knee inflammation',
           symptoms: 'Swelling and warmth over right knee',
@@ -229,10 +218,7 @@ describe('Appointments & Pre-consultation HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: `/api/v1/appointments/${apptId}/pre-consultation/submit`,
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
       });
 
       expect(res.statusCode).toBe(200);
@@ -245,10 +231,7 @@ describe('Appointments & Pre-consultation HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: `/api/v1/appointments/${apptId}/pre-consultation`,
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
         payload: {
           reasonForVisit: 'Attempting to change submitted medical answers',
         },
@@ -261,10 +244,7 @@ describe('Appointments & Pre-consultation HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: `/api/v1/doctor/appointments/${apptId}/pre-consultation`,
-        headers: {
-          'x-user-id': DOCTOR_USER,
-          'x-user-role': 'DOCTOR',
-        },
+        headers: doctorUser.headers,
       });
 
       expect(res.statusCode).toBe(200);
@@ -281,10 +261,7 @@ describe('Appointments & Pre-consultation HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/appointments',
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
         payload: {
           doctorId,
           consultationOfferId: offerId,
@@ -299,10 +276,7 @@ describe('Appointments & Pre-consultation HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: `/api/v1/doctor/appointments/${apptId}/accept`,
-        headers: {
-          'x-user-id': DOCTOR_USER,
-          'x-user-role': 'DOCTOR',
-        },
+        headers: doctorUser.headers,
       });
 
       expect(res.statusCode).toBe(200);
@@ -315,10 +289,7 @@ describe('Appointments & Pre-consultation HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: `/api/v1/doctor/appointments/${apptId}/start`,
-        headers: {
-          'x-user-id': DOCTOR_USER,
-          'x-user-role': 'DOCTOR',
-        },
+        headers: doctorUser.headers,
       });
 
       expect(res.statusCode).toBe(200);
@@ -331,10 +302,7 @@ describe('Appointments & Pre-consultation HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: `/api/v1/doctor/appointments/${apptId}/complete`,
-        headers: {
-          'x-user-id': DOCTOR_USER,
-          'x-user-role': 'DOCTOR',
-        },
+        headers: doctorUser.headers,
       });
 
       expect(res.statusCode).toBe(200);
@@ -357,9 +325,20 @@ describe('Appointments & Pre-consultation HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: '/api/v1/doctor/appointments',
+        headers: patientAUser.headers,
+      });
+      expect(res.statusCode).toBe(403);
+    });
+
+    it('SECURITY: Forged identity headers cannot grant patient access to doctor endpoints', async () => {
+      const res = await app.inject({
+        method: 'GET',
+        url: '/api/v1/doctor/appointments',
         headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
+          ...patientAUser.headers,
+          'x-user-id': doctorUser.id,
+          'x-user-role': 'DOCTOR',
+          'x-active-role': 'DOCTOR',
         },
       });
       expect(res.statusCode).toBe(403);
@@ -370,10 +349,7 @@ describe('Appointments & Pre-consultation HTTP API (E2E)', () => {
       const createRes = await app.inject({
         method: 'POST',
         url: '/api/v1/appointments',
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
         payload: {
           doctorId,
           consultationOfferId: offerId,
@@ -386,10 +362,7 @@ describe('Appointments & Pre-consultation HTTP API (E2E)', () => {
       const cancelRes = await app.inject({
         method: 'POST',
         url: `/api/v1/appointments/${apptId}/cancel`,
-        headers: {
-          'x-user-id': PATIENT_B_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientBUser.headers,
         payload: {
           reason: 'Malicious cancellation attempt',
         },

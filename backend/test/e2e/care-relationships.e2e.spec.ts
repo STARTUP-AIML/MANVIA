@@ -1,30 +1,37 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { createApp } from '../../src/main.js';
 import { DOCTORS_REPOSITORY } from '../../src/modules/doctors/interfaces/doctor-repository.interface.js';
 import type { IDoctorsRepository } from '../../src/modules/doctors/interfaces/doctor-repository.interface.js';
 import { VerificationStatus } from '../../src/modules/doctors/enums/verification-status.enum.js';
 import { ConsentScope } from '../../src/modules/care-relationships/enums/consent-scope.enum.js';
 import { CareRelationshipStatus } from '../../src/modules/care-relationships/enums/care-relationship-status.enum.js';
 import { ConsentStatus } from '../../src/modules/care-relationships/enums/consent-status.enum.js';
+import {
+  setupE2EApp,
+  createE2EUser,
+  cleanupE2EUsers,
+  type E2EUser,
+} from './helpers/auth.helper.js';
 
 describe('Care Relationships & Consent HTTP API (E2E)', () => {
   let app: NestFastifyApplication;
   let doctorsRepo: IDoctorsRepository;
 
-  const DOCTOR_VERIFIED_USER = 'usr-e2e-doc-ver';
-  const DOCTOR_UNVERIFIED_USER = 'usr-e2e-doc-unver';
-  const PATIENT_A_USER = 'usr-e2e-pat-a';
-  const PATIENT_B_USER = 'usr-e2e-pat-b';
+  let doctorVerified: E2EUser;
+  let doctorUnverified: E2EUser;
+  let patientAUser: E2EUser;
+  let patientBUser: E2EUser;
 
   let verifiedDoctorPublicId: string;
   let unverifiedDoctorPublicId: string;
 
   beforeAll(async () => {
-    process.env.NODE_ENV = 'test';
-    app = await createApp();
-    await app.init();
-    await app.getHttpAdapter().getInstance().ready();
+    app = await setupE2EApp();
+
+    doctorVerified = await createE2EUser(app, { role: 'DOCTOR' });
+    doctorUnverified = await createE2EUser(app, { role: 'DOCTOR' });
+    patientAUser = await createE2EUser(app, { role: 'PATIENT' });
+    patientBUser = await createE2EUser(app, { role: 'PATIENT' });
 
     doctorsRepo = app.get<IDoctorsRepository>(DOCTORS_REPOSITORY);
     const specialties = await doctorsRepo.findActiveSpecialties();
@@ -34,10 +41,7 @@ describe('Care Relationships & Consent HTTP API (E2E)', () => {
     const resA = await app.inject({
       method: 'POST',
       url: '/api/v1/doctors/profile',
-      headers: {
-        'x-user-id': DOCTOR_VERIFIED_USER,
-        'x-user-role': 'DOCTOR',
-      },
+      headers: doctorVerified.headers,
       payload: {
         displayName: 'Dr. Gregory House, MD',
         medicalRegistrationNumber: 'MED-E2E-HOUSE-10',
@@ -51,7 +55,7 @@ describe('Care Relationships & Consent HTTP API (E2E)', () => {
     verifiedDoctorPublicId = parsedA.publicDoctorId;
 
     // Upgrade to VERIFIED status
-    const docProfile = await doctorsRepo.findByUserId(DOCTOR_VERIFIED_USER);
+    const docProfile = await doctorsRepo.findByUserId(doctorVerified.id);
     await doctorsRepo.updateVerificationStatus(
       docProfile!.id,
       VerificationStatus.VERIFIED,
@@ -62,10 +66,7 @@ describe('Care Relationships & Consent HTTP API (E2E)', () => {
     const resB = await app.inject({
       method: 'POST',
       url: '/api/v1/doctors/profile',
-      headers: {
-        'x-user-id': DOCTOR_UNVERIFIED_USER,
-        'x-user-role': 'DOCTOR',
-      },
+      headers: doctorUnverified.headers,
       payload: {
         displayName: 'Dr. John Watson, MD',
         medicalRegistrationNumber: 'MED-E2E-WATSON-11',
@@ -77,10 +78,16 @@ describe('Care Relationships & Consent HTTP API (E2E)', () => {
     });
     const parsedB = JSON.parse(resB.payload);
     unverifiedDoctorPublicId = parsedB.publicDoctorId;
-  });
+  }, 60000);
 
   afterAll(async () => {
     if (app) {
+      await cleanupE2EUsers(app, [
+        doctorVerified?.email,
+        doctorUnverified?.email,
+        patientAUser?.email,
+        patientBUser?.email,
+      ]);
       await app.close();
     }
   });
@@ -95,10 +102,7 @@ describe('Care Relationships & Consent HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/care-relationships',
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
         payload: {
           doctorId: verifiedDoctorPublicId,
           notes: 'Primary diagnostic relationship established',
@@ -119,10 +123,7 @@ describe('Care Relationships & Consent HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/care-relationships',
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
         payload: {
           doctorId: unverifiedDoctorPublicId,
         },
@@ -137,10 +138,7 @@ describe('Care Relationships & Consent HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/care-relationships',
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
         payload: {
           doctorId: verifiedDoctorPublicId,
         },
@@ -155,10 +153,7 @@ describe('Care Relationships & Consent HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: '/api/v1/care-relationships',
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
       });
 
       expect(res.statusCode).toBe(200);
@@ -172,10 +167,7 @@ describe('Care Relationships & Consent HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'DELETE',
         url: `/api/v1/care-relationships/${createdRelId}`,
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
       });
 
       expect(res.statusCode).toBe(200);
@@ -196,10 +188,7 @@ describe('Care Relationships & Consent HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/consents',
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
         payload: {
           doctorId: verifiedDoctorPublicId,
           scopes: [ConsentScope.PATIENT_PROFILE, ConsentScope.HEALTH_RECORDS],
@@ -225,10 +214,7 @@ describe('Care Relationships & Consent HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: '/api/v1/consents',
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
         payload: {
           doctorId: unverifiedDoctorPublicId,
           scopes: [ConsentScope.WELLNESS],
@@ -244,10 +230,7 @@ describe('Care Relationships & Consent HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: '/api/v1/consents',
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
       });
 
       expect(res.statusCode).toBe(200);
@@ -260,10 +243,7 @@ describe('Care Relationships & Consent HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'GET',
         url: `/api/v1/consents/${createdConsentId}`,
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
       });
 
       expect(res.statusCode).toBe(200);
@@ -279,10 +259,7 @@ describe('Care Relationships & Consent HTTP API (E2E)', () => {
       const res = await app.inject({
         method: 'POST',
         url: `/api/v1/consents/${createdConsentId}/revoke`,
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
         payload: {
           reason: 'Patient terminated consultation agreement',
         },
@@ -298,10 +275,7 @@ describe('Care Relationships & Consent HTTP API (E2E)', () => {
       const detailRes = await app.inject({
         method: 'GET',
         url: `/api/v1/consents/${createdConsentId}`,
-        headers: {
-          'x-user-id': PATIENT_A_USER,
-          'x-user-role': 'PATIENT',
-        },
+        headers: patientAUser.headers,
       });
       const detailBody = JSON.parse(detailRes.payload);
       expect(detailBody.history).toHaveLength(2);
@@ -317,10 +291,7 @@ describe('Care Relationships & Consent HTTP API (E2E)', () => {
         const res = await app.inject({
           method: 'GET',
           url: '/api/v1/doctors/me/care-relationships',
-          headers: {
-            'x-user-id': DOCTOR_VERIFIED_USER,
-            'x-user-role': 'DOCTOR',
-          },
+          headers: doctorVerified.headers,
         });
 
         expect(res.statusCode).toBe(200);
@@ -334,10 +305,7 @@ describe('Care Relationships & Consent HTTP API (E2E)', () => {
         await app.inject({
           method: 'POST',
           url: '/api/v1/consents',
-          headers: {
-            'x-user-id': PATIENT_A_USER,
-            'x-user-role': 'PATIENT',
-          },
+          headers: patientAUser.headers,
           payload: {
             doctorId: verifiedDoctorPublicId,
             scopes: [ConsentScope.CONSULTATION_INFO],
@@ -347,10 +315,7 @@ describe('Care Relationships & Consent HTTP API (E2E)', () => {
         const res = await app.inject({
           method: 'GET',
           url: `/api/v1/doctors/me/care-relationships/access?patientId=${patientAPublicId}&resourceType=${ConsentScope.CONSULTATION_INFO}`,
-          headers: {
-            'x-user-id': DOCTOR_VERIFIED_USER,
-            'x-user-role': 'DOCTOR',
-          },
+          headers: doctorVerified.headers,
         });
 
         expect(res.statusCode).toBe(200);
@@ -363,10 +328,7 @@ describe('Care Relationships & Consent HTTP API (E2E)', () => {
         const res = await app.inject({
           method: 'GET',
           url: `/api/v1/doctors/me/care-relationships/access?patientId=${patientAPublicId}&resourceType=${ConsentScope.HEALTH_RECORDS}`,
-          headers: {
-            'x-user-id': DOCTOR_VERIFIED_USER,
-            'x-user-role': 'DOCTOR',
-          },
+          headers: doctorVerified.headers,
         });
 
         expect(res.statusCode).toBe(200);
@@ -392,9 +354,25 @@ describe('Care Relationships & Consent HTTP API (E2E)', () => {
         const res = await app.inject({
           method: 'POST',
           url: '/api/v1/consents',
+          headers: doctorVerified.headers,
+          payload: {
+            doctorId: verifiedDoctorPublicId,
+            scopes: [ConsentScope.PATIENT_PROFILE],
+          },
+        });
+
+        expect(res.statusCode).toBe(403);
+      });
+
+      it('SECURITY: Forged identity headers cannot impersonate another patient or bypass role', async () => {
+        const res = await app.inject({
+          method: 'POST',
+          url: '/api/v1/consents',
           headers: {
-            'x-user-id': DOCTOR_VERIFIED_USER,
-            'x-user-role': 'DOCTOR',
+            ...doctorVerified.headers,
+            'x-user-id': patientAUser.id,
+            'x-user-role': 'PATIENT',
+            'x-active-role': 'PATIENT',
           },
           payload: {
             doctorId: verifiedDoctorPublicId,
@@ -409,10 +387,7 @@ describe('Care Relationships & Consent HTTP API (E2E)', () => {
         const res = await app.inject({
           method: 'POST',
           url: `/api/v1/consents/${createdConsentId}/revoke`,
-          headers: {
-            'x-user-id': PATIENT_B_USER,
-            'x-user-role': 'PATIENT',
-          },
+          headers: patientBUser.headers,
           payload: {
             reason: 'Malicious revocation attempt',
           },
@@ -425,10 +400,7 @@ describe('Care Relationships & Consent HTTP API (E2E)', () => {
         const res = await app.inject({
           method: 'GET',
           url: '/api/v1/doctors/me/care-relationships',
-          headers: {
-            'x-user-id': PATIENT_A_USER,
-            'x-user-role': 'PATIENT',
-          },
+          headers: patientAUser.headers,
         });
 
         expect(res.statusCode).toBe(403);

@@ -1,24 +1,33 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { NestFastifyApplication } from '@nestjs/platform-fastify';
-import { createApp } from '../../src/main.js';
 import { DOCTORS_REPOSITORY } from '../../src/modules/doctors/interfaces/doctor-repository.interface.js';
 import type { IDoctorsRepository } from '../../src/modules/doctors/interfaces/doctor-repository.interface.js';
 import { VerificationDocumentType } from '../../src/modules/doctor-verification/enums/verification-document-type.enum.js';
 import { DoctorVerificationStatus } from '../../src/modules/doctor-verification/enums/doctor-verification-status.enum.js';
+import {
+  setupE2EApp,
+  createE2EUser,
+  cleanupE2EUsers,
+  type E2EUser,
+} from './helpers/auth.helper.js';
 
 describe('Doctor Verification HTTP API (E2E)', () => {
   let app: NestFastifyApplication;
 
-  const DOCTOR_USER_ID = 'usr-e2e-doctor-01';
-  const OTHER_DOCTOR_USER_ID = 'usr-e2e-doctor-02';
-  const ADMIN_USER_ID = 'usr-e2e-admin-01';
-  const PATIENT_USER_ID = 'usr-e2e-patient-01';
+  let doctor1: E2EUser;
+  let doctor2: E2EUser;
+  let adminUser: E2EUser;
+  let admin2User: E2EUser;
+  let patientUser: E2EUser;
 
   beforeAll(async () => {
-    process.env.NODE_ENV = 'test';
-    app = await createApp();
-    await app.init();
-    await app.getHttpAdapter().getInstance().ready();
+    app = await setupE2EApp();
+
+    doctor1 = await createE2EUser(app, { role: 'DOCTOR' });
+    doctor2 = await createE2EUser(app, { role: 'DOCTOR' });
+    adminUser = await createE2EUser(app, { role: 'ADMIN' });
+    admin2User = await createE2EUser(app, { role: 'ADMIN' });
+    patientUser = await createE2EUser(app, { role: 'PATIENT' });
 
     const repo = app.get<IDoctorsRepository>(DOCTORS_REPOSITORY);
     const specialties = await repo.findActiveSpecialties();
@@ -28,10 +37,7 @@ describe('Doctor Verification HTTP API (E2E)', () => {
     await app.inject({
       method: 'POST',
       url: '/api/v1/doctors/profile',
-      headers: {
-        'x-user-id': DOCTOR_USER_ID,
-        'x-user-role': 'DOCTOR',
-      },
+      headers: doctor1.headers,
       payload: {
         displayName: 'Dr. Meredith Grey',
         medicalRegistrationNumber: 'MED-E2E-GREY-01',
@@ -46,10 +52,7 @@ describe('Doctor Verification HTTP API (E2E)', () => {
     await app.inject({
       method: 'POST',
       url: '/api/v1/doctors/profile',
-      headers: {
-        'x-user-id': OTHER_DOCTOR_USER_ID,
-        'x-user-role': 'DOCTOR',
-      },
+      headers: doctor2.headers,
       payload: {
         displayName: 'Dr. Derek Shepherd',
         medicalRegistrationNumber: 'MED-E2E-SHEP-02',
@@ -59,10 +62,17 @@ describe('Doctor Verification HTTP API (E2E)', () => {
         languages: [{ languageId: languages[0]!.id }],
       },
     });
-  });
+  }, 60000);
 
   afterAll(async () => {
     if (app) {
+      await cleanupE2EUsers(app, [
+        doctor1?.email,
+        doctor2?.email,
+        adminUser?.email,
+        admin2User?.email,
+        patientUser?.email,
+      ]);
       await app.close();
     }
   });
@@ -78,10 +88,7 @@ describe('Doctor Verification HTTP API (E2E)', () => {
     const res = await app.inject({
       method: 'GET',
       url: '/api/v1/doctors/me/verification',
-      headers: {
-        'x-user-id': DOCTOR_USER_ID,
-        'x-user-role': 'DOCTOR',
-      },
+      headers: doctor1.headers,
     });
 
     expect(res.statusCode).toBe(200);
@@ -95,10 +102,7 @@ describe('Doctor Verification HTTP API (E2E)', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/api/v1/doctors/me/verification',
-      headers: {
-        'x-user-id': DOCTOR_USER_ID,
-        'x-user-role': 'DOCTOR',
-      },
+      headers: doctor1.headers,
       payload: {
         notes: 'Attached certified Washington state license.',
       },
@@ -113,10 +117,7 @@ describe('Doctor Verification HTTP API (E2E)', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/api/v1/doctors/me/verification/documents',
-      headers: {
-        'x-user-id': DOCTOR_USER_ID,
-        'x-user-role': 'DOCTOR',
-      },
+      headers: doctor1.headers,
       payload: {
         documentType: VerificationDocumentType.MEDICAL_LICENSE,
         originalFileName: 'wa_state_license.pdf',
@@ -138,10 +139,7 @@ describe('Doctor Verification HTTP API (E2E)', () => {
     const res = await app.inject({
       method: 'GET',
       url: `/api/v1/doctors/me/verification/documents/${documentId}/access`,
-      headers: {
-        'x-user-id': DOCTOR_USER_ID,
-        'x-user-role': 'DOCTOR',
-      },
+      headers: doctor1.headers,
     });
 
     expect(res.statusCode).toBe(200);
@@ -155,10 +153,7 @@ describe('Doctor Verification HTTP API (E2E)', () => {
     const res = await app.inject({
       method: 'POST',
       url: '/api/v1/doctors/me/verification/submit',
-      headers: {
-        'x-user-id': DOCTOR_USER_ID,
-        'x-user-role': 'DOCTOR',
-      },
+      headers: doctor1.headers,
       payload: {
         notes: 'Submitting all verified credentials for hospital privileges.',
       },
@@ -178,10 +173,7 @@ describe('Doctor Verification HTTP API (E2E)', () => {
     const res = await app.inject({
       method: 'GET',
       url: '/api/v1/admin/doctor-verifications?status=PENDING_REVIEW',
-      headers: {
-        'x-user-id': ADMIN_USER_ID,
-        'x-user-role': 'ADMIN',
-      },
+      headers: adminUser.headers,
     });
 
     expect(res.statusCode).toBe(200);
@@ -197,10 +189,7 @@ describe('Doctor Verification HTTP API (E2E)', () => {
     const res = await app.inject({
       method: 'GET',
       url: `/api/v1/admin/doctor-verifications/${docVerificationId}`,
-      headers: {
-        'x-user-id': ADMIN_USER_ID,
-        'x-user-role': 'ADMIN',
-      },
+      headers: adminUser.headers,
     });
 
     expect(res.statusCode).toBe(200);
@@ -214,10 +203,7 @@ describe('Doctor Verification HTTP API (E2E)', () => {
     const res = await app.inject({
       method: 'GET',
       url: `/api/v1/admin/doctor-verifications/${docVerificationId}/documents/${documentId}/access`,
-      headers: {
-        'x-user-id': ADMIN_USER_ID,
-        'x-user-role': 'ADMIN',
-      },
+      headers: adminUser.headers,
     });
 
     expect(res.statusCode).toBe(200);
@@ -230,10 +216,7 @@ describe('Doctor Verification HTTP API (E2E)', () => {
     const res = await app.inject({
       method: 'POST',
       url: `/api/v1/admin/doctor-verifications/${docVerificationId}/approve`,
-      headers: {
-        'x-user-id': ADMIN_USER_ID,
-        'x-user-role': 'ADMIN',
-      },
+      headers: adminUser.headers,
       payload: {
         notes: 'Medical board registry check passed.',
       },
@@ -242,7 +225,7 @@ describe('Doctor Verification HTTP API (E2E)', () => {
     expect(res.statusCode).toBe(200);
     const body = JSON.parse(res.body);
     expect(body.status).toBe(DoctorVerificationStatus.APPROVED);
-    expect(body.reviewedBy).toBe(ADMIN_USER_ID);
+    expect(body.reviewedBy).toBe(adminUser.id);
     expect(body.reviews).toHaveLength(1);
     expect(body.reviews[0].action).toBe('APPROVED');
 
@@ -250,10 +233,7 @@ describe('Doctor Verification HTTP API (E2E)', () => {
     const profileRes = await app.inject({
       method: 'GET',
       url: '/api/v1/doctors/me',
-      headers: {
-        'x-user-id': DOCTOR_USER_ID,
-        'x-user-role': 'DOCTOR',
-      },
+      headers: doctor1.headers,
     });
     expect(profileRes.statusCode).toBe(200);
     const profileBody = JSON.parse(profileRes.body);
@@ -269,10 +249,7 @@ describe('Doctor Verification HTTP API (E2E)', () => {
     const res = await app.inject({
       method: 'POST',
       url: `/api/v1/admin/doctor-verifications/${docVerificationId}/approve`,
-      headers: {
-        'x-user-id': 'usr-e2e-admin-02',
-        'x-user-role': 'ADMIN',
-      },
+      headers: admin2User.headers,
       payload: {},
     });
 
@@ -285,10 +262,7 @@ describe('Doctor Verification HTTP API (E2E)', () => {
     const res = await app.inject({
       method: 'POST',
       url: `/api/v1/admin/doctor-verifications/${docVerificationId}/reject`,
-      headers: {
-        'x-user-id': 'usr-e2e-admin-02',
-        'x-user-role': 'ADMIN',
-      },
+      headers: admin2User.headers,
       payload: {
         reason: 'Attempting to reject an approved doctor',
       },
@@ -308,10 +282,7 @@ describe('Doctor Verification HTTP API (E2E)', () => {
     await app.inject({
       method: 'POST',
       url: '/api/v1/doctors/me/verification/documents',
-      headers: {
-        'x-user-id': OTHER_DOCTOR_USER_ID,
-        'x-user-role': 'DOCTOR',
-      },
+      headers: doctor2.headers,
       payload: {
         documentType: VerificationDocumentType.MEDICAL_LICENSE,
         originalFileName: 'old_license.pdf',
@@ -324,10 +295,7 @@ describe('Doctor Verification HTTP API (E2E)', () => {
     const submitRes = await app.inject({
       method: 'POST',
       url: '/api/v1/doctors/me/verification/submit',
-      headers: {
-        'x-user-id': OTHER_DOCTOR_USER_ID,
-        'x-user-role': 'DOCTOR',
-      },
+      headers: doctor2.headers,
       payload: {},
     });
     expect(submitRes.statusCode).toBe(200);
@@ -337,10 +305,7 @@ describe('Doctor Verification HTTP API (E2E)', () => {
     const rejectNoReason = await app.inject({
       method: 'POST',
       url: `/api/v1/admin/doctor-verifications/${doc2VerificationId}/reject`,
-      headers: {
-        'x-user-id': ADMIN_USER_ID,
-        'x-user-role': 'ADMIN',
-      },
+      headers: adminUser.headers,
       payload: { reason: '' },
     });
     expect(rejectNoReason.statusCode).toBe(400);
@@ -349,10 +314,7 @@ describe('Doctor Verification HTTP API (E2E)', () => {
     const rejectRes = await app.inject({
       method: 'POST',
       url: `/api/v1/admin/doctor-verifications/${doc2VerificationId}/reject`,
-      headers: {
-        'x-user-id': ADMIN_USER_ID,
-        'x-user-role': 'ADMIN',
-      },
+      headers: adminUser.headers,
       payload: {
         reason: 'License image is blurry and unreadable. Please upload a high-resolution PDF scan.',
       },
@@ -366,10 +328,7 @@ describe('Doctor Verification HTTP API (E2E)', () => {
     const docStatusRes = await app.inject({
       method: 'GET',
       url: '/api/v1/doctors/me/verification',
-      headers: {
-        'x-user-id': OTHER_DOCTOR_USER_ID,
-        'x-user-role': 'DOCTOR',
-      },
+      headers: doctor2.headers,
     });
     expect(docStatusRes.statusCode).toBe(200);
     const docStatusBody = JSON.parse(docStatusRes.body);
@@ -380,10 +339,7 @@ describe('Doctor Verification HTTP API (E2E)', () => {
     await app.inject({
       method: 'POST',
       url: '/api/v1/doctors/me/verification/documents',
-      headers: {
-        'x-user-id': OTHER_DOCTOR_USER_ID,
-        'x-user-role': 'DOCTOR',
-      },
+      headers: doctor2.headers,
       payload: {
         documentType: VerificationDocumentType.MEDICAL_LICENSE,
         originalFileName: 'high_res_license.pdf',
@@ -395,10 +351,7 @@ describe('Doctor Verification HTTP API (E2E)', () => {
     const resubmitRes = await app.inject({
       method: 'POST',
       url: '/api/v1/doctors/me/verification/submit',
-      headers: {
-        'x-user-id': OTHER_DOCTOR_USER_ID,
-        'x-user-role': 'DOCTOR',
-      },
+      headers: doctor2.headers,
       payload: {
         notes: 'Uploaded clear scan.',
       },
@@ -431,22 +384,42 @@ describe('Doctor Verification HTTP API (E2E)', () => {
     const res = await app.inject({
       method: 'GET',
       url: '/api/v1/doctors/me/verification',
-      headers: {
-        'x-user-id': PATIENT_USER_ID,
-        'x-user-role': 'PATIENT',
-      },
+      headers: patientUser.headers,
     });
     expect(res.statusCode).toBe(403);
+  });
+
+  it('SECURITY: Forged identity headers cannot escalate patient to doctor or admin', async () => {
+    const resDoctor = await app.inject({
+      method: 'GET',
+      url: '/api/v1/doctors/me/verification',
+      headers: {
+        ...patientUser.headers,
+        'x-user-id': doctor1.id,
+        'x-user-role': 'DOCTOR',
+        'x-active-role': 'DOCTOR',
+      },
+    });
+    expect(resDoctor.statusCode).toBe(403);
+
+    const resAdmin = await app.inject({
+      method: 'GET',
+      url: '/api/v1/admin/doctor-verifications',
+      headers: {
+        ...patientUser.headers,
+        'x-user-id': adminUser.id,
+        'x-user-role': 'ADMIN',
+        'x-active-role': 'ADMIN',
+      },
+    });
+    expect(resAdmin.statusCode).toBe(403);
   });
 
   it('SECURITY: Patient role should be rejected with 403 on admin verification endpoints', async () => {
     const res = await app.inject({
       method: 'GET',
       url: '/api/v1/admin/doctor-verifications',
-      headers: {
-        'x-user-id': PATIENT_USER_ID,
-        'x-user-role': 'PATIENT',
-      },
+      headers: patientUser.headers,
     });
     expect(res.statusCode).toBe(403);
   });
@@ -455,10 +428,7 @@ describe('Doctor Verification HTTP API (E2E)', () => {
     const res = await app.inject({
       method: 'GET',
       url: '/api/v1/admin/doctor-verifications',
-      headers: {
-        'x-user-id': DOCTOR_USER_ID,
-        'x-user-role': 'DOCTOR',
-      },
+      headers: doctor1.headers,
     });
     expect(res.statusCode).toBe(403);
   });
@@ -467,10 +437,7 @@ describe('Doctor Verification HTTP API (E2E)', () => {
     const res = await app.inject({
       method: 'POST',
       url: `/api/v1/admin/doctor-verifications/${docVerificationId}/approve`,
-      headers: {
-        'x-user-id': DOCTOR_USER_ID,
-        'x-user-role': 'DOCTOR',
-      },
+      headers: doctor1.headers,
       payload: {},
     });
     expect(res.statusCode).toBe(403);
@@ -480,10 +447,7 @@ describe('Doctor Verification HTTP API (E2E)', () => {
     const res = await app.inject({
       method: 'GET',
       url: `/api/v1/doctors/me/verification/documents/${documentId}/access`,
-      headers: {
-        'x-user-id': OTHER_DOCTOR_USER_ID,
-        'x-user-role': 'DOCTOR',
-      },
+      headers: doctor2.headers,
     });
     expect(res.statusCode).toBe(403);
   });
