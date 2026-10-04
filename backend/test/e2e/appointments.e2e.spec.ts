@@ -42,12 +42,13 @@ describe('Appointments & Pre-consultation HTTP API (E2E)', () => {
     // 1. Setup Doctor Profile & Verification
     const specialties = await doctorsRepo.findActiveSpecialties();
     const languages = await doctorsRepo.findAllLanguages();
+    const uniqueSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
 
     const doc = await doctorsRepo.createProfile({
       userId: doctorUser.id,
-      publicDoctorId: 'DOC-55443322',
+      publicDoctorId: `DOC-${uniqueSuffix}`,
       displayName: 'Dr. Gregory House, MD',
-      medicalRegistrationNumber: 'MED-E2E-APPT-01',
+      medicalRegistrationNumber: `MED-E2E-APPT-${uniqueSuffix}`,
       licensingCouncil: 'Medical Board of Diagnostics',
       yearsOfExperience: 18,
       defaultConsultationFee: 150,
@@ -370,5 +371,12 @@ describe('Appointments & Pre-consultation HTTP API (E2E)', () => {
 
       expect(cancelRes.statusCode).toBe(404);
     });
+  });
+
+  afterAll(async () => {
+    if (app) {
+      await cleanupE2EUsers(app, [doctorUser?.email, patientAUser?.email, patientBUser?.email]);
+      await app.close();
+    }
   });
 });

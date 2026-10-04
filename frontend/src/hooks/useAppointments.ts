@@ -12,6 +12,13 @@ import {
   getPreConsultationApi,
   saveDraftPreConsultationApi,
   submitPreConsultationApi,
+  getDoctorAppointmentsApi,
+  acceptDoctorAppointmentApi,
+  declineDoctorAppointmentApi,
+  cancelDoctorAppointmentApi,
+  startDoctorAppointmentApi,
+  completeDoctorAppointmentApi,
+  markNoShowDoctorAppointmentApi,
 } from '@/api/';
 import type {
   CreateAppointmentDto,
@@ -141,6 +148,109 @@ export function useSubmitPreConsultation() {
       queryClient.invalidateQueries({ queryKey: APPOINTMENT_KEYS.preConsultation(variables) });
       queryClient.invalidateQueries({ queryKey: APPOINTMENT_KEYS.detail(variables) });
       queryClient.invalidateQueries({ queryKey: APPOINTMENT_KEYS.all });
+    },
+  });
+}
+
+export const DOCTOR_APPOINTMENT_KEYS = {
+  all: ['doctor', 'appointments'] as const,
+  list: (params?: AppointmentQueryParams) => ['doctor', 'appointments', 'list', params] as const,
+  detail: (id: string) => ['doctor', 'appointments', 'detail', id] as const,
+};
+
+/**
+ * Query hook to fetch doctor's appointments
+ */
+export function useDoctorAppointments(params?: AppointmentQueryParams) {
+  return useQuery({
+    queryKey: DOCTOR_APPOINTMENT_KEYS.list(params),
+    queryFn: () => getDoctorAppointmentsApi(params),
+    staleTime: 30 * 1000,
+  });
+}
+
+/**
+ * Mutation hook for doctor to accept an appointment
+ */
+export function useAcceptDoctorAppointment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (appointmentId: string) => acceptDoctorAppointmentApi(appointmentId),
+    onSuccess: (_data, appointmentId) => {
+      queryClient.invalidateQueries({ queryKey: DOCTOR_APPOINTMENT_KEYS.all });
+      queryClient.invalidateQueries({ queryKey: DOCTOR_APPOINTMENT_KEYS.detail(appointmentId) });
+    },
+  });
+}
+
+/**
+ * Mutation hook for doctor to decline an appointment
+ */
+export function useDeclineDoctorAppointment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ appointmentId, reason }: { appointmentId: string; reason: string }) =>
+      declineDoctorAppointmentApi(appointmentId, reason),
+    onSuccess: (_data, { appointmentId }) => {
+      queryClient.invalidateQueries({ queryKey: DOCTOR_APPOINTMENT_KEYS.all });
+      queryClient.invalidateQueries({ queryKey: DOCTOR_APPOINTMENT_KEYS.detail(appointmentId) });
+    },
+  });
+}
+
+/**
+ * Mutation hook for doctor to cancel an appointment
+ */
+export function useCancelDoctorAppointment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ appointmentId, reason }: { appointmentId: string; reason: string }) =>
+      cancelDoctorAppointmentApi(appointmentId, reason),
+    onSuccess: (_data, { appointmentId }) => {
+      queryClient.invalidateQueries({ queryKey: DOCTOR_APPOINTMENT_KEYS.all });
+      queryClient.invalidateQueries({ queryKey: DOCTOR_APPOINTMENT_KEYS.detail(appointmentId) });
+    },
+  });
+}
+
+/**
+ * Mutation hook for doctor to start an appointment
+ */
+export function useStartDoctorAppointment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (appointmentId: string) => startDoctorAppointmentApi(appointmentId),
+    onSuccess: (_data, appointmentId) => {
+      queryClient.invalidateQueries({ queryKey: DOCTOR_APPOINTMENT_KEYS.all });
+      queryClient.invalidateQueries({ queryKey: DOCTOR_APPOINTMENT_KEYS.detail(appointmentId) });
+    },
+  });
+}
+
+/**
+ * Mutation hook for doctor to complete an appointment
+ */
+export function useCompleteDoctorAppointment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (appointmentId: string) => completeDoctorAppointmentApi(appointmentId),
+    onSuccess: (_data, appointmentId) => {
+      queryClient.invalidateQueries({ queryKey: DOCTOR_APPOINTMENT_KEYS.all });
+      queryClient.invalidateQueries({ queryKey: DOCTOR_APPOINTMENT_KEYS.detail(appointmentId) });
+    },
+  });
+}
+
+/**
+ * Mutation hook for doctor to mark patient no-show
+ */
+export function useMarkNoShowDoctorAppointment() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (appointmentId: string) => markNoShowDoctorAppointmentApi(appointmentId),
+    onSuccess: (_data, appointmentId) => {
+      queryClient.invalidateQueries({ queryKey: DOCTOR_APPOINTMENT_KEYS.all });
+      queryClient.invalidateQueries({ queryKey: DOCTOR_APPOINTMENT_KEYS.detail(appointmentId) });
     },
   });
 }

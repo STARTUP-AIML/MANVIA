@@ -28,6 +28,14 @@ import {
   createDoctorOfferApi,
   deleteDoctorOfferApi,
 } from '@/api/doctors';
+import {
+  getDoctorAppointmentsApi,
+  acceptDoctorAppointmentApi,
+  declineDoctorAppointmentApi,
+  startDoctorAppointmentApi,
+  completeDoctorAppointmentApi,
+  markNoShowDoctorAppointmentApi,
+} from '@/api/appointments';
 import type {
   DoctorSelfProfile,
   DoctorVerificationResponse,
@@ -35,9 +43,10 @@ import type {
   ConsultationOffer,
   DayOfWeek,
   ConsultationType,
+  AppointmentResponseDto,
 } from '@/types/';
 
-type ActiveTab = 'overview' | 'profile' | 'verification' | 'availability' | 'offers';
+type ActiveTab = 'overview' | 'appointments' | 'profile' | 'verification' | 'availability' | 'offers';
 
 export const DoctorRoute: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
@@ -47,6 +56,8 @@ export const DoctorRoute: React.FC = () => {
   const [verification, setVerification] = useState<DoctorVerificationResponse | null>(null);
   const [availabilities, setAvailabilities] = useState<DoctorAvailability[]>([]);
   const [offers, setOffers] = useState<ConsultationOffer[]>([]);
+  const [doctorAppointments, setDoctorAppointments] = useState<AppointmentResponseDto[]>([]);
+  const [appointmentsLoading, setAppointmentsLoading] = useState(false);
 
   // UI Flow States
   const [isLoading, setIsLoading] = useState(true);
@@ -122,9 +133,106 @@ export const DoctorRoute: React.FC = () => {
     }
   }, []);
 
+  const loadDoctorAppointments = useCallback(async () => {
+    setAppointmentsLoading(true);
+    try {
+      const res = await getDoctorAppointmentsApi();
+      setDoctorAppointments(res.data);
+    } catch {
+      setErrorMessage('Unable to load doctor appointments.');
+    } finally {
+      setAppointmentsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     void loadAllData();
   }, [loadAllData]);
+
+  useEffect(() => {
+    if (activeTab === 'appointments') {
+      void loadDoctorAppointments();
+    }
+  }, [activeTab, loadDoctorAppointments]);
+
+  // Appointment Action Handlers
+  const handleAcceptAppointment = async (appointmentId: string) => {
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    try {
+      await acceptDoctorAppointmentApi(appointmentId);
+      setSuccessMessage('Appointment confirmed successfully.');
+      await loadDoctorAppointments();
+    } catch (err: unknown) {
+      const msg = (err as { message?: string })?.message || 'Failed to accept appointment.';
+      setErrorMessage(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleDeclineAppointment = async (appointmentId: string) => {
+    const reason = window.prompt('Please enter reason for declining appointment:');
+    if (!reason) return;
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    try {
+      await declineDoctorAppointmentApi(appointmentId, reason);
+      setSuccessMessage('Appointment declined.');
+      await loadDoctorAppointments();
+    } catch (err: unknown) {
+      const msg = (err as { message?: string })?.message || 'Failed to decline appointment.';
+      setErrorMessage(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleStartAppointment = async (appointmentId: string) => {
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    try {
+      await startDoctorAppointmentApi(appointmentId);
+      setSuccessMessage('Appointment marked in-progress.');
+      await loadDoctorAppointments();
+    } catch (err: unknown) {
+      const msg = (err as { message?: string })?.message || 'Failed to start appointment.';
+      setErrorMessage(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCompleteAppointment = async (appointmentId: string) => {
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    try {
+      await completeDoctorAppointmentApi(appointmentId);
+      setSuccessMessage('Appointment completed successfully.');
+      await loadDoctorAppointments();
+    } catch (err: unknown) {
+      const msg = (err as { message?: string })?.message || 'Failed to complete appointment.';
+      setErrorMessage(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleNoShowAppointment = async (appointmentId: string) => {
+    if (!window.confirm('Mark this appointment as patient no-show?')) return;
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    try {
+      await markNoShowDoctorAppointmentApi(appointmentId);
+      setSuccessMessage('Appointment marked as no-show.');
+      await loadDoctorAppointments();
+    } catch (err: unknown) {
+      const msg = (err as { message?: string })?.message || 'Failed to mark no-show.';
+      setErrorMessage(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   // Handle Profile Save
   const handleSaveProfile = async (e: React.FormEvent) => {
@@ -401,7 +509,7 @@ export const DoctorRoute: React.FC = () => {
 
       {/* Tabs Navigation */}
       <div style={{ display: 'flex', borderBottom: '1px solid var(--border-subtle, #e2e8f0)', gap: '0.5rem', overflowX: 'auto' }}>
-        {(['overview', 'profile', 'verification', 'availability', 'offers'] as ActiveTab[]).map((tab) => (
+        {(['overview', 'appointments', 'profile', 'verification', 'availability', 'offers'] as ActiveTab[]).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -420,6 +528,145 @@ export const DoctorRoute: React.FC = () => {
           </button>
         ))}
       </div>
+
+      {/* TAB: APPOINTMENTS */}
+      {activeTab === 'appointments' && (
+        <Card>
+          <CardHeader>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <CardTitle>Consultation Appointments</CardTitle>
+                <p className="text-muted" style={{ fontSize: '0.875rem' }}>
+                  Manage patient consultation requests, accept or decline bookings, and track appointment lifecycles.
+                </p>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => void loadDoctorAppointments()} isLoading={appointmentsLoading}>
+                Refresh
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {appointmentsLoading ? (
+              <div style={{ display: 'flex', justifyContent: 'center', padding: '2rem' }}>
+                <Spinner />
+              </div>
+            ) : doctorAppointments.length === 0 ? (
+              <div style={{ padding: '3rem 1rem', textAlign: 'center', background: '#f8fafc', borderRadius: '8px' }}>
+                <p className="text-muted" style={{ fontSize: '1rem', fontWeight: 500 }}>No consultation appointments found.</p>
+                <p className="text-muted" style={{ fontSize: '0.875rem', marginTop: '0.25rem' }}>
+                  Incoming booking requests and confirmed consultations will appear here.
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {doctorAppointments.map((appt) => (
+                  <div
+                    key={appt.id}
+                    style={{
+                      border: '1px solid #e2e8f0',
+                      borderRadius: '8px',
+                      padding: '1.25rem',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'flex-start',
+                      flexWrap: 'wrap',
+                      gap: '1rem',
+                      background: '#ffffff',
+                    }}
+                  >
+                    <div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                        <span style={{ fontWeight: 600, fontSize: '1.1rem' }}>{appt.publicAppointmentId}</span>
+                        <Badge
+                          variant={
+                            appt.status === 'CONFIRMED'
+                              ? 'success'
+                              : appt.status === 'REQUESTED'
+                              ? 'warning'
+                              : appt.status === 'IN_PROGRESS'
+                              ? 'info'
+                              : appt.status === 'COMPLETED'
+                              ? 'success'
+                              : 'neutral'
+                          }
+                        >
+                          {appt.status}
+                        </Badge>
+                      </div>
+                      <p style={{ fontSize: '0.9rem', color: '#475569' }}>
+                        <strong>Patient:</strong> {appt.publicPatientId || appt.patientId}
+                      </p>
+                      <p style={{ fontSize: '0.9rem', color: '#475569' }}>
+                        <strong>Schedule:</strong> {new Date(appt.startAt).toLocaleString()} - {new Date(appt.endAt).toLocaleTimeString()}
+                      </p>
+                      {appt.notes && (
+                        <p style={{ fontSize: '0.875rem', color: '#64748b', marginTop: '0.25rem' }}>
+                          <em>Notes: "{appt.notes}"</em>
+                        </p>
+                      )}
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      {appt.status === 'REQUESTED' && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            onClick={() => handleAcceptAppointment(appt.id)}
+                            disabled={isSubmitting}
+                          >
+                            Accept
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleDeclineAppointment(appt.id)}
+                            disabled={isSubmitting}
+                          >
+                            Decline
+                          </Button>
+                        </>
+                      )}
+
+                      {appt.status === 'CONFIRMED' && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            onClick={() => handleStartAppointment(appt.id)}
+                            disabled={isSubmitting}
+                          >
+                            Start Session
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleNoShowAppointment(appt.id)}
+                            disabled={isSubmitting}
+                          >
+                            Mark No-Show
+                          </Button>
+                        </>
+                      )}
+
+                      {appt.status === 'IN_PROGRESS' && (
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          onClick={() => handleCompleteAppointment(appt.id)}
+                          disabled={isSubmitting}
+                        >
+                          Complete Session
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* TAB 1: OVERVIEW */}
       {activeTab === 'overview' && (
