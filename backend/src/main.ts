@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { FastifyAdapter, type NestFastifyApplication } from '@nestjs/platform-fastify';
 import helmet from '@fastify/helmet';
+import fastifyWebsocket from '@fastify/websocket';
 import crypto from 'node:crypto';
 import { Logger } from '@nestjs/common';
 import { AppModule } from './app.module.js';
@@ -10,6 +11,7 @@ import { GlobalExceptionFilter } from './common/filters/global-exception.filter.
 import { createValidationPipe } from './common/pipes/validation.pipe.js';
 import { setupSwagger } from './config/swagger.config.js';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor.js';
+import { AIVoiceGateway } from './modules/ai/realtime/ai-voice.gateway.js';
 
 import type { IncomingMessage } from 'node:http';
 
@@ -85,6 +87,13 @@ export async function createApp(): Promise<NestFastifyApplication> {
     crossOriginEmbedderPolicy: false,
   });
 
+  // Fastify WebSocket Plugin (Voice Avatar Gateway /ws/v1/ai/voice)
+  await app.register(fastifyWebsocket, {
+    options: {
+      maxPayload: 2 * 1024 * 1024, // 2MB max frame payload limit
+    },
+  });
+
   // CORS Configuration
   const allowedOrigins = configService.corsAllowedOrigins;
   app.enableCors({
@@ -132,8 +141,19 @@ export async function createApp(): Promise<NestFastifyApplication> {
       'health/readiness',
       '',
       'api/v1',
+      'ws/v1/ai/voice',
     ],
   });
+
+  // Register MANVIA Realtime Voice Gateway on Fastify adapter
+  try {
+    const voiceGateway = app.get(AIVoiceGateway);
+    voiceGateway.registerGateway(app.getHttpAdapter().getInstance());
+  } catch (err) {
+    new Logger('AIVoiceGateway').warn(
+      `Deferred voice gateway route registration: ${(err as Error).message}`,
+    );
+  }
 
   // Global Validation Pipe
   app.useGlobalPipes(createValidationPipe());
