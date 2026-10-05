@@ -1,172 +1,166 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  SimulatedEmailProvider,
-  SimulatedPushProvider,
-  SimulatedSmsProvider,
-} from '../../src/modules/notifications/providers/simulated-providers.js';
+import { describe, it, expect, vi, afterEach } from 'vitest';
+import { ResendEmailProvider } from '../../src/modules/notifications/providers/resend-email.provider.js';
+import { TwilioSmsProvider } from '../../src/modules/notifications/providers/twilio-sms.provider.js';
+import { FcmPushProvider } from '../../src/modules/notifications/providers/fcm-push.provider.js';
+import type { ConfigService } from '../../src/config/config.service.js';
 
-describe('Simulated Notification Providers (Unit Tests)', () => {
-  describe('SimulatedEmailProvider', () => {
-    let provider: SimulatedEmailProvider;
+describe('Production Notification Providers (M8)', () => {
+  const originalFetch = globalThis.fetch;
 
-    beforeEach(() => {
-      provider = new SimulatedEmailProvider();
-    });
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    vi.restoreAllMocks();
+  });
 
-    it('should successfully send an email message and record it', async () => {
-      const result = await provider.send({
+  describe('ResendEmailProvider', () => {
+    it('returns failure when RESEND_API_KEY is missing', async () => {
+      const mockConfig = {
+        raw: { EMAIL_PROVIDER: 'resend' },
+      } as unknown as ConfigService;
+
+      const provider = new ResendEmailProvider(mockConfig);
+      const res = await provider.send({
         recipientEmail: 'patient@example.com',
         subject: 'Appointment Confirmed',
-        bodyText: 'Your appointment is confirmed for tomorrow.',
+        bodyText: 'Your appointment is confirmed.',
       });
 
-      expect(result.success).toBe(true);
-      expect(result.provider).toBe('simulated-email');
-      expect(result.providerMessageId).toBeDefined();
-      expect(provider.sentEmails).toHaveLength(1);
-      expect(provider.sentEmails[0]?.recipientEmail).toBe('patient@example.com');
+      expect(res.success).toBe(false);
+      expect(res.failureCode).toBe('MISSING_API_KEY');
+      expect(res.isRetryable).toBe(false);
     });
 
-    it('should handle permanent failure when failNextWithPermanent is true', async () => {
-      provider.failNextWithPermanent = true;
-      const result = await provider.send({
-        recipientEmail: 'invalid@example.com',
-        subject: 'Test',
-        bodyText: 'Test',
-      });
+    it('successfully delivers email via Resend API', async () => {
+      const mockConfig = {
+        raw: {
+          EMAIL_PROVIDER: 'resend',
+          RESEND_API_KEY: 're_1234567890',
+          EMAIL_FROM: 'MANVIA Health <alerts@manvia.health>',
+        },
+      } as unknown as ConfigService;
 
-      expect(result.success).toBe(false);
-      expect(result.failureCode).toBe('INVALID_RECIPIENT');
-      expect(result.isRetryable).toBe(false);
-      expect(provider.failNextWithPermanent).toBe(false);
-    });
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ id: 'resend_msg_abc123' }),
+      } as unknown as Response);
 
-    it('should handle transient failure when failNextWithTransient is true', async () => {
-      provider.failNextWithTransient = true;
-      const result = await provider.send({
+      const provider = new ResendEmailProvider(mockConfig);
+      const res = await provider.send({
         recipientEmail: 'patient@example.com',
-        subject: 'Test',
-        bodyText: 'Test',
+        subject: 'Appointment Confirmed',
+        bodyText: 'Your appointment is confirmed.',
       });
 
-      expect(result.success).toBe(false);
-      expect(result.failureCode).toBe('TIMEOUT_ERROR');
-      expect(result.isRetryable).toBe(true);
-      expect(provider.failNextWithTransient).toBe(false);
+      expect(res.success).toBe(true);
+      expect(res.provider).toBe('resend');
+      expect(res.providerMessageId).toBe('resend_msg_abc123');
     });
 
-    it('should clear recorded messages and failure flags', () => {
-      provider.failNextWithPermanent = true;
-      provider.failNextWithTransient = true;
-      provider.sentEmails = [{ recipientEmail: 'a@b.com', subject: 's', bodyText: 'b' }];
+    it('marks HTTP 500 error as retryable', async () => {
+      const mockConfig = {
+        raw: {
+          EMAIL_PROVIDER: 'resend',
+          RESEND_API_KEY: 're_1234567890',
+        },
+      } as unknown as ConfigService;
 
-      provider.clear();
-      expect(provider.sentEmails).toHaveLength(0);
-      expect(provider.failNextWithPermanent).toBe(false);
-      expect(provider.failNextWithTransient).toBe(false);
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 503,
+        text: async () => 'Service Unavailable',
+      } as unknown as Response);
+
+      const provider = new ResendEmailProvider(mockConfig);
+      const res = await provider.send({
+        recipientEmail: 'patient@example.com',
+        subject: 'Appointment Confirmed',
+        bodyText: 'Your appointment is confirmed.',
+      });
+
+      expect(res.success).toBe(false);
+      expect(res.isRetryable).toBe(true);
+      expect(res.failureCode).toBe('HTTP_503');
     });
   });
 
-  describe('SimulatedPushProvider', () => {
-    let provider: SimulatedPushProvider;
+  describe('TwilioSmsProvider', () => {
+    it('returns failure when Twilio credentials are missing', async () => {
+      const mockConfig = {
+        raw: { SMS_PROVIDER: 'twilio' },
+      } as unknown as ConfigService;
 
-    beforeEach(() => {
-      provider = new SimulatedPushProvider();
-    });
-
-    it('should successfully send a push notification and record it', async () => {
-      const result = await provider.send({
-        pushToken: 'push-token-1234567890',
-        title: 'New Update',
-        body: 'You have a new message.',
+      const provider = new TwilioSmsProvider(mockConfig);
+      const res = await provider.send({
+        phoneNumber: '+919876543210',
+        bodyText: 'Your verification OTP is 123456',
       });
 
-      expect(result.success).toBe(true);
-      expect(result.provider).toBe('simulated-push');
-      expect(result.providerMessageId).toBeDefined();
-      expect(provider.sentPushes).toHaveLength(1);
+      expect(res.success).toBe(false);
+      expect(res.failureCode).toBe('MISSING_CREDENTIALS');
     });
 
-    it('should handle permanent failure when token is invalid', async () => {
-      provider.failNextWithPermanent = true;
-      const result = await provider.send({
-        pushToken: 'bad-token',
-        title: 'Test',
-        body: 'Test',
+    it('successfully delivers SMS via Twilio Messages API', async () => {
+      const mockConfig = {
+        raw: {
+          SMS_PROVIDER: 'twilio',
+          TWILIO_ACCOUNT_SID: 'AC1234567890abcdef',
+          TWILIO_AUTH_TOKEN: 'token12345',
+          TWILIO_PHONE_NUMBER: '+15551234567',
+        },
+      } as unknown as ConfigService;
+
+      globalThis.fetch = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({ sid: 'SM1234567890abcdef' }),
+      } as unknown as Response);
+
+      const provider = new TwilioSmsProvider(mockConfig);
+      const res = await provider.send({
+        phoneNumber: '+919876543210',
+        bodyText: 'Your verification OTP is 123456',
       });
 
-      expect(result.success).toBe(false);
-      expect(result.failureCode).toBe('INVALID_DEVICE_TOKEN');
-      expect(result.isRetryable).toBe(false);
-    });
-
-    it('should handle transient rate-limit failure', async () => {
-      provider.failNextWithTransient = true;
-      const result = await provider.send({
-        pushToken: 'token-123',
-        title: 'Test',
-        body: 'Test',
-      });
-
-      expect(result.success).toBe(false);
-      expect(result.failureCode).toBe('RATE_LIMIT_EXCEEDED');
-      expect(result.isRetryable).toBe(true);
-    });
-
-    it('should clear push history and flags', () => {
-      provider.sentPushes.push({ pushToken: 'tok', title: 't', body: 'b' });
-      provider.clear();
-      expect(provider.sentPushes).toHaveLength(0);
+      expect(res.success).toBe(true);
+      expect(res.provider).toBe('twilio');
+      expect(res.providerMessageId).toBe('SM1234567890abcdef');
     });
   });
 
-  describe('SimulatedSmsProvider', () => {
-    let provider: SimulatedSmsProvider;
+  describe('FcmPushProvider', () => {
+    it('returns failure when FIREBASE_PROJECT_ID is missing', async () => {
+      const mockConfig = {
+        raw: { PUSH_PROVIDER: 'fcm' },
+      } as unknown as ConfigService;
 
-    beforeEach(() => {
-      provider = new SimulatedSmsProvider();
-    });
-
-    it('should successfully send an SMS message and mask phone in logging', async () => {
-      const result = await provider.send({
-        phoneNumber: '+15551234567',
-        bodyText: 'Your verification code is 123456',
+      const provider = new FcmPushProvider(mockConfig);
+      const res = await provider.send({
+        pushToken: 'sample_token_123',
+        title: 'New Message',
+        body: 'You have a new update.',
       });
 
-      expect(result.success).toBe(true);
-      expect(result.provider).toBe('simulated-sms');
-      expect(result.providerMessageId).toBeDefined();
-      expect(provider.sentSms).toHaveLength(1);
+      expect(res.success).toBe(false);
+      expect(res.failureCode).toBe('MISSING_PROJECT_ID');
     });
 
-    it('should handle invalid phone number as permanent failure', async () => {
-      provider.failNextWithPermanent = true;
-      const result = await provider.send({
-        phoneNumber: 'invalid-phone',
-        bodyText: 'Test',
+    it('successfully constructs push dispatch with configured project', async () => {
+      const mockConfig = {
+        raw: {
+          PUSH_PROVIDER: 'fcm',
+          FIREBASE_PROJECT_ID: 'manvia-health-prod',
+        },
+      } as unknown as ConfigService;
+
+      const provider = new FcmPushProvider(mockConfig);
+      const res = await provider.send({
+        pushToken: 'sample_token_123',
+        title: 'New Message',
+        body: 'You have a new update.',
       });
 
-      expect(result.success).toBe(false);
-      expect(result.failureCode).toBe('INVALID_PHONE_NUMBER');
-      expect(result.isRetryable).toBe(false);
-    });
-
-    it('should handle gateway timeout as transient failure', async () => {
-      provider.failNextWithTransient = true;
-      const result = await provider.send({
-        phoneNumber: '+15551234567',
-        bodyText: 'Test',
-      });
-
-      expect(result.success).toBe(false);
-      expect(result.failureCode).toBe('GATEWAY_TIMEOUT');
-      expect(result.isRetryable).toBe(true);
-    });
-
-    it('should clear SMS history and flags', () => {
-      provider.sentSms.push({ phoneNumber: '+123', bodyText: 'msg' });
-      provider.clear();
-      expect(provider.sentSms).toHaveLength(0);
+      expect(res.success).toBe(true);
+      expect(res.provider).toBe('fcm');
+      expect(res.providerMessageId).toBeDefined();
     });
   });
 });

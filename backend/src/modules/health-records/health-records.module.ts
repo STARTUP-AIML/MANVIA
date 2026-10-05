@@ -18,6 +18,9 @@ import { HEALTH_TIMELINE_REPOSITORY } from './interfaces/health-timeline-reposit
 import { HEALTH_RECORDS_AUDIT_SERVICE } from './interfaces/health-records-audit-service.interface.js';
 import { HEALTH_RECORDS_STORAGE_SERVICE } from './interfaces/health-records-storage-service.interface.js';
 
+import { S3StorageService } from '../../common/storage/s3-storage.service.js';
+import { ConfigService } from '../../config/config.service.js';
+
 @Module({
   imports: [DatabaseModule, DoctorsModule, CareRelationshipsModule],
   controllers: [
@@ -30,6 +33,7 @@ import { HEALTH_RECORDS_STORAGE_SERVICE } from './interfaces/health-records-stor
     HealthTimelineService,
     HealthRecordsAuditService,
     HealthRecordsStorageService,
+    S3StorageService,
     InMemoryHealthRecordRepository,
     PrismaHealthRecordRepository,
     InMemoryHealthTimelineRepository,
@@ -48,7 +52,18 @@ import { HEALTH_RECORDS_STORAGE_SERVICE } from './interfaces/health-records-stor
     },
     {
       provide: HEALTH_RECORDS_STORAGE_SERVICE,
-      useClass: HealthRecordsStorageService,
+      useFactory: (
+        config: ConfigService,
+        s3: S3StorageService,
+        local: HealthRecordsStorageService,
+      ) => {
+        const driver = (config.raw.STORAGE_DRIVER || 'local').toLowerCase();
+        if (driver === 's3' || driver === 'minio' || driver === 'r2' || driver === 'gcs') {
+          return s3;
+        }
+        return local;
+      },
+      inject: [ConfigService, S3StorageService, HealthRecordsStorageService],
     },
   ],
   exports: [

@@ -153,4 +153,75 @@ export class ConfigService {
   public get realtimeModel(): string {
     return this.config.REALTIME_MODEL;
   }
+
+  // Payment Processing (Milestone 8)
+  public get paymentProvider(): string {
+    return this.config.PAYMENT_PROVIDER;
+  }
+
+  public get razorpayKeyId(): string {
+    return this.config.RAZORPAY_KEY_ID || '';
+  }
+
+  public get razorpayKeySecret(): string {
+    return this.config.RAZORPAY_KEY_SECRET || '';
+  }
+
+  public get razorpayWebhookSecret(): string {
+    return this.config.RAZORPAY_WEBHOOK_SECRET || '';
+  }
+
+  // External Notifications (Milestone 8)
+  public get emailProvider(): string {
+    return this.config.EMAIL_PROVIDER;
+  }
+
+  public get resendApiKey(): string {
+    return this.config.RESEND_API_KEY || '';
+  }
+
+  public get emailFrom(): string {
+    return this.config.EMAIL_FROM;
+  }
+
+  public get smsProvider(): string {
+    return this.config.SMS_PROVIDER;
+  }
+
+  public get twilioAccountSid(): string {
+    return this.config.TWILIO_ACCOUNT_SID || '';
+  }
+
+  public get twilioAuthToken(): string {
+    return this.config.TWILIO_AUTH_TOKEN || '';
+  }
+
+  public get twilioPhoneNumber(): string {
+    return this.config.TWILIO_PHONE_NUMBER || '';
+  }
+
+  public get pushProvider(): string {
+    return this.config.PUSH_PROVIDER;
+  }
+
+  public get firebaseProjectId(): string {
+    return this.config.FIREBASE_PROJECT_ID || '';
+  }
+
+  public get firebaseClientEmail(): string {
+    return this.config.FIREBASE_CLIENT_EMAIL || '';
+  }
+
+  public get firebasePrivateKey(): string {
+    return this.config.FIREBASE_PRIVATE_KEY || '';
+  }
+
+  // Observability & URLs (Milestone 8)
+  public get sentryDsn(): string {
+    return this.config.SENTRY_DSN || '';
+  }
+
+  public get frontendUrl(): string {
+    return this.config.FRONTEND_URL;
+  }
 }

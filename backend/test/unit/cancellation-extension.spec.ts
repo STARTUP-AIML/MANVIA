@@ -188,7 +188,7 @@ describe('Appointments Cancellation Extension (Unit Tests)', () => {
   });
 
   it('doctor cancellation should initiate 100% refund to patient regardless of time', async () => {
-    const slotStart = new Date('2026-10-05T14:00:00.000Z');
+    const slotStart = new Date('2026-10-12T14:00:00.000Z');
     const appt = await appointmentsService.createAppointment(PATIENT_USER, {
       doctorId,
       consultationOfferId: offerId,
@@ -213,7 +213,7 @@ describe('Appointments Cancellation Extension (Unit Tests)', () => {
   });
 
   it('admin override cancellation should initiate 100% refund', async () => {
-    const slotStart = new Date('2026-10-05T15:00:00.000Z');
+    const slotStart = new Date('2026-10-12T15:00:00.000Z');
     const appt = await appointmentsService.createAppointment(PATIENT_USER, {
       doctorId,
       consultationOfferId: offerId,

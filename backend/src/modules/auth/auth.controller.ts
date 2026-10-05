@@ -22,6 +22,7 @@ import { Public } from './decorators/public.decorator.js';
 import type { AuthenticatedUser, ClientMetadata } from './auth.interface.js';
 import { UserService } from '../identity/user.service.js';
 import { NotFoundError } from '../../common/errors/app-error.js';
+import { RateLimit } from '../../common/guards/rate-limit.decorator.js';
 
 @ApiTags('Authentication')
 @Controller('auth')
@@ -41,6 +42,7 @@ export class AuthController {
   }
 
   @Public()
+  @RateLimit({ limit: 15, ttlSeconds: 60, scope: 'auth:register', trackBy: 'ip' })
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   @ApiOperation({
@@ -70,6 +72,7 @@ export class AuthController {
   }
 
   @Public()
+  @RateLimit({ limit: 10, ttlSeconds: 60, scope: 'auth:login', trackBy: 'ip' })
   @Post('login')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -92,6 +95,7 @@ export class AuthController {
   }
 
   @Public()
+  @RateLimit({ limit: 30, ttlSeconds: 60, scope: 'auth:refresh', trackBy: 'ip' })
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({

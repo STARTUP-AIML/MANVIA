@@ -10,16 +10,25 @@ import { HealthController } from './health.controller.js';
 import { HealthService } from './health.service.js';
 import { DatabaseModule } from '../database/database.module.js';
 import { PrismaService } from '../database/prisma.service.js';
+import { CacheModule } from '../cache/cache.module.js';
+import { RedisCacheService } from '../cache/redis-cache.service.js';
 
 @Module({
-  imports: [DatabaseModule],
+  imports: [DatabaseModule, CacheModule],
   controllers: [HealthController],
   providers: [
     {
       provide: HealthService,
-      useFactory: (prisma: PrismaService) => {
+      useFactory: (prisma: PrismaService, cache: RedisCacheService) => {
         const service = new HealthService('0.1.0-phase20');
         service.registerIndicator('database', () => prisma.checkHealth());
+        service.registerIndicator('cache', async () => {
+          const res = await cache.healthCheck();
+          return {
+            status: res.isHealthy ? 'healthy' : 'unhealthy',
+            details: { latencyMs: res.latencyMs, error: res.error },
+          };
+        });
         service.registerIndicator('memory', async () => {
           const mem = process.memoryUsage();
           const heapUsedMb = Math.round((mem.heapUsed / 1024 / 1024) * 100) / 100;
@@ -32,7 +41,7 @@ import { PrismaService } from '../database/prisma.service.js';
         });
         return service;
       },
-      inject: [PrismaService],
+      inject: [PrismaService, RedisCacheService],
     },
   ],
   exports: [HealthService],

@@ -143,6 +143,8 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         return 'NOT_FOUND';
       case 'ConflictError':
         return 'CONFLICT';
+      case 'TooManyRequestsError':
+        return 'TOO_MANY_REQUESTS';
       case 'InternalServerError':
         return 'INTERNAL_SERVER_ERROR';
       default:

@@ -52,6 +52,16 @@ export class ConflictError extends AppError {
   }
 }
 
+export class TooManyRequestsError extends AppError {
+  public readonly statusCode = 429;
+  public readonly retryAfterSeconds: number | undefined;
+
+  constructor(message = 'Too many requests, please try again later', retryAfterSeconds?: number) {
+    super(message);
+    this.retryAfterSeconds = retryAfterSeconds;
+  }
+}
+
 export class InternalServerError extends AppError {
   public readonly statusCode = 500;
 

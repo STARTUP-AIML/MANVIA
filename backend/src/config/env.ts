@@ -88,6 +88,30 @@ export const EnvSchema = z
     EMBEDDING_MODEL: z.string().default('gemini-embedding-2'),
     REALTIME_PROVIDER: z.string().default('gemini'),
     REALTIME_MODEL: z.string().default('gemini-3.8-live'),
+
+    // Payment Processing (Milestone 8)
+    PAYMENT_PROVIDER: z.string().default('simulated'),
+    RAZORPAY_KEY_ID: z.string().optional().default(''),
+    RAZORPAY_KEY_SECRET: z.string().optional().default(''),
+    RAZORPAY_WEBHOOK_SECRET: z.string().optional().default(''),
+
+    // External Notifications (Milestone 8)
+    EMAIL_PROVIDER: z.string().default('simulated'),
+    RESEND_API_KEY: z.string().optional().default(''),
+    EMAIL_FROM: z.string().default('notifications@manvia.com'),
+    SMS_PROVIDER: z.string().default('simulated'),
+    TWILIO_ACCOUNT_SID: z.string().optional().default(''),
+    TWILIO_AUTH_TOKEN: z.string().optional().default(''),
+    TWILIO_PHONE_NUMBER: z.string().optional().default(''),
+    PUSH_PROVIDER: z.string().default('simulated'),
+    FIREBASE_PROJECT_ID: z.string().optional().default(''),
+    FIREBASE_CLIENT_EMAIL: z.string().optional().default(''),
+    FIREBASE_PRIVATE_KEY: z.string().optional().default(''),
+
+    // Error Tracking & Observability (Milestone 8)
+    SENTRY_DSN: z.string().optional().default(''),
+    SENTRY_AUTH_TOKEN: z.string().optional().default(''),
+    FRONTEND_URL: z.string().default('http://localhost:5173'),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV === 'production') {
@@ -114,6 +138,22 @@ export const EnvSchema = z
           message:
             'In production, JWT_REFRESH_SECRET must be at least 32 characters and must not contain placeholder/dev-only values.',
         });
+      }
+      if (data.PAYMENT_PROVIDER.toLowerCase() === 'razorpay') {
+        if (!data.RAZORPAY_KEY_ID || data.RAZORPAY_KEY_ID.includes('placeholder')) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['RAZORPAY_KEY_ID'],
+            message: 'In production with Razorpay enabled, RAZORPAY_KEY_ID must be provided.',
+          });
+        }
+        if (!data.RAZORPAY_KEY_SECRET || data.RAZORPAY_KEY_SECRET.includes('placeholder')) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['RAZORPAY_KEY_SECRET'],
+            message: 'In production with Razorpay enabled, RAZORPAY_KEY_SECRET must be provided.',
+          });
+        }
       }
     }
   });
