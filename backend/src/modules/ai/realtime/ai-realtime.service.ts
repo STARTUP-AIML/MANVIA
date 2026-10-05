@@ -44,7 +44,7 @@ export class AIRealtimeService {
       data: {
         publicSessionId,
         userId,
-        provider: 'MOCK_REALTIME_PROVIDER',
+        provider: this.provider.providerName ?? 'GEMINI_LIVE',
         model,
         state: AIRealtimeState.IDLE,
         connectionInfo: connectionInfo as unknown as object,

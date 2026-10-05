@@ -73,6 +73,21 @@ export const EnvSchema = z
     OTEL_SERVICE_NAME: z.string().default('manvia-backend'),
     OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional().default(''),
     OTEL_ENABLED: z.coerce.boolean().default(false),
+
+    // AI & Realtime Configuration (Milestone 6)
+    AI_PROVIDER: z.string().default('gemini'),
+    GEMINI_API_KEY: z.string().optional().default(''),
+    GEMINI_MODEL: z.string().default('gemini-3.8-flash'),
+    AI_SAFETY_ENABLED: z.coerce.boolean().default(true),
+    AI_SAFETY_PROVIDER: z.string().default('gemini'),
+    AI_SAFETY_MODEL: z.string().default('gemini-3.8-flash'),
+    RAG_ENABLED: z.coerce.boolean().default(true),
+    RAG_TOP_K: z.coerce.number().int().positive().default(5),
+    RAG_MIN_RELEVANCE: z.coerce.number().min(0).max(1).default(0.7),
+    EMBEDDING_PROVIDER: z.string().default('gemini'),
+    EMBEDDING_MODEL: z.string().default('gemini-embedding-2'),
+    REALTIME_PROVIDER: z.string().default('gemini'),
+    REALTIME_MODEL: z.string().default('gemini-3.8-live'),
   })
   .superRefine((data, ctx) => {
     if (data.NODE_ENV === 'production') {

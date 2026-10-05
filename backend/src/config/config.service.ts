@@ -100,4 +100,57 @@ export class ConfigService {
   public get jwtRefreshExpiration(): string {
     return this.config.JWT_REFRESH_EXPIRATION;
   }
+
+  // AI & Realtime Configuration (Milestone 6)
+  public get aiProvider(): string {
+    return this.config.AI_PROVIDER;
+  }
+
+  public get geminiApiKey(): string {
+    return this.config.GEMINI_API_KEY || '';
+  }
+
+  public get geminiModel(): string {
+    return this.config.GEMINI_MODEL;
+  }
+
+  public get isAiSafetyEnabled(): boolean {
+    return this.config.AI_SAFETY_ENABLED;
+  }
+
+  public get aiSafetyProvider(): string {
+    return this.config.AI_SAFETY_PROVIDER;
+  }
+
+  public get aiSafetyModel(): string {
+    return this.config.AI_SAFETY_MODEL;
+  }
+
+  public get isRagEnabled(): boolean {
+    return this.config.RAG_ENABLED;
+  }
+
+  public get ragTopK(): number {
+    return this.config.RAG_TOP_K;
+  }
+
+  public get ragMinRelevance(): number {
+    return this.config.RAG_MIN_RELEVANCE;
+  }
+
+  public get embeddingProvider(): string {
+    return this.config.EMBEDDING_PROVIDER;
+  }
+
+  public get embeddingModel(): string {
+    return this.config.EMBEDDING_MODEL;
+  }
+
+  public get realtimeProvider(): string {
+    return this.config.REALTIME_PROVIDER;
+  }
+
+  public get realtimeModel(): string {
+    return this.config.REALTIME_MODEL;
+  }
 }

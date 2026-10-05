@@ -50,35 +50,32 @@ export function AICompanionPage() {
               border: '1px solid #e2e8f0',
               fontSize: '13px',
               color: '#334155',
-              lineHeight: 1.5,
-              marginBottom: '16px',
+              lineHeight: 1.6,
+              marginBottom: '20px',
             }}
           >
-            Hello! How can I support your health journey today? You can log daily wellness check-ins or review your health timeline events anytime.
+            Welcome! How can I support your health journey today? You can discuss wellness routines, review evidence-based guidance, or ask for help finding the right doctor.
           </div>
 
-          <div style={{ display: 'flex', gap: '8px' }}>
-            <input
-              type="text"
-              placeholder="Type your message..."
-              disabled
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <a
+              href="/app/ai"
+              className="button primary"
               style={{
-                flex: 1,
-                padding: '10px 14px',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '10px 18px',
                 borderRadius: '12px',
-                border: '1px solid #cbd5e1',
+                background: '#096ed3',
+                color: '#fff',
                 fontSize: '13px',
-                background: '#f8fafc',
+                fontWeight: 600,
+                textDecoration: 'none',
               }}
-            />
-            <button
-              type="button"
-              disabled
-              className="primary small"
-              style={{ opacity: 0.7, cursor: 'not-allowed' }}
             >
-              Send ↗
-            </button>
+              Open Interactive Companion Chat ↗
+            </a>
           </div>
         </div>
       </div>
