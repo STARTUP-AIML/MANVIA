@@ -18,6 +18,9 @@ import { ReconciliationService } from './services/reconciliation.service.js';
 import { PaymentAuditService } from './services/payment-audit.service.js';
 import { SimulatedPaymentProvider } from './providers/simulated-payment.provider.js';
 import { SimulatedPayoutProvider } from './providers/simulated-payout.provider.js';
+import { RazorpayPaymentProvider } from './providers/razorpay-payment.provider.js';
+import { RazorpayPayoutProvider } from './providers/razorpay-payout.provider.js';
+import { ConfigService } from '../../config/config.service.js';
 import { InMemoryPaymentRepository } from './repositories/in-memory-payment.repository.js';
 import { PrismaPaymentRepository } from './repositories/prisma-payment.repository.js';
 import { PAYMENT_REPOSITORY } from './interfaces/payment-repository.interface.js';
@@ -53,6 +56,8 @@ import { PAYMENT_AUDIT_SERVICE } from './interfaces/payment-audit-service.interf
     PaymentAuditService,
     SimulatedPaymentProvider,
     SimulatedPayoutProvider,
+    RazorpayPaymentProvider,
+    RazorpayPayoutProvider,
     InMemoryPaymentRepository,
     PrismaPaymentRepository,
     {
@@ -61,11 +66,33 @@ import { PAYMENT_AUDIT_SERVICE } from './interfaces/payment-audit-service.interf
     },
     {
       provide: PAYMENT_PROVIDER,
-      useClass: SimulatedPaymentProvider,
+      useFactory: (
+        config: ConfigService,
+        razorpay: RazorpayPaymentProvider,
+        simulated: SimulatedPaymentProvider,
+      ) => {
+        const isTest = process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST);
+        if (isTest || config.paymentProvider === 'simulated') {
+          return simulated;
+        }
+        return razorpay;
+      },
+      inject: [ConfigService, RazorpayPaymentProvider, SimulatedPaymentProvider],
     },
     {
       provide: PAYOUT_PROVIDER,
-      useClass: SimulatedPayoutProvider,
+      useFactory: (
+        config: ConfigService,
+        razorpayx: RazorpayPayoutProvider,
+        simulated: SimulatedPayoutProvider,
+      ) => {
+        const isTest = process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST);
+        if (isTest || config.paymentProvider === 'simulated') {
+          return simulated;
+        }
+        return razorpayx;
+      },
+      inject: [ConfigService, RazorpayPayoutProvider, SimulatedPayoutProvider],
     },
     {
       provide: PRICING_STRATEGY,
@@ -88,6 +115,10 @@ import { PAYMENT_AUDIT_SERVICE } from './interfaces/payment-audit-service.interf
     PAYMENT_PROVIDER,
     PAYOUT_PROVIDER,
     PAYMENT_AUDIT_SERVICE,
+    SimulatedPaymentProvider,
+    SimulatedPayoutProvider,
+    RazorpayPaymentProvider,
+    RazorpayPayoutProvider,
   ],
 })
 export class PaymentsModule {}

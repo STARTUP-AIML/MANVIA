@@ -9,7 +9,11 @@ import {
   SimulatedEmailProvider,
   SimulatedPushProvider,
   SimulatedSmsProvider,
-} from './providers/simulated-providers.js';
+  ResendEmailProvider,
+  TwilioSmsProvider,
+  FcmPushProvider,
+} from './providers/index.js';
+import { ConfigService } from '../../config/config.service.js';
 import { TemplateEngineService } from './services/template-engine.service.js';
 import { NotificationPreferencesService } from './services/notification-preferences.service.js';
 import { NotificationDeviceService } from './services/notification-device.service.js';
@@ -46,15 +50,45 @@ import { NotificationAuthGuard } from './guards/notification-auth.guard.js';
     },
     {
       provide: EMAIL_PROVIDER,
-      useClass: SimulatedEmailProvider,
+      useFactory: (config: ConfigService) => {
+        if (
+          config.raw.EMAIL_PROVIDER === 'resend' &&
+          process.env.NODE_ENV !== 'test' &&
+          !process.env.VITEST
+        ) {
+          return new ResendEmailProvider(config);
+        }
+        return new SimulatedEmailProvider();
+      },
+      inject: [ConfigService],
     },
     {
       provide: PUSH_PROVIDER,
-      useClass: SimulatedPushProvider,
+      useFactory: (config: ConfigService) => {
+        if (
+          config.raw.PUSH_PROVIDER === 'fcm' &&
+          process.env.NODE_ENV !== 'test' &&
+          !process.env.VITEST
+        ) {
+          return new FcmPushProvider(config);
+        }
+        return new SimulatedPushProvider();
+      },
+      inject: [ConfigService],
     },
     {
       provide: SMS_PROVIDER,
-      useClass: SimulatedSmsProvider,
+      useFactory: (config: ConfigService) => {
+        if (
+          config.raw.SMS_PROVIDER === 'twilio' &&
+          process.env.NODE_ENV !== 'test' &&
+          !process.env.VITEST
+        ) {
+          return new TwilioSmsProvider(config);
+        }
+        return new SimulatedSmsProvider();
+      },
+      inject: [ConfigService],
     },
   ],
   exports: [
