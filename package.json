@@ -56,6 +56,10 @@
     "husky": "^9.1.7",
     "lint-staged": "^15.4.3"
   },
+  "overrides": {
+    "fastify": "5.12.5",
+    "deepmerge-ts": "^8.0.0"
+  },
   "lint-staged": {
     "backend/**/*.{ts,js,mjs,json,md}": [
       "prettier --write"
