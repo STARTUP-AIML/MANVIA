@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "MANVIA Frontend — Care made simpler. Healthcare and wellness web client.",
+  "description": "MANVIA Frontend — Care that feels human. Healthcare and wellness web client.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -p tsconfig.app.json --noEmit && vite build",

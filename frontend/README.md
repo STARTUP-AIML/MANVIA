@@ -1,4 +1,4 @@
-# MANVIA Frontend — Care made simpler.
+# MANVIA Frontend — Care that feels human.
 
 Production-grade web client for the MANVIA Healthcare and Wellness platform. Built with React 18, TypeScript (strict mode), Vite, TanStack Query, React Router, and standard CSS design tokens.
 
