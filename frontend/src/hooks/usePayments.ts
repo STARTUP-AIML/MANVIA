@@ -1,4 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/auth/AuthContext';
 import {
   createPaymentApi,
   getPaymentsApi,
@@ -15,26 +16,36 @@ export const PAYMENT_KEYS = {
   attempts: (id: string) => ['payments', 'attempts', id] as const,
 };
 
-export function usePayments(params?: PaymentQueryParams) {
+export function usePayments(params?: PaymentQueryParams, options?: { enabled?: boolean }) {
+  const { isAuthenticated, status } = useAuth();
+  const isAuthReady = isAuthenticated && status === "AUTHENTICATED";
   return useQuery({
     queryKey: PAYMENT_KEYS.list(params),
     queryFn: () => getPaymentsApi(params),
+    ...options,
+    enabled: isAuthReady && (options?.enabled ?? true),
   });
 }
 
-export function usePayment(id: string) {
+export function usePayment(id: string, options?: { enabled?: boolean }) {
+  const { isAuthenticated, status } = useAuth();
+  const isAuthReady = isAuthenticated && status === "AUTHENTICATED";
   return useQuery({
     queryKey: PAYMENT_KEYS.detail(id),
     queryFn: () => getPaymentByIdApi(id),
-    enabled: !!id,
+    ...options,
+    enabled: isAuthReady && Boolean(id) && (options?.enabled ?? true),
   });
 }
 
-export function usePaymentAttempts(id: string) {
+export function usePaymentAttempts(id: string, options?: { enabled?: boolean }) {
+  const { isAuthenticated, status } = useAuth();
+  const isAuthReady = isAuthenticated && status === "AUTHENTICATED";
   return useQuery({
     queryKey: PAYMENT_KEYS.attempts(id),
     queryFn: () => getPaymentAttemptsApi(id),
-    enabled: !!id,
+    ...options,
+    enabled: isAuthReady && Boolean(id) && (options?.enabled ?? true),
   });
 }
 

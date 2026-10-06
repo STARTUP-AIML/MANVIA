@@ -17,6 +17,7 @@ export const patientService = {
   /**
    * Retrieves the current authenticated patient's profile.
    * Scoped to the requesting user (IDOR protected).
+   * If the user does not have a profile, throws ApiError with status 404.
    */
   async getMyProfile(): Promise<PatientProfileResponseDto> {
     return apiClient.get<PatientProfileResponseDto>("patients/me");

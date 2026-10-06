@@ -39,6 +39,13 @@ export const EnvSchema = z
         'DATABASE_URL must be a valid PostgreSQL connection string starting with postgresql:// or postgres://',
       )
       .default('postgresql://postgres:postgres@localhost:5432/manvia_dev?schema=public'),
+    TEST_DATABASE_URL: z
+      .string()
+      .regex(
+        /^(postgresql|postgres):\/\/.+/i,
+        'TEST_DATABASE_URL must be a valid PostgreSQL connection string starting with postgresql:// or postgres://',
+      )
+      .optional(),
     DATABASE_POOL_MIN: z.coerce.number().int().positive().default(2),
     DATABASE_POOL_MAX: z.coerce.number().int().positive().default(10),
     DATABASE_CONNECTION_TIMEOUT_MS: z.coerce.number().int().positive().default(10000),

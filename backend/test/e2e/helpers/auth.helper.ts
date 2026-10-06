@@ -46,6 +46,9 @@ export function attachE2EAuthHook(app: NestFastifyApplication): void {
   const fastify = app.getHttpAdapter().getInstance();
 
   fastify.addHook('onRequest', async (request: FastifyRequest) => {
+    if ((request as FastifyRequest & { user?: AuthenticatedUser }).user) {
+      return;
+    }
     const authHeader = request.headers.authorization;
     if (!authHeader) {
       return;

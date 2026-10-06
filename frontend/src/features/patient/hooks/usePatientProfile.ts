@@ -18,20 +18,27 @@ import type {
 } from "../types";
 import { ApiError } from "@/api/errors/apiError";
 
+import { useAuth } from "@/auth/AuthContext";
+
 export const PATIENT_PROFILE_QUERY_KEY = ["patient", "profile", "me"] as const;
 
 /**
  * Hook to retrieve the current authenticated patient's profile.
+ * Only executes when user is authenticated.
  */
 export function usePatientProfileQuery(options?: {
   enabled?: boolean;
   retry?: boolean | ((failureCount: number, error: ApiError) => boolean);
 }): UseQueryResult<PatientProfileResponseDto, ApiError> {
+  const { isAuthenticated, status } = useAuth();
+  const isAuthReady = isAuthenticated && status === "AUTHENTICATED";
+
   return useQuery<PatientProfileResponseDto, ApiError>({
     queryKey: PATIENT_PROFILE_QUERY_KEY,
     queryFn: () => patientService.getMyProfile(),
     staleTime: 1000 * 60 * 5, // 5 minutes
     ...options,
+    enabled: isAuthReady && (options?.enabled ?? true),
   });
 }
 

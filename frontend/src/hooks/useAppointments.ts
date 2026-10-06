@@ -3,6 +3,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/auth/AuthContext';
 import {
   createAppointmentApi,
   reserveSlotApi,
@@ -67,25 +68,37 @@ export function useReserveSlot() {
 /**
  * Query hook to fetch patient's appointments
  */
-export function usePatientAppointments(params?: AppointmentQueryParams) {
-  return useQuery({
+export function usePatientAppointments(params?: AppointmentQueryParams, options?: { enabled?: boolean }) {
+  const { isAuthenticated, status } = useAuth();
+  const isAuthReady = isAuthenticated && status === "AUTHENTICATED";
+  const query = useQuery({
     queryKey: APPOINTMENT_KEYS.list(params),
     queryFn: () => getPatientAppointmentsApi(params),
     staleTime: 60 * 1000,
+    ...options,
+    enabled: isAuthReady && (options?.enabled ?? true),
   });
+
+  return {
+    ...query,
+    isLoading: query.isLoading || !isAuthReady,
+  };
 }
 
 /**
  * Query hook to fetch a single appointment by id
  */
-export function useAppointmentDetail(appointmentId: string | null | undefined) {
+export function useAppointmentDetail(appointmentId: string | null | undefined, options?: { enabled?: boolean }) {
+  const { isAuthenticated, status } = useAuth();
+  const isAuthReady = isAuthenticated && status === "AUTHENTICATED";
   return useQuery({
     queryKey: appointmentId ? APPOINTMENT_KEYS.detail(appointmentId) : ['appointments', 'detail', 'none'],
     queryFn: () => {
       if (!appointmentId) throw new Error('Appointment ID is required');
       return getAppointmentByIdApi(appointmentId);
     },
-    enabled: Boolean(appointmentId),
+    ...options,
+    enabled: isAuthReady && Boolean(appointmentId) && (options?.enabled ?? true),
   });
 }
 
@@ -161,11 +174,15 @@ export const DOCTOR_APPOINTMENT_KEYS = {
 /**
  * Query hook to fetch doctor's appointments
  */
-export function useDoctorAppointments(params?: AppointmentQueryParams) {
+export function useDoctorAppointments(params?: AppointmentQueryParams, options?: { enabled?: boolean }) {
+  const { isAuthenticated, status } = useAuth();
+  const isAuthReady = isAuthenticated && status === "AUTHENTICATED";
   return useQuery({
     queryKey: DOCTOR_APPOINTMENT_KEYS.list(params),
     queryFn: () => getDoctorAppointmentsApi(params),
     staleTime: 30 * 1000,
+    ...options,
+    enabled: isAuthReady && (options?.enabled ?? true),
   });
 }
 

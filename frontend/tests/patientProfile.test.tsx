@@ -6,6 +6,8 @@ import { PatientProfileRoute } from "@/routes/PatientProfileRoute";
 import { patientService } from "@/features/patient/api/patientService";
 import type { PatientProfileResponseDto } from "@/features/patient/types";
 import { ApiError } from "@/api/errors/apiError";
+import { sessionStorageManager } from "@/auth/sessionStorage";
+import { authService } from "@/auth/authService";
 
 const mockProfile: PatientProfileResponseDto = {
   id: "profile-uuid-1234",
@@ -29,6 +31,20 @@ const mockProfile: PatientProfileResponseDto = {
 describe("MANVIA Patient Profile Component & Workflow", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    sessionStorageManager.setTokens({
+      accessToken: "mock-patient-access-token",
+      refreshToken: "mock-patient-refresh-token",
+    });
+    vi.spyOn(authService, "getMe").mockResolvedValue({
+      id: "usr-patient-test",
+      email: "priya.sharma@example.com",
+      phone: "+919876543210",
+      roles: ["PATIENT"],
+      emailVerified: true,
+      phoneVerified: true,
+      status: "ACTIVE",
+      createdAt: "2026-01-01T00:00:00.000Z",
+    });
   });
 
   it("renders loading skeleton while patient profile is loading", () => {

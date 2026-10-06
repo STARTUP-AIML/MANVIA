@@ -12,6 +12,7 @@ import { QueryProvider } from "@/app/providers/QueryProvider";
 import { AuthProvider } from "@/auth/AuthContext";
 import { I18nProvider } from "@/i18n/i18nContext";
 import { ToastProvider } from "@/components/feedback/Toast/ToastContext";
+import type { AuthState } from "@/auth/types";
 
 export function createTestQueryClient(): QueryClient {
   return new QueryClient({
@@ -30,15 +31,22 @@ export function createTestQueryClient(): QueryClient {
 export interface CustomRenderOptions extends Omit<RenderOptions, "wrapper"> {
   initialEntries?: MemoryRouterProps["initialEntries"];
   queryClient?: QueryClient;
+  initialAuthState?: Partial<AuthState>;
 }
 
 export function renderWithProviders(
   ui: ReactElement,
-  options: CustomRenderOptions = {},
+  optionsOrRoute: CustomRenderOptions | string = {},
 ) {
+  const options: CustomRenderOptions =
+    typeof optionsOrRoute === "string"
+      ? { initialEntries: [optionsOrRoute] }
+      : optionsOrRoute;
+
   const {
     initialEntries = ["/"],
     queryClient = createTestQueryClient(),
+    initialAuthState,
     ...renderOptions
   } = options;
 
@@ -46,7 +54,7 @@ export function renderWithProviders(
     return (
       <MemoryRouter initialEntries={initialEntries}>
         <QueryProvider client={queryClient}>
-          <AuthProvider>
+          <AuthProvider initialState={initialAuthState}>
             <I18nProvider>
               <ToastProvider>{children}</ToastProvider>
             </I18nProvider>

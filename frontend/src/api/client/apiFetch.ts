@@ -19,14 +19,8 @@ export async function apiFetch<T>(
   // If uploading FormData or doing raw binary, dispatch via native fetch
   if (options.body instanceof FormData || options.body instanceof Blob) {
     const token = sessionStorageManager.getAccessToken();
-    const user = sessionStorageManager.getUser();
     const headers = new Headers(options.headers || {});
     if (token) headers.set("Authorization", `Bearer ${token}`);
-    if (user) {
-      headers.set("x-user-id", user.userId);
-      headers.set("x-user-role", user.activeRole);
-      headers.set("x-active-role", user.activeRole);
-    }
 
     const url = endpoint.startsWith("http")
       ? endpoint
@@ -81,7 +75,7 @@ export function getStoredToken(): string | null {
 }
 
 export function getStoredUser<T = unknown>(): T | null {
-  return sessionStorageManager.getUser() as T | null;
+  return null;
 }
 
 export function clearSession(): void {

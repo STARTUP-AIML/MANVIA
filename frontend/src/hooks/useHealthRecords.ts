@@ -3,6 +3,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/auth/AuthContext';
 import {
   createUploadIntentApi,
   uploadFileToPresignedUrlApi,
@@ -47,34 +48,52 @@ export const CONSENT_KEYS = {
 /**
  * Hook to retrieve paginated health records with filters
  */
-export function useHealthRecords(params?: HealthRecordQueryParams) {
-  return useQuery({
+export function useHealthRecords(params?: HealthRecordQueryParams, options?: { enabled?: boolean }) {
+  const { isAuthenticated, status } = useAuth();
+  const isAuthReady = isAuthenticated && status === "AUTHENTICATED";
+  const query = useQuery({
     queryKey: HEALTH_RECORD_KEYS.list(params),
     queryFn: () => getPatientHealthRecordsApi(params),
     staleTime: 60 * 1000,
+    ...options,
+    enabled: isAuthReady && (options?.enabled ?? true),
   });
+
+  return {
+    ...query,
+    isLoading: query.isLoading || !isAuthReady,
+  };
 }
 
 /**
  * Hook to retrieve details for a specific health record
  */
 export function useHealthRecordDetail(recordId: string, enabled = true) {
-  return useQuery({
+  const { isAuthenticated, status } = useAuth();
+  const isAuthReady = isAuthenticated && status === "AUTHENTICATED";
+  const query = useQuery({
     queryKey: HEALTH_RECORD_KEYS.detail(recordId),
     queryFn: () => getHealthRecordByIdApi(recordId),
-    enabled: Boolean(recordId) && enabled,
+    enabled: isAuthReady && Boolean(recordId) && enabled,
     staleTime: 60 * 1000,
   });
+
+  return {
+    ...query,
+    isLoading: query.isLoading || !isAuthReady,
+  };
 }
 
 /**
  * Hook to fetch a time-limited signed download URL
  */
 export function useRecordDownloadUrl(recordId: string, enabled = false) {
+  const { isAuthenticated, status } = useAuth();
+  const isAuthReady = isAuthenticated && status === "AUTHENTICATED";
   return useQuery({
     queryKey: HEALTH_RECORD_KEYS.downloadUrl(recordId),
     queryFn: () => getRecordDownloadUrlApi(recordId),
-    enabled: Boolean(recordId) && enabled,
+    enabled: isAuthReady && Boolean(recordId) && enabled,
     // Do not cache sensitive temporary signed URLs long term
     staleTime: 0,
     gcTime: 2 * 60 * 1000,
@@ -176,24 +195,40 @@ export function useDeleteHealthRecord() {
 /**
  * Hook to list patient consents
  */
-export function useConsents() {
-  return useQuery({
+export function useConsents(options?: { enabled?: boolean }) {
+  const { isAuthenticated, status } = useAuth();
+  const isAuthReady = isAuthenticated && status === "AUTHENTICATED";
+  const query = useQuery({
     queryKey: CONSENT_KEYS.list(),
     queryFn: () => getPatientConsentsApi(),
     staleTime: 60 * 1000,
+    ...options,
+    enabled: isAuthReady && (options?.enabled ?? true),
   });
+
+  return {
+    ...query,
+    isLoading: query.isLoading || !isAuthReady,
+  };
 }
 
 /**
  * Hook to get consent details and immutable audit trail
  */
 export function useConsentDetail(id: string, enabled = true) {
-  return useQuery({
+  const { isAuthenticated, status } = useAuth();
+  const isAuthReady = isAuthenticated && status === "AUTHENTICATED";
+  const query = useQuery({
     queryKey: CONSENT_KEYS.detail(id),
     queryFn: () => getConsentDetailsApi(id),
-    enabled: Boolean(id) && enabled,
+    enabled: isAuthReady && Boolean(id) && enabled,
     staleTime: 60 * 1000,
   });
+
+  return {
+    ...query,
+    isLoading: query.isLoading || !isAuthReady,
+  };
 }
 
 /**

@@ -4,6 +4,7 @@
  */
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useAuth } from '@/auth/AuthContext';
 import {
   getWellnessSummaryApi,
   getWellnessTrendsApi,
@@ -32,35 +33,50 @@ export const wellnessQueryKeys = {
   detail: (id: string) => ['wellness', 'check-in', id] as const,
 };
 
-export function useWellnessSummary(timezone?: string) {
+export function useWellnessSummary(timezone?: string, options?: { enabled?: boolean }) {
+  const { isAuthenticated, status } = useAuth();
+  const isAuthReady = isAuthenticated && status === "AUTHENTICATED";
   return useQuery<WellnessSummaryResponse, Error>({
     queryKey: wellnessQueryKeys.summary(timezone),
     queryFn: () => getWellnessSummaryApi(timezone),
     staleTime: 60 * 1000,
+    ...options,
+    enabled: isAuthReady && (options?.enabled ?? true),
   });
 }
 
-export function useWellnessTrends(params?: WellnessTrendsQueryParams) {
+export function useWellnessTrends(params?: WellnessTrendsQueryParams, options?: { enabled?: boolean }) {
+  const { isAuthenticated, status } = useAuth();
+  const isAuthReady = isAuthenticated && status === "AUTHENTICATED";
   return useQuery<WellnessTrendsResponse, Error>({
     queryKey: wellnessQueryKeys.trends(params),
     queryFn: () => getWellnessTrendsApi(params),
     staleTime: 60 * 1000,
+    ...options,
+    enabled: isAuthReady && (options?.enabled ?? true),
   });
 }
 
-export function useWellnessCheckIns(params?: WellnessQueryParams) {
+export function useWellnessCheckIns(params?: WellnessQueryParams, options?: { enabled?: boolean }) {
+  const { isAuthenticated, status } = useAuth();
+  const isAuthReady = isAuthenticated && status === "AUTHENTICATED";
   return useQuery<PaginatedWellnessCheckInsResponse, Error>({
     queryKey: wellnessQueryKeys.checkIns(params),
     queryFn: () => getWellnessCheckInsApi(params),
     staleTime: 30 * 1000,
+    ...options,
+    enabled: isAuthReady && (options?.enabled ?? true),
   });
 }
 
-export function useWellnessCheckIn(id: string) {
+export function useWellnessCheckIn(id: string, options?: { enabled?: boolean }) {
+  const { isAuthenticated, status } = useAuth();
+  const isAuthReady = isAuthenticated && status === "AUTHENTICATED";
   return useQuery<WellnessCheckInResponse, Error>({
     queryKey: wellnessQueryKeys.detail(id),
     queryFn: () => getWellnessCheckInByIdApi(id),
-    enabled: Boolean(id),
+    ...options,
+    enabled: isAuthReady && Boolean(id) && (options?.enabled ?? true),
   });
 }
 
