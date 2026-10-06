@@ -242,7 +242,11 @@ export const DoctorBookingPage: React.FC = () => {
           onGoToDoctors={() => navigate('/app/doctors')}
           onGoHome={() => navigate('/app')}
           onViewAppointments={() => navigate('/app/appointments')}
-          onViewDetails={() => navigate(`/app/appointments/${createdAppointment.id}`)}
+          onViewDetails={() =>
+            navigate(
+              `/app/appointments/${createdAppointment.publicAppointmentId || createdAppointment.id}`
+            )
+          }
         />
       </div>
     );

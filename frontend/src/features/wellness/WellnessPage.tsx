@@ -34,7 +34,7 @@ export function WellnessPage() {
         }}
       >
         <div>
-          <div className="eyebrow">PHASE 5 ENGINE</div>
+          <div className="eyebrow">WELLNESS TRACKING</div>
           <h1 style={{ fontSize: '32px', fontWeight: 800, margin: '6px 0 4px', color: '#073a78' }}>
             Wellness & Daily Check-ins
           </h1>

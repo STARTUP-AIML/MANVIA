@@ -306,7 +306,7 @@ export const UpcomingAppointmentSection: React.FC<
           </div>
         </div>
 
-        <Link to="/app/consultations" style={{ textDecoration: "none" }}>
+        <Link to="/app/doctors" style={{ textDecoration: "none" }}>
           <Button variant="primary" size="sm" data-testid="explore-care-button">
             Book Consultation
           </Button>

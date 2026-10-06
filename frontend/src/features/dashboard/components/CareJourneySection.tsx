@@ -174,7 +174,7 @@ export const CareJourneySection: React.FC = () => {
           </CardContent>
           <CardFooter>
             <Link
-              to="/app/consultations"
+              to="/app/doctors"
               style={{ textDecoration: "none", width: "100%" }}
             >
               <Button

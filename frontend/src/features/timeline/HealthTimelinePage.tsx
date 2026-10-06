@@ -13,7 +13,7 @@ export function HealthTimelinePage() {
       data-testid="health-timeline-page"
     >
       <div style={{ marginBottom: '24px' }}>
-        <div className="eyebrow">PHASE 5 ENGINE</div>
+        <div className="eyebrow">HEALTH JOURNEY</div>
         <h1 style={{ fontSize: '32px', fontWeight: 800, margin: '6px 0 4px', color: '#073a78' }}>
           Longitudinal Health Timeline
         </h1>
