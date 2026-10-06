@@ -275,3 +275,15 @@ export async function markNoShowDoctorAppointmentApi(
     }
   );
 }
+
+/**
+ * Doctor: View submitted pre-consultation intake form.
+ * GET /api/v1/doctor/appointments/:appointmentId/pre-consultation
+ */
+export async function getDoctorPreConsultationApi(
+  appointmentId: string
+): Promise<PreConsultationResponseDto> {
+  return apiFetch<PreConsultationResponseDto>(
+    `/doctor/appointments/${encodeURIComponent(appointmentId)}/pre-consultation`
+  );
+}
