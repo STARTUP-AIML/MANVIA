@@ -161,7 +161,7 @@ export function HealthRecordCard({ record, onPreview, onDelete }: HealthRecordCa
           </button>
 
           <Link
-            to={`/health-records/${encodeURIComponent(record.id)}`}
+            to={`/app/health-records/${encodeURIComponent(record.id)}`}
             style={{
               padding: '6px 10px',
               fontSize: '12px',

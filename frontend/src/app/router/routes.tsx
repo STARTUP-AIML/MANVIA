@@ -1,10 +1,16 @@
 /**
  * MANVIA Application Route Definitions
- * Integrates Public, Patient (Phases 1-9), Doctor, and Admin workspaces.
+ * Integrates Public, Canonical Patient (/app/*), Doctor, and Admin workspaces.
  */
 
 import React from "react";
-import { Route, Routes, Navigate } from "react-router-dom";
+import {
+  Route,
+  Routes,
+  Navigate,
+  useParams,
+  useLocation,
+} from "react-router-dom";
 import { ProtectedRoute } from "./ProtectedRoute";
 
 // Shells
@@ -27,7 +33,7 @@ import {
   NotFoundRoute,
 } from "@/routes";
 
-// Migrated Phase 5-9 domain views
+// Domain views
 import { WellnessPage } from "@/features/wellness/WellnessPage";
 import { HealthTimelinePage } from "@/features/timeline/HealthTimelinePage";
 import { DoctorDiscoveryPage } from "@/features/doctors/DoctorDiscoveryPage";
@@ -38,9 +44,21 @@ import { AppointmentDetailPage } from "@/features/appointments/AppointmentDetail
 import { PreConsultationPage } from "@/features/appointments/PreConsultationPage";
 import { HealthRecordsPage } from "@/features/health-records/HealthRecordsPage";
 import { HealthRecordDetailPage } from "@/features/health-records/HealthRecordDetailPage";
-import { PatientLayout } from "@/components/layout/PatientLayout";
 import { AccountPage } from "@/features/patient/AccountPage";
-import { AICompanionPage } from "@/features/ai-companion/AICompanionPage";
+
+// Helper components for preserving query strings and route params during redirects
+const RedirectWithSearch: React.FC<{ to: string }> = ({ to }) => {
+  const location = useLocation();
+  return <Navigate to={`${to}${location.search}`} replace />;
+};
+
+const RedirectWithParams: React.FC<{
+  to: (params: Record<string, string | undefined>) => string;
+}> = ({ to }) => {
+  const params = useParams();
+  const location = useLocation();
+  return <Navigate to={`${to(params)}${location.search}`} replace />;
+};
 
 export const AppRoutes: React.FC = () => {
   return (
@@ -52,154 +70,103 @@ export const AppRoutes: React.FC = () => {
       <Route path="/get-started" element={<Navigate to="/register" replace />} />
       <Route path="/dev-health" element={<DevHealthRoute />} />
 
-      {/* Top-level Patient Domain Routes (Phases 5-9 & Direct Patient Navigation) */}
-      <Route
-        path="/wellness"
-        element={
-          <ProtectedRoute allowedRoles={["PATIENT"]}>
-            <WellnessPage />
-          </ProtectedRoute>
-        }
-      />
+      {/* Legacy Patient Routes -> Redirects to Canonical /app/* */}
+      <Route path="/wellness" element={<RedirectWithSearch to="/app/wellness" />} />
       <Route
         path="/health-timeline"
-        element={
-          <ProtectedRoute allowedRoles={["PATIENT"]}>
-            <HealthTimelinePage />
-          </ProtectedRoute>
-        }
+        element={<RedirectWithSearch to="/app/health-timeline" />}
       />
       <Route
-        path="/doctors"
-        element={
-          <ProtectedRoute allowedRoles={["PATIENT"]}>
-            <PatientLayout activeTab="doctors">
-              <DoctorDiscoveryPage />
-            </PatientLayout>
-          </ProtectedRoute>
-        }
+        path="/timeline"
+        element={<RedirectWithSearch to="/app/health-timeline" />}
       />
-      <Route path="/care/doctors" element={<Navigate to="/doctors" replace />} />
+      <Route path="/doctors" element={<RedirectWithSearch to="/app/doctors" />} />
+      <Route
+        path="/care/doctors"
+        element={<RedirectWithSearch to="/app/doctors" />}
+      />
       <Route
         path="/doctors/:doctorId"
         element={
-          <ProtectedRoute allowedRoles={["PATIENT"]}>
-            <PatientLayout activeTab="doctors">
-              <DoctorProfilePage />
-            </PatientLayout>
-          </ProtectedRoute>
+          <RedirectWithParams
+            to={(p) => `/app/doctors/${encodeURIComponent(p.doctorId || "")}`}
+          />
         }
       />
       <Route
         path="/care/doctors/:doctorId"
         element={
-          <ProtectedRoute allowedRoles={["PATIENT"]}>
-            <PatientLayout activeTab="doctors">
-              <DoctorProfilePage />
-            </PatientLayout>
-          </ProtectedRoute>
+          <RedirectWithParams
+            to={(p) => `/app/doctors/${encodeURIComponent(p.doctorId || "")}`}
+          />
         }
       />
       <Route
         path="/doctors/:doctorId/book"
         element={
-          <ProtectedRoute allowedRoles={["PATIENT"]}>
-            <PatientLayout activeTab="doctors">
-              <DoctorBookingPage />
-            </PatientLayout>
-          </ProtectedRoute>
+          <RedirectWithParams
+            to={(p) => `/app/doctors/${encodeURIComponent(p.doctorId || "")}/book`}
+          />
         }
       />
       <Route
         path="/care/doctors/:doctorId/book"
         element={
-          <ProtectedRoute allowedRoles={["PATIENT"]}>
-            <PatientLayout activeTab="doctors">
-              <DoctorBookingPage />
-            </PatientLayout>
-          </ProtectedRoute>
+          <RedirectWithParams
+            to={(p) => `/app/doctors/${encodeURIComponent(p.doctorId || "")}/book`}
+          />
         }
       />
       <Route
         path="/appointments"
-        element={
-          <ProtectedRoute allowedRoles={["PATIENT"]}>
-            <PatientLayout activeTab="appointments">
-              <AppointmentsPage />
-            </PatientLayout>
-          </ProtectedRoute>
-        }
+        element={<RedirectWithSearch to="/app/appointments" />}
       />
       <Route
         path="/care/appointments"
-        element={<Navigate to="/appointments" replace />}
+        element={<RedirectWithSearch to="/app/appointments" />}
       />
       <Route
         path="/appointments/:appointmentId"
         element={
-          <ProtectedRoute allowedRoles={["PATIENT"]}>
-            <PatientLayout activeTab="appointments">
-              <AppointmentDetailPage />
-            </PatientLayout>
-          </ProtectedRoute>
+          <RedirectWithParams
+            to={(p) => `/app/appointments/${encodeURIComponent(p.appointmentId || "")}`}
+          />
         }
       />
       <Route
         path="/appointments/:appointmentId/pre-consultation"
         element={
-          <ProtectedRoute allowedRoles={["PATIENT"]}>
-            <PatientLayout activeTab="appointments">
-              <PreConsultationPage />
-            </PatientLayout>
-          </ProtectedRoute>
+          <RedirectWithParams
+            to={(p) =>
+              `/app/appointments/${encodeURIComponent(p.appointmentId || "")}/pre-consultation`
+            }
+          />
         }
       />
       <Route
         path="/health-records"
-        element={
-          <ProtectedRoute allowedRoles={["PATIENT"]}>
-            <PatientLayout activeTab="records">
-              <HealthRecordsPage />
-            </PatientLayout>
-          </ProtectedRoute>
-        }
+        element={<RedirectWithSearch to="/app/health-records" />}
       />
       <Route
         path="/care/health-records"
-        element={<Navigate to="/health-records" replace />}
+        element={<RedirectWithSearch to="/app/health-records" />}
       />
       <Route
         path="/health-records/:recordId"
         element={
-          <ProtectedRoute allowedRoles={["PATIENT"]}>
-            <PatientLayout activeTab="records">
-              <HealthRecordDetailPage />
-            </PatientLayout>
-          </ProtectedRoute>
+          <RedirectWithParams
+            to={(p) => `/app/health-records/${encodeURIComponent(p.recordId || "")}`}
+          />
         }
       />
       <Route
         path="/consents"
-        element={<Navigate to="/health-records?tab=consents" replace />}
+        element={<RedirectWithSearch to="/app/health-records?tab=consents" />}
       />
-      <Route
-        path="/account"
-        element={
-          <ProtectedRoute allowedRoles={["PATIENT"]}>
-            <AccountPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/ai-companion"
-        element={
-          <ProtectedRoute allowedRoles={["PATIENT"]}>
-            <AICompanionPage />
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/account" element={<RedirectWithSearch to="/app/account" />} />
+      <Route path="/ai-companion" element={<RedirectWithSearch to="/app/ai" />} />
 
-      {/* Patient Domain (Protected) */}
+      {/* Canonical Patient Domain (Protected via PatientShell + Outlet) */}
       <Route
         path="/app"
         element={
@@ -209,8 +176,6 @@ export const AppRoutes: React.FC = () => {
         }
       >
         <Route index element={<PatientHomeRoute />} />
-        <Route path="profile" element={<PatientProfileRoute />} />
-        <Route path="settings" element={<PatientSettingsRoute />} />
         <Route path="ai" element={<AiCompanionRoute />} />
         <Route path="ai/:conversationId" element={<AiCompanionRoute />} />
         <Route path="wellness" element={<WellnessPage />} />
@@ -220,11 +185,18 @@ export const AppRoutes: React.FC = () => {
         <Route path="doctors/:doctorId/book" element={<DoctorBookingPage />} />
         <Route path="appointments" element={<AppointmentsPage />} />
         <Route path="appointments/:appointmentId" element={<AppointmentDetailPage />} />
-        <Route path="appointments/:appointmentId/pre-consultation" element={<PreConsultationPage />} />
+        <Route
+          path="appointments/:appointmentId/pre-consultation"
+          element={<PreConsultationPage />}
+        />
         <Route path="health-records" element={<HealthRecordsPage />} />
         <Route path="health-records/:recordId" element={<HealthRecordDetailPage />} />
+        <Route path="account" element={<AccountPage />} />
+        <Route path="profile" element={<PatientProfileRoute />} />
+        <Route path="settings" element={<PatientSettingsRoute />} />
         <Route path="records" element={<Navigate to="/app/health-records" replace />} />
-        <Route path="*" element={<PatientHomeRoute />} />
+        <Route path="consultations" element={<Navigate to="/app/doctors" replace />} />
+        <Route path="*" element={<NotFoundRoute />} />
       </Route>
 
       {/* Doctor Domain (Protected) */}

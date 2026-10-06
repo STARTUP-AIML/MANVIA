@@ -13,14 +13,15 @@ export const PatientShell: React.FC<{ children?: ReactNode }> = ({
   children,
 }) => {
   const patientNav = [
-    { label: "Overview", href: "/app", icon: "📊" },
+    { label: "Home", href: "/app", icon: "🏠" },
     { label: "AI Companion", href: "/app/ai", icon: "🤖", badge: "AI" },
     { label: "Wellness", href: "/app/wellness", icon: "🌱", badge: "Daily" },
     { label: "Health Timeline", href: "/app/health-timeline", icon: "⏱️" },
     { label: "Find Doctors", href: "/app/doctors", icon: "🩺" },
     { label: "Appointments", href: "/app/appointments", icon: "📅" },
     { label: "Health Records", href: "/app/health-records", icon: "📁" },
-    { label: "Profile", href: "/app/profile", icon: "👤" },
+    { label: "Account", href: "/app/account", icon: "👤" },
+    { label: "Profile", href: "/app/profile", icon: "📋" },
     { label: "Settings", href: "/app/settings", icon: "⚙️" },
   ];
 

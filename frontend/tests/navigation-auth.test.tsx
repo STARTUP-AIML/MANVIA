@@ -1,5 +1,5 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '@/auth/AuthContext';
@@ -91,6 +91,31 @@ vi.mock('@/api/timeline', async () => {
   };
 });
 
+vi.mock('@/features/ai-companion', async () => {
+  const actual = await vi.importActual('@/features/ai-companion');
+  return {
+    ...actual,
+    useAiConversationsQuery: vi.fn().mockReturnValue({
+      data: { data: [] },
+      isLoading: false,
+      isError: false,
+    }),
+    useAiConversationQuery: vi.fn().mockReturnValue({
+      data: null,
+      isLoading: false,
+      isError: false,
+    }),
+    useCreateConversationMutation: vi.fn().mockReturnValue({
+      mutateAsync: vi.fn(),
+      isPending: false,
+    }),
+    useSendAiMessageMutation: vi.fn().mockReturnValue({
+      mutateAsync: vi.fn(),
+      isPending: false,
+    }),
+  };
+});
+
 function renderAppWithRoute(initialRoute: string) {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -109,27 +134,59 @@ function renderAppWithRoute(initialRoute: string) {
   );
 }
 
-describe('Navigation & Auth Protection — Phase 5', () => {
+describe('Navigation & Auth Protection — Canonical /app/* Routing', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+  });
+
   it('renders landing page on root route /', () => {
     renderAppWithRoute('/');
     expect(screen.getByText(/Your health journey,/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Open Wellness Hub/i })).toBeInTheDocument();
   });
 
+  it('redirects unauthenticated user accessing /app to login', async () => {
+    renderAppWithRoute('/app');
+    await waitFor(() => {
+      expect(screen.getByText('Welcome to MANVIA')).toBeInTheDocument();
+    });
+  });
+
   it('redirects unauthenticated user accessing /wellness to login', async () => {
-    sessionStorage.clear();
     renderAppWithRoute('/wellness');
-    expect(screen.getByText('Welcome to MANVIA')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Sign In to Wellness & Timeline/i })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Welcome to MANVIA')).toBeInTheDocument();
+    });
   });
 
   it('redirects unauthenticated user accessing /health-timeline to login', async () => {
-    sessionStorage.clear();
     renderAppWithRoute('/health-timeline');
-    expect(screen.getByText('Welcome to MANVIA')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Welcome to MANVIA')).toBeInTheDocument();
+    });
   });
 
-  it('allows authenticated patient to access /wellness and /health-timeline', async () => {
+  it('allows authenticated patient to access /app and renders PatientHomeRoute without stale Phase 0 shell', async () => {
+    sessionStorage.setItem(
+      'manvia_auth_user',
+      JSON.stringify({
+        id: 'pat-auth-test',
+        email: 'patient.auth@manvia.health',
+        roles: ['PATIENT'],
+      })
+    );
+    sessionStorage.setItem('manvia_auth_token', 'test-valid-bearer-token');
+
+    renderAppWithRoute('/app');
+    await waitFor(() => {
+      expect(screen.getByTestId('patient-home-dashboard')).toBeInTheDocument();
+    });
+    // Ensure stale Phase-0 shell is NOT rendered
+    expect(screen.queryByText('Phase 0 Shell Active')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Planned: Phase 2/i)).not.toBeInTheDocument();
+  });
+
+  it('allows authenticated patient to access /wellness and /health-timeline inside PatientShell', async () => {
     sessionStorage.setItem(
       'manvia_auth_user',
       JSON.stringify({
@@ -144,11 +201,54 @@ describe('Navigation & Auth Protection — Phase 5', () => {
     await waitFor(() => {
       expect(screen.getByRole('heading', { name: /Wellness & Daily Check-ins/i })).toBeInTheDocument();
     });
-    expect(screen.getByText('Patient Care Hub')).toBeInTheDocument();
+    // PatientShell sidebar title is "Patient Care"
+    expect(screen.getByText('Patient Care')).toBeInTheDocument();
     expect(screen.getAllByRole('link', { name: /Health Timeline/i })[0]).toBeInTheDocument();
   });
 
-  it('preserves Phase 2 Account route for authenticated patient', async () => {
+  it('patient navigation links point to canonical /app/* paths', async () => {
+    sessionStorage.setItem(
+      'manvia_auth_user',
+      JSON.stringify({
+        id: 'pat-auth-test',
+        email: 'patient.auth@manvia.health',
+        roles: ['PATIENT'],
+      })
+    );
+    sessionStorage.setItem('manvia_auth_token', 'test-valid-bearer-token');
+
+    renderAppWithRoute('/app');
+    await waitFor(() => {
+      expect(screen.getByTestId('patient-home-dashboard')).toBeInTheDocument();
+    });
+
+    const sidebar = screen.getByRole('complementary', { name: /Patient Care/i });
+    const homeLink = within(sidebar).getByRole('link', { name: /Home/i });
+    expect(homeLink).toHaveAttribute('href', '/app');
+
+    const aiLink = within(sidebar).getByRole('link', { name: /AI Companion/i });
+    expect(aiLink).toHaveAttribute('href', '/app/ai');
+
+    const wellnessLink = within(sidebar).getByRole('link', { name: /Wellness/i });
+    expect(wellnessLink).toHaveAttribute('href', '/app/wellness');
+
+    const timelineLink = within(sidebar).getByRole('link', { name: /Health Timeline/i });
+    expect(timelineLink).toHaveAttribute('href', '/app/health-timeline');
+
+    const doctorsLink = within(sidebar).getByRole('link', { name: /Find Doctors/i });
+    expect(doctorsLink).toHaveAttribute('href', '/app/doctors');
+
+    const appointmentsLink = within(sidebar).getByRole('link', { name: /Appointments/i });
+    expect(appointmentsLink).toHaveAttribute('href', '/app/appointments');
+
+    const recordsLink = within(sidebar).getByRole('link', { name: /Health Records/i });
+    expect(recordsLink).toHaveAttribute('href', '/app/health-records');
+
+    const accountLink = within(sidebar).getByRole('link', { name: /Account/i });
+    expect(accountLink).toHaveAttribute('href', '/app/account');
+  });
+
+  it('preserves legacy Account route by redirecting to /app/account', async () => {
     sessionStorage.setItem(
       'manvia_auth_user',
       JSON.stringify({
@@ -166,7 +266,7 @@ describe('Navigation & Auth Protection — Phase 5', () => {
     expect(screen.getAllByText('patient.auth@manvia.health')[0]).toBeInTheDocument();
   });
 
-  it('preserves Phase 4 AI Companion route', async () => {
+  it('preserves legacy AI Companion route by redirecting to /app/ai', async () => {
     sessionStorage.setItem(
       'manvia_auth_user',
       JSON.stringify({
@@ -179,8 +279,43 @@ describe('Navigation & Auth Protection — Phase 5', () => {
 
     renderAppWithRoute('/ai-companion');
     await waitFor(() => {
-      expect(screen.getByRole('heading', { name: /AI Health Companion/i })).toBeInTheDocument();
+      expect(
+        screen.getByRole('heading', { level: 1, name: /MANVIA AI Companion/i })
+      ).toBeInTheDocument();
+    });
+  });
+
+  it('blocks patient from accessing doctor and admin areas', async () => {
+    sessionStorage.setItem(
+      'manvia_auth_user',
+      JSON.stringify({
+        id: 'pat-auth-test',
+        email: 'patient.auth@manvia.health',
+        roles: ['PATIENT'],
+      })
+    );
+    sessionStorage.setItem('manvia_auth_token', 'test-valid-bearer-token');
+
+    renderAppWithRoute('/doctor');
+    await waitFor(() => {
+      expect(screen.getByText(/Access Restricted/i)).toBeInTheDocument();
+    });
+  });
+
+  it('renders NotFound on unknown subpaths under /app and unknown global routes', async () => {
+    sessionStorage.setItem(
+      'manvia_auth_user',
+      JSON.stringify({
+        id: 'pat-auth-test',
+        email: 'patient.auth@manvia.health',
+        roles: ['PATIENT'],
+      })
+    );
+    sessionStorage.setItem('manvia_auth_token', 'test-valid-bearer-token');
+
+    renderAppWithRoute('/app/unknown-subroute');
+    await waitFor(() => {
+      expect(screen.getByText('Page Not Found')).toBeInTheDocument();
     });
   });
 });
-

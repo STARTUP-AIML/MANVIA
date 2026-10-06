@@ -120,7 +120,7 @@ export function HealthRecordDetailPage() {
           This health record does not exist or you do not have permission to view it.
         </p>
         <Link
-          to="/health-records"
+          to="/app/health-records"
           style={{
             display: 'inline-block',
             padding: '10px 20px',
@@ -151,7 +151,7 @@ export function HealthRecordDetailPage() {
       {/* Back button */}
       <div>
         <Link
-          to="/health-records"
+          to="/app/health-records"
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -365,7 +365,7 @@ export function HealthRecordDetailPage() {
             </p>
           </div>
           <Link
-            to="/health-records?tab=consents"
+            to="/app/health-records?tab=consents"
             style={{
               fontSize: '13px',
               fontWeight: 600,
@@ -607,7 +607,7 @@ export function HealthRecordDetailPage() {
           onClose={() => setDeleteOpen(false)}
           onSuccess={() => {
             setDeleteOpen(false);
-            navigate('/health-records');
+            navigate('/app/health-records');
           }}
         />
       )}

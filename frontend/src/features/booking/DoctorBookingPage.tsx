@@ -163,7 +163,7 @@ export const DoctorBookingPage: React.FC = () => {
           </p>
           <button
             type="button"
-            onClick={() => navigate('/doctors')}
+            onClick={() => navigate('/app/doctors')}
             className="mt-4 px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white font-semibold rounded-xl text-sm"
           >
             Return to Directory
@@ -195,7 +195,7 @@ export const DoctorBookingPage: React.FC = () => {
           </p>
           <button
             type="button"
-            onClick={() => navigate('/doctors')}
+            onClick={() => navigate('/app/doctors')}
             className="mt-4 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold rounded-xl text-sm"
           >
             Find Another Doctor
@@ -223,7 +223,7 @@ export const DoctorBookingPage: React.FC = () => {
           </p>
           <button
             type="button"
-            onClick={() => navigate('/doctors')}
+            onClick={() => navigate('/app/doctors')}
             className="mt-5 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white font-semibold rounded-xl text-sm shadow-sm"
           >
             Explore Verified Doctors
@@ -239,10 +239,10 @@ export const DoctorBookingPage: React.FC = () => {
       <div className="max-w-2xl mx-auto py-12 px-4">
         <BookingSuccessCard
           appointment={createdAppointment}
-          onGoToDoctors={() => navigate('/doctors')}
-          onGoHome={() => navigate('/')}
-          onViewAppointments={() => navigate('/appointments')}
-          onViewDetails={() => navigate(`/appointments/${createdAppointment.id}`)}
+          onGoToDoctors={() => navigate('/app/doctors')}
+          onGoHome={() => navigate('/app')}
+          onViewAppointments={() => navigate('/app/appointments')}
+          onViewDetails={() => navigate(`/app/appointments/${createdAppointment.id}`)}
         />
       </div>
     );
@@ -255,7 +255,7 @@ export const DoctorBookingPage: React.FC = () => {
         <div className="flex items-center gap-4">
           <button
             type="button"
-            onClick={() => navigate(`/doctors/${doctor.publicDoctorId}`)}
+            onClick={() => navigate(`/app/doctors/${doctor.publicDoctorId}`)}
             className="p-2 -ml-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
             aria-label="Back to Doctor Profile"
           >
