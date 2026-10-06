@@ -12,6 +12,10 @@ import { createValidationPipe } from './common/pipes/validation.pipe.js';
 import { setupSwagger } from './config/swagger.config.js';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor.js';
 import { AIVoiceGateway } from './modules/ai/realtime/ai-voice.gateway.js';
+import { TokenService } from './modules/auth/services/token.service.js';
+import { SessionService } from './modules/auth/services/session.service.js';
+import type { AuthenticatedUser } from './modules/auth/auth.interface.js';
+import type { FastifyRequest } from 'fastify';
 
 import type { IncomingMessage } from 'node:http';
 
@@ -163,6 +167,48 @@ export async function createApp(): Promise<NestFastifyApplication> {
 
   // Global Structured Logging Interceptor
   app.useGlobalInterceptors(new LoggingInterceptor(configService.raw));
+
+  // Fastify Bearer Authentication Resolution Hook
+  // Validates cryptographic JWT signature and active database session state,
+  // attaching verified identity context to request.user for downstream domain guards.
+  try {
+    const tokenService = app.get(TokenService);
+    const sessionService = app.get(SessionService);
+    const fastifyInstance = app.getHttpAdapter().getInstance();
+
+    fastifyInstance.addHook('onRequest', async (request: FastifyRequest) => {
+      const authHeader = request.headers.authorization;
+      if (!authHeader) {
+        return;
+      }
+
+      const [scheme, token] = authHeader.split(' ');
+      if (scheme?.toLowerCase() !== 'bearer' || !token) {
+        return;
+      }
+
+      try {
+        const payload = tokenService.verifyAccessToken(token);
+        const { isValid, session } = await sessionService.validateSession(payload.sessionId);
+        if (!isValid || !session || session.user.status !== 'ACTIVE') {
+          return;
+        }
+
+        (request as FastifyRequest & { user?: AuthenticatedUser & { userId?: string } }).user = {
+          id: session.user.id,
+          userId: session.user.id,
+          email: session.user.email,
+          roles: session.user.roles,
+          activeRole: payload.activeRole ?? session.user.roles[0] ?? 'PATIENT',
+          sessionId: session.id,
+        };
+      } catch {
+        // Invalid/expired token -> request.user remains undefined
+      }
+    });
+  } catch (err) {
+    new Logger('AuthHook').warn(`Deferred auth hook registration: ${(err as Error).message}`);
+  }
 
   // OpenAPI / Swagger Documentation
   setupSwagger(app, configService.raw);

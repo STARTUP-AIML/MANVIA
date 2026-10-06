@@ -146,7 +146,10 @@ export class ApiClient {
       headers.set("x-request-id", this.generateRequestId());
     }
 
-    if (body !== undefined && !headers.has("Content-Type")) {
+    const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
+    const isBlob = typeof Blob !== "undefined" && body instanceof Blob;
+
+    if (body !== undefined && !isFormData && !headers.has("Content-Type")) {
       headers.set("Content-Type", "application/json");
     }
 
@@ -158,17 +161,6 @@ export class ApiClient {
       }
     }
 
-    // Attach user identity headers if configured and not explicitly skipped
-    if (!options.skipAuth && this.config.getUserContext) {
-      const userContext = this.config.getUserContext();
-      if (userContext?.userId && !headers.has("x-user-id")) {
-        headers.set("x-user-id", userContext.userId);
-      }
-      if (userContext?.activeRole && !headers.has("x-user-role")) {
-        headers.set("x-user-role", userContext.activeRole);
-      }
-    }
-
     try {
       const response = await fetch(url.toString(), {
         ...options,
@@ -176,8 +168,8 @@ export class ApiClient {
         headers,
         body:
           body !== undefined
-            ? typeof body === "string"
-              ? body
+            ? isFormData || isBlob || typeof body === "string"
+              ? (body as BodyInit)
               : JSON.stringify(body)
             : undefined,
         signal: controller.signal,
@@ -195,15 +187,18 @@ export class ApiClient {
       if (!response.ok) {
         const apiError = await this.normalizeError(response, responseText);
 
+        const isAuthEndpoint =
+          endpoint.includes("auth/login") ||
+          endpoint.includes("auth/register") ||
+          endpoint.includes("auth/refresh");
+
         // Check for 401 Unauthorized and attempt token refresh if not already retrying
         if (
           apiError.isUnauthorized &&
           !isRetry &&
           !options.skipAuth &&
-          this.config.refreshTokenHandler &&
-          !endpoint.includes("auth/login") &&
-          !endpoint.includes("auth/register") &&
-          !endpoint.includes("auth/refresh")
+          !isAuthEndpoint &&
+          this.config.refreshTokenHandler
         ) {
           try {
             // Deduplicate concurrent refresh calls
@@ -227,12 +222,17 @@ export class ApiClient {
               );
             }
           } catch {
-            // Refresh failed, notify unauthorized
+            // Refresh failed
           }
         }
 
-        // If still 401 or refresh not possible, notify listener
-        if (apiError.isUnauthorized && this.config.onUnauthorized) {
+        // If still 401 (e.g. after refresh failed or retry returned 401), notify listener
+        if (
+          apiError.isUnauthorized &&
+          !options.skipAuth &&
+          !isAuthEndpoint &&
+          this.config.onUnauthorized
+        ) {
           this.config.onUnauthorized();
         }
 

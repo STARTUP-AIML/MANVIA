@@ -1,11 +1,19 @@
-import { PatientLayout } from '@/components/layout/PatientLayout';
 import { TimelineFeed } from '@/features/timeline/components/TimelineFeed';
 
 export function HealthTimelinePage() {
   return (
-    <PatientLayout activeTab="timeline">
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'var(--space-6)',
+        maxWidth: '1120px',
+        margin: '0 auto',
+      }}
+      data-testid="health-timeline-page"
+    >
       <div style={{ marginBottom: '24px' }}>
-        <div className="eyebrow">PHASE 5 ENGINE</div>
+        <div className="eyebrow">HEALTH JOURNEY</div>
         <h1 style={{ fontSize: '32px', fontWeight: 800, margin: '6px 0 4px', color: '#073a78' }}>
           Longitudinal Health Timeline
         </h1>
@@ -32,6 +40,6 @@ export function HealthTimelinePage() {
       >
         <strong>Privacy & Security Notice:</strong> Health Timeline entries are secured using end-to-end patient authorization. Event summaries and metadata contain non-sensitive attributes for navigation and clinical auditability. Physician access requires explicit, active consent with the HEALTH_TIMELINE scope.
       </div>
-    </PatientLayout>
+    </div>
   );
 }

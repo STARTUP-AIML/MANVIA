@@ -26,7 +26,8 @@ import {
 } from "@/features/dashboard";
 
 export const PatientHomeRoute: React.FC = () => {
-  const { user } = useAuth();
+  const { user, isAuthenticated, status } = useAuth();
+  const isAuthReady = isAuthenticated && status === "AUTHENTICATED";
   const { data: profile } = usePatientProfileQuery();
 
   // Independent queries ensuring section-level partial failure resilience
@@ -52,7 +53,7 @@ export const PatientHomeRoute: React.FC = () => {
       {/* 2. Top Priority Status: Nearest Upcoming Appointment */}
       <UpcomingAppointmentSection
         appointment={upcomingAppointmentQuery.data}
-        isLoading={upcomingAppointmentQuery.isLoading}
+        isLoading={upcomingAppointmentQuery.isLoading || !isAuthReady}
         error={upcomingAppointmentQuery.error}
         onRetry={() => upcomingAppointmentQuery.refetch()}
       />
@@ -80,7 +81,7 @@ export const PatientHomeRoute: React.FC = () => {
           {/* Recent Longitudinal Care Feed */}
           <RecentTimelineSection
             events={timelineQuery.data?.data}
-            isLoading={timelineQuery.isLoading}
+            isLoading={timelineQuery.isLoading || !isAuthReady}
             error={timelineQuery.error}
             onRetry={() => timelineQuery.refetch()}
           />
@@ -97,7 +98,7 @@ export const PatientHomeRoute: React.FC = () => {
           {/* Daily Wellness Check-in Status */}
           <WellnessSummarySection
             summary={wellnessSummaryQuery.data}
-            isLoading={wellnessSummaryQuery.isLoading}
+            isLoading={wellnessSummaryQuery.isLoading || !isAuthReady}
             error={wellnessSummaryQuery.error}
             onRetry={() => wellnessSummaryQuery.refetch()}
           />
@@ -106,7 +107,7 @@ export const PatientHomeRoute: React.FC = () => {
           <NotificationsSummarySection
             notifications={notificationsQuery.data?.data}
             unreadCount={notificationsQuery.data?.unreadCount ?? 0}
-            isLoading={notificationsQuery.isLoading}
+            isLoading={notificationsQuery.isLoading || !isAuthReady}
             error={notificationsQuery.error}
             onRetry={() => notificationsQuery.refetch()}
           />

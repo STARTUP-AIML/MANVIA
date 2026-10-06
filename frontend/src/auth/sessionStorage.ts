@@ -2,10 +2,14 @@
  * MANVIA Token & Session Storage Manager
  * Safely manages short-lived access tokens and persistent refresh tokens.
  * Access tokens are kept in-memory for minimal XSS attack surface,
- * with optional sessionStorage sync. Refresh tokens are kept in secure client storage.
+ * with sessionStorage sync for page reloads.
+ * Refresh tokens are kept in secure client storage for session continuity.
+ *
+ * NOTE: User identity is NOT stored here as authoritative proof of authentication.
+ * The backend /auth/me verification is the sole identity authority.
  */
 
-import type { AuthSessionTokens, UserResponseDto } from "./types";
+import type { AuthSessionTokens } from "./types";
 
 const REFRESH_TOKEN_KEY = "manvia_refresh_token";
 const ACCESS_TOKEN_KEY = "manvia_access_token";
@@ -29,11 +33,17 @@ class SessionStorageManager {
   }
 
   public getAccessToken(): string | null {
-    if (!this.inMemoryAccessToken && typeof window !== "undefined") {
+    if (typeof window !== "undefined") {
       try {
-        this.inMemoryAccessToken =
+        const stored =
           window.sessionStorage.getItem(ACCESS_TOKEN_KEY) ||
           window.sessionStorage.getItem(LEGACY_TOKEN_KEY);
+        if (stored) {
+          this.inMemoryAccessToken = stored;
+          return stored;
+        }
+        this.inMemoryAccessToken = null;
+        return null;
       } catch {
         // ignore
       }
@@ -50,29 +60,6 @@ class SessionStorageManager {
     }
   }
 
-  public getStoredUser(): UserResponseDto | null {
-    if (typeof window === "undefined") return null;
-    try {
-      const raw = window.sessionStorage.getItem(LEGACY_USER_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        return {
-          id: parsed.id,
-          email: parsed.email || "",
-          phone: parsed.phone || null,
-          emailVerified: true,
-          phoneVerified: false,
-          status: "ACTIVE",
-          roles: parsed.roles || ["PATIENT"],
-          createdAt: new Date().toISOString(),
-        };
-      }
-    } catch {
-      return null;
-    }
-    return null;
-  }
-
   public setTokens(
     tokens: Pick<AuthSessionTokens, "accessToken" | "refreshToken">,
   ): void {
@@ -82,6 +69,9 @@ class SessionStorageManager {
       try {
         window.sessionStorage.setItem(ACCESS_TOKEN_KEY, tokens.accessToken);
         window.localStorage.setItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
+        // Clear any legacy keys
+        window.sessionStorage.removeItem(LEGACY_TOKEN_KEY);
+        window.sessionStorage.removeItem(LEGACY_USER_KEY);
       } catch {
         // Storage might fail if cookies/storage disabled
       }
@@ -99,31 +89,8 @@ class SessionStorageManager {
     }
   }
 
-  private cachedUserContext: { userId: string; activeRole: string } | null =
-    null;
-
-  public setUser(userId: string, activeRole: string): void {
-    this.cachedUserContext = { userId, activeRole };
-  }
-
-  public getUser(): { userId: string; activeRole: string } | null {
-    if (!this.cachedUserContext && typeof window !== "undefined") {
-      try {
-        const raw = window.sessionStorage.getItem(LEGACY_USER_KEY);
-        if (raw) {
-          const parsed = JSON.parse(raw);
-          return { userId: parsed.id, activeRole: parsed.roles?.[0] || "PATIENT" };
-        }
-      } catch {
-        // ignore
-      }
-    }
-    return this.cachedUserContext;
-  }
-
   public clearTokens(): void {
     this.inMemoryAccessToken = null;
-    this.cachedUserContext = null;
     if (typeof window !== "undefined") {
       try {
         window.sessionStorage.removeItem(ACCESS_TOKEN_KEY);
@@ -138,6 +105,23 @@ class SessionStorageManager {
 
   public hasTokens(): boolean {
     return Boolean(this.getAccessToken() || this.getRefreshToken());
+  }
+
+  /**
+   * @deprecated Legacy user identity helper. Kept for backwards compatibility.
+   * Identity authority is exclusively the verified Bearer JWT.
+   */
+  public setUser(userId?: string, role?: string): void {
+    if (typeof window !== "undefined" && userId) {
+      try {
+        window.sessionStorage.setItem(
+          LEGACY_USER_KEY,
+          JSON.stringify({ id: userId, roles: role ? [role] : [] })
+        );
+      } catch {
+        // Ignore
+      }
+    }
   }
 }
 

@@ -50,7 +50,7 @@ export const PreConsultationPage: React.FC = () => {
           </p>
           <button
             type="button"
-            onClick={() => navigate('/appointments')}
+            onClick={() => navigate('/app/appointments')}
             className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold"
           >
             Back to Appointments
@@ -100,7 +100,7 @@ export const PreConsultationPage: React.FC = () => {
       {/* Breadcrumb Navigation */}
       <div className="flex items-center justify-between">
         <Link
-          to={`/appointments/${appointment.publicAppointmentId}`}
+          to={`/app/appointments/${appointment.publicAppointmentId}`}
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors"
         >
           &larr; Back to Appointment ({appointment.publicAppointmentId})

@@ -8,6 +8,7 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -32,9 +33,11 @@ import {
   getDoctorAppointmentsApi,
   acceptDoctorAppointmentApi,
   declineDoctorAppointmentApi,
+  cancelDoctorAppointmentApi,
   startDoctorAppointmentApi,
   completeDoctorAppointmentApi,
   markNoShowDoctorAppointmentApi,
+  getDoctorPreConsultationApi,
 } from '@/api/appointments';
 import type {
   DoctorSelfProfile,
@@ -44,12 +47,38 @@ import type {
   DayOfWeek,
   ConsultationType,
   AppointmentResponseDto,
+  PreConsultationResponseDto,
 } from '@/types/';
 
 type ActiveTab = 'overview' | 'appointments' | 'profile' | 'verification' | 'availability' | 'offers';
 
 export const DoctorRoute: React.FC = () => {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<ActiveTab>('overview');
+
+  // Synchronize active tab with URL path
+  useEffect(() => {
+    const path = location.pathname.toLowerCase();
+    if (path.includes('/doctor/appointments') || path.includes('/doctor/consultations')) {
+      setActiveTab('appointments');
+    } else if (path.includes('/doctor/availability')) {
+      setActiveTab('availability');
+    } else if (path.includes('/doctor/offers')) {
+      setActiveTab('offers');
+    } else if (path.includes('/doctor/profile') || path.includes('/doctor/settings')) {
+      setActiveTab('profile');
+    } else if (path.includes('/doctor/verification')) {
+      setActiveTab('verification');
+    } else if (path === '/doctor' || path === '/doctor/') {
+      setActiveTab('overview');
+    }
+  }, [location.pathname]);
+
+  const handleTabChange = (tab: ActiveTab) => {
+    setActiveTab(tab);
+    navigate(tab === 'overview' ? '/doctor' : `/doctor/${tab}`);
+  };
 
   // Core Data States
   const [profile, setProfile] = useState<DoctorSelfProfile | null>(null);
@@ -58,6 +87,14 @@ export const DoctorRoute: React.FC = () => {
   const [offers, setOffers] = useState<ConsultationOffer[]>([]);
   const [doctorAppointments, setDoctorAppointments] = useState<AppointmentResponseDto[]>([]);
   const [appointmentsLoading, setAppointmentsLoading] = useState(false);
+
+  // Pre-consultation Inspection State
+  const [selectedPreConsultation, setSelectedPreConsultation] = useState<{
+    appointmentId: string;
+    data: PreConsultationResponseDto | null;
+    error?: string | null;
+    loading: boolean;
+  } | null>(null);
 
   // UI Flow States
   const [isLoading, setIsLoading] = useState(true);
@@ -94,6 +131,18 @@ export const DoctorRoute: React.FC = () => {
   const [offerDuration, setOfferDuration] = useState(30);
   const [offerFee, setOfferFee] = useState(100);
 
+  const loadDoctorAppointments = useCallback(async () => {
+    setAppointmentsLoading(true);
+    try {
+      const res = await getDoctorAppointmentsApi();
+      setDoctorAppointments(res.data);
+    } catch {
+      setErrorMessage('Unable to load doctor appointments.');
+    } finally {
+      setAppointmentsLoading(false);
+    }
+  }, []);
+
   const loadAllData = useCallback(async () => {
     setIsLoading(true);
     setErrorMessage(null);
@@ -109,14 +158,16 @@ export const DoctorRoute: React.FC = () => {
         setConsultationFee(prof.defaultConsultationFee || 100);
         setCurrency(prof.currency || 'USD');
 
-        const [verif, avail, off] = await Promise.all([
+        const [verif, avail, off, appts] = await Promise.all([
           getDoctorVerificationApi().catch(() => null),
           getDoctorSelfAvailabilityApi(true).catch(() => []),
           getDoctorSelfOffersApi(true).catch(() => []),
+          getDoctorAppointmentsApi().then((r) => r.data).catch(() => []),
         ]);
         setVerification(verif);
         setAvailabilities(avail);
         setOffers(off);
+        setDoctorAppointments(appts);
       } catch (err: unknown) {
         // If 404, profile not yet initialized
         const status = (err as { status?: number })?.status;
@@ -130,18 +181,6 @@ export const DoctorRoute: React.FC = () => {
       setErrorMessage('Network or server error encountered while synchronizing workspace.');
     } finally {
       setIsLoading(false);
-    }
-  }, []);
-
-  const loadDoctorAppointments = useCallback(async () => {
-    setAppointmentsLoading(true);
-    try {
-      const res = await getDoctorAppointmentsApi();
-      setDoctorAppointments(res.data);
-    } catch {
-      setErrorMessage('Unable to load doctor appointments.');
-    } finally {
-      setAppointmentsLoading(false);
     }
   }, []);
 
@@ -164,8 +203,12 @@ export const DoctorRoute: React.FC = () => {
       setSuccessMessage('Appointment confirmed successfully.');
       await loadDoctorAppointments();
     } catch (err: unknown) {
-      const msg = (err as { message?: string })?.message || 'Failed to accept appointment.';
-      setErrorMessage(msg);
+      if ((err as { status?: number })?.status === 409) {
+        setErrorMessage('This appointment changed before your action completed. Refresh and try again.');
+      } else {
+        const msg = (err as { message?: string })?.message || 'Failed to accept appointment.';
+        setErrorMessage(msg);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -181,8 +224,33 @@ export const DoctorRoute: React.FC = () => {
       setSuccessMessage('Appointment declined.');
       await loadDoctorAppointments();
     } catch (err: unknown) {
-      const msg = (err as { message?: string })?.message || 'Failed to decline appointment.';
-      setErrorMessage(msg);
+      if ((err as { status?: number })?.status === 409) {
+        setErrorMessage('This appointment changed before your action completed. Refresh and try again.');
+      } else {
+        const msg = (err as { message?: string })?.message || 'Failed to decline appointment.';
+        setErrorMessage(msg);
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCancelAppointment = async (appointmentId: string) => {
+    const reason = window.prompt('Please enter cancellation reason:');
+    if (!reason) return;
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    try {
+      await cancelDoctorAppointmentApi(appointmentId, reason);
+      setSuccessMessage('Appointment cancelled.');
+      await loadDoctorAppointments();
+    } catch (err: unknown) {
+      if ((err as { status?: number })?.status === 409) {
+        setErrorMessage('This appointment changed before your action completed. Refresh and try again.');
+      } else {
+        const msg = (err as { message?: string })?.message || 'Failed to cancel appointment.';
+        setErrorMessage(msg);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -196,8 +264,12 @@ export const DoctorRoute: React.FC = () => {
       setSuccessMessage('Appointment marked in-progress.');
       await loadDoctorAppointments();
     } catch (err: unknown) {
-      const msg = (err as { message?: string })?.message || 'Failed to start appointment.';
-      setErrorMessage(msg);
+      if ((err as { status?: number })?.status === 409) {
+        setErrorMessage('This appointment changed before your action completed. Refresh and try again.');
+      } else {
+        const msg = (err as { message?: string })?.message || 'Failed to start appointment.';
+        setErrorMessage(msg);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -211,8 +283,12 @@ export const DoctorRoute: React.FC = () => {
       setSuccessMessage('Appointment completed successfully.');
       await loadDoctorAppointments();
     } catch (err: unknown) {
-      const msg = (err as { message?: string })?.message || 'Failed to complete appointment.';
-      setErrorMessage(msg);
+      if ((err as { status?: number })?.status === 409) {
+        setErrorMessage('This appointment changed before your action completed. Refresh and try again.');
+      } else {
+        const msg = (err as { message?: string })?.message || 'Failed to complete appointment.';
+        setErrorMessage(msg);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -227,10 +303,29 @@ export const DoctorRoute: React.FC = () => {
       setSuccessMessage('Appointment marked as no-show.');
       await loadDoctorAppointments();
     } catch (err: unknown) {
-      const msg = (err as { message?: string })?.message || 'Failed to mark no-show.';
-      setErrorMessage(msg);
+      if ((err as { status?: number })?.status === 409) {
+        setErrorMessage('This appointment changed before your action completed. Refresh and try again.');
+      } else {
+        const msg = (err as { message?: string })?.message || 'Failed to mark no-show.';
+        setErrorMessage(msg);
+      }
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleViewPreConsultation = async (appointmentId: string) => {
+    setSelectedPreConsultation({ appointmentId, data: null, loading: true });
+    try {
+      const data = await getDoctorPreConsultationApi(appointmentId);
+      setSelectedPreConsultation({ appointmentId, data, loading: false });
+    } catch (err: unknown) {
+      const status = (err as { status?: number })?.status;
+      const msg =
+        status === 403 || status === 404
+          ? 'Patient has not submitted pre-consultation intake form yet.'
+          : 'Unable to load pre-consultation intake information.';
+      setSelectedPreConsultation({ appointmentId, data: null, error: msg, loading: false });
     }
   };
 
@@ -512,7 +607,7 @@ export const DoctorRoute: React.FC = () => {
         {(['overview', 'appointments', 'profile', 'verification', 'availability', 'offers'] as ActiveTab[]).map((tab) => (
           <button
             key={tab}
-            onClick={() => setActiveTab(tab)}
+            onClick={() => handleTabChange(tab)}
             style={{
               padding: '0.75rem 1.25rem',
               border: 'none',
@@ -537,7 +632,7 @@ export const DoctorRoute: React.FC = () => {
               <div>
                 <CardTitle>Consultation Appointments</CardTitle>
                 <p className="text-muted" style={{ fontSize: '0.875rem' }}>
-                  Manage patient consultation requests, accept or decline bookings, and track appointment lifecycles.
+                  Manage patient consultation requests, accept or decline bookings, view pre-consultation intake, and track appointment lifecycles.
                 </p>
               </div>
               <Button size="sm" variant="outline" onClick={() => void loadDoctorAppointments()} isLoading={appointmentsLoading}>
@@ -567,99 +662,154 @@ export const DoctorRoute: React.FC = () => {
                       borderRadius: '8px',
                       padding: '1.25rem',
                       display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'flex-start',
-                      flexWrap: 'wrap',
+                      flexDirection: 'column',
                       gap: '1rem',
                       background: '#ffffff',
                     }}
                   >
-                    <div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                        <span style={{ fontWeight: 600, fontSize: '1.1rem' }}>{appt.publicAppointmentId}</span>
-                        <Badge
-                          variant={
-                            appt.status === 'CONFIRMED'
-                              ? 'success'
-                              : appt.status === 'REQUESTED'
-                              ? 'warning'
-                              : appt.status === 'IN_PROGRESS'
-                              ? 'info'
-                              : appt.status === 'COMPLETED'
-                              ? 'success'
-                              : 'neutral'
-                          }
-                        >
-                          {appt.status}
-                        </Badge>
-                      </div>
-                      <p style={{ fontSize: '0.9rem', color: '#475569' }}>
-                        <strong>Patient:</strong> {appt.publicPatientId || appt.patientId}
-                      </p>
-                      <p style={{ fontSize: '0.9rem', color: '#475569' }}>
-                        <strong>Schedule:</strong> {new Date(appt.startAt).toLocaleString()} - {new Date(appt.endAt).toLocaleTimeString()}
-                      </p>
-                      {appt.notes && (
-                        <p style={{ fontSize: '0.875rem', color: '#64748b', marginTop: '0.25rem' }}>
-                          <em>Notes: "{appt.notes}"</em>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
+                          <span style={{ fontWeight: 600, fontSize: '1.1rem' }}>{appt.publicAppointmentId}</span>
+                          <Badge
+                            variant={
+                              appt.status === 'CONFIRMED'
+                                ? 'success'
+                                : appt.status === 'REQUESTED'
+                                ? 'warning'
+                                : appt.status === 'IN_PROGRESS'
+                                ? 'info'
+                                : appt.status === 'COMPLETED'
+                                ? 'success'
+                                : 'neutral'
+                            }
+                          >
+                            {appt.status}
+                          </Badge>
+                        </div>
+                        <p style={{ fontSize: '0.9rem', color: '#475569' }}>
+                          <strong>Patient:</strong> {appt.publicPatientId || appt.patientId}
                         </p>
-                      )}
-                    </div>
+                        <p style={{ fontSize: '0.9rem', color: '#475569' }}>
+                          <strong>Schedule:</strong> {new Date(appt.startAt).toLocaleString()} - {new Date(appt.endAt).toLocaleTimeString()}
+                        </p>
+                        {appt.notes && (
+                          <p style={{ fontSize: '0.875rem', color: '#64748b', marginTop: '0.25rem' }}>
+                            <em>Notes: "{appt.notes}"</em>
+                          </p>
+                        )}
+                      </div>
 
-                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                      {appt.status === 'REQUESTED' && (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="primary"
-                            onClick={() => handleAcceptAppointment(appt.id)}
-                            disabled={isSubmitting}
-                          >
-                            Accept
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleDeclineAppointment(appt.id)}
-                            disabled={isSubmitting}
-                          >
-                            Decline
-                          </Button>
-                        </>
-                      )}
-
-                      {appt.status === 'CONFIRMED' && (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="primary"
-                            onClick={() => handleStartAppointment(appt.id)}
-                            disabled={isSubmitting}
-                          >
-                            Start Session
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleNoShowAppointment(appt.id)}
-                            disabled={isSubmitting}
-                          >
-                            Mark No-Show
-                          </Button>
-                        </>
-                      )}
-
-                      {appt.status === 'IN_PROGRESS' && (
+                      <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                         <Button
                           size="sm"
-                          variant="primary"
-                          onClick={() => handleCompleteAppointment(appt.id)}
-                          disabled={isSubmitting}
+                          variant="ghost"
+                          onClick={() => handleViewPreConsultation(appt.id)}
                         >
-                          Complete Session
+                          {selectedPreConsultation?.appointmentId === appt.id ? 'Hide Intake' : 'Pre-Consultation'}
                         </Button>
-                      )}
+
+                        {appt.status === 'REQUESTED' && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="primary"
+                              onClick={() => handleAcceptAppointment(appt.id)}
+                              disabled={isSubmitting}
+                            >
+                              Accept
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleDeclineAppointment(appt.id)}
+                              disabled={isSubmitting}
+                            >
+                              Decline
+                            </Button>
+                          </>
+                        )}
+
+                        {appt.status === 'CONFIRMED' && (
+                          <>
+                            <Button
+                              size="sm"
+                              variant="primary"
+                              onClick={() => handleStartAppointment(appt.id)}
+                              disabled={isSubmitting}
+                            >
+                              Start Session
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleCancelAppointment(appt.id)}
+                              disabled={isSubmitting}
+                            >
+                              Cancel
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleNoShowAppointment(appt.id)}
+                              disabled={isSubmitting}
+                            >
+                              Mark No-Show
+                            </Button>
+                          </>
+                        )}
+
+                        {appt.status === 'IN_PROGRESS' && (
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            onClick={() => handleCompleteAppointment(appt.id)}
+                            disabled={isSubmitting}
+                          >
+                            Complete Session
+                          </Button>
+                        )}
+                      </div>
                     </div>
+
+                    {/* Pre-Consultation Intake Viewer */}
+                    {selectedPreConsultation?.appointmentId === appt.id && (
+                      <div style={{ marginTop: '0.5rem', padding: '1rem', background: '#f8fafc', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                          <strong style={{ fontSize: '0.9rem', color: '#1e293b' }}>Patient Pre-Consultation Intake</strong>
+                          <Button size="sm" variant="ghost" onClick={() => setSelectedPreConsultation(null)}>✕</Button>
+                        </div>
+                        {selectedPreConsultation.loading ? (
+                          <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                            <Spinner size="sm" />
+                            <span style={{ fontSize: '0.85rem', color: '#64748b' }}>Loading intake details...</span>
+                          </div>
+                        ) : selectedPreConsultation.error ? (
+                          <p style={{ fontSize: '0.85rem', color: '#b45309' }}>{selectedPreConsultation.error}</p>
+                        ) : selectedPreConsultation.data ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', fontSize: '0.875rem' }}>
+                            <p><strong>Reason for Visit:</strong> {selectedPreConsultation.data.reasonForVisit || 'None specified'}</p>
+                            {selectedPreConsultation.data.symptoms && (
+                              <p><strong>Primary Symptoms:</strong> {selectedPreConsultation.data.symptoms}</p>
+                            )}
+                            {selectedPreConsultation.data.symptomOnset && (
+                              <p><strong>Symptom Onset:</strong> {selectedPreConsultation.data.symptomOnset}</p>
+                            )}
+                            {selectedPreConsultation.data.currentMedications && (
+                              <p><strong>Current Medications:</strong> {selectedPreConsultation.data.currentMedications}</p>
+                            )}
+                            {selectedPreConsultation.data.allergies && (
+                              <p><strong>Allergies:</strong> {selectedPreConsultation.data.allergies}</p>
+                            )}
+                            {selectedPreConsultation.data.patientNotes && (
+                              <p><strong>Patient Notes:</strong> {selectedPreConsultation.data.patientNotes}</p>
+                            )}
+                          </div>
+                        ) : (
+                          <p style={{ fontSize: '0.85rem', color: '#64748b' }}>No intake data submitted.</p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -671,6 +821,43 @@ export const DoctorRoute: React.FC = () => {
       {/* TAB 1: OVERVIEW */}
       {activeTab === 'overview' && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.5rem' }}>
+          {/* Card 1: Consultation Requests & Appointments */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Consultations & Requests</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {doctorAppointments.filter((a) => a.status === 'REQUESTED').length > 0 ? (
+                <div>
+                  <p>
+                    <strong>Pending Requests:</strong>{' '}
+                    <Badge variant="warning">
+                      {doctorAppointments.filter((a) => a.status === 'REQUESTED').length} Pending
+                    </Badge>
+                  </p>
+                  <p style={{ marginTop: '0.5rem', fontSize: '0.875rem', color: '#64748b' }}>
+                    Total Appointments: {doctorAppointments.length}
+                  </p>
+                  <Button size="sm" variant="primary" onClick={() => handleTabChange('appointments')} style={{ marginTop: '1rem' }}>
+                    Review Requests
+                  </Button>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-muted" style={{ marginBottom: '0.5rem' }}>
+                    {doctorAppointments.length > 0
+                      ? `${doctorAppointments.length} total consultation appointments scheduled.`
+                      : 'No appointment requests yet.'}
+                  </p>
+                  <Button size="sm" variant="outline" onClick={() => handleTabChange('appointments')} style={{ marginTop: '0.5rem' }}>
+                    View Appointments
+                  </Button>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Card 2: Profile */}
           <Card>
             <CardHeader>
               <CardTitle>Professional Profile</CardTitle>
@@ -683,19 +870,20 @@ export const DoctorRoute: React.FC = () => {
                   <p><strong>Council:</strong> {profile.licensingCouncil}</p>
                   <p><strong>Experience:</strong> {profile.yearsOfExperience} years</p>
                   <p><strong>Default Fee:</strong> {profile.currency} {profile.defaultConsultationFee}</p>
-                  <Button size="sm" variant="outline" onClick={() => setActiveTab('profile')} style={{ marginTop: '0.5rem' }}>
+                  <Button size="sm" variant="outline" onClick={() => handleTabChange('profile')} style={{ marginTop: '0.5rem' }}>
                     Edit Profile
                   </Button>
                 </div>
               ) : (
                 <div>
                   <p className="text-muted" style={{ marginBottom: '1rem' }}>No clinical profile found. Complete setup to begin practice.</p>
-                  <Button size="sm" variant="primary" onClick={() => setActiveTab('profile')}>Create Profile</Button>
+                  <Button size="sm" variant="primary" onClick={() => handleTabChange('profile')}>Create Profile</Button>
                 </div>
               )}
             </CardContent>
           </Card>
 
+          {/* Card 3: Verification */}
           <Card>
             <CardHeader>
               <CardTitle>Verification Workflow</CardTitle>
@@ -706,12 +894,13 @@ export const DoctorRoute: React.FC = () => {
               {verification?.submittedAt && (
                 <p style={{ marginTop: '0.25rem' }}><strong>Submitted:</strong> {new Date(verification.submittedAt).toLocaleDateString()}</p>
               )}
-              <Button size="sm" variant="outline" onClick={() => setActiveTab('verification')} style={{ marginTop: '1rem' }}>
+              <Button size="sm" variant="outline" onClick={() => handleTabChange('verification')} style={{ marginTop: '1rem' }}>
                 Manage Credentials
               </Button>
             </CardContent>
           </Card>
 
+          {/* Card 4: Schedule & Offers */}
           <Card>
             <CardHeader>
               <CardTitle>Practice Schedule</CardTitle>
@@ -720,8 +909,8 @@ export const DoctorRoute: React.FC = () => {
               <p><strong>Active Availability Windows:</strong> {availabilities.filter((a) => a.isActive).length}</p>
               <p style={{ marginTop: '0.5rem' }}><strong>Published Consultation Offers:</strong> {offers.filter((o) => o.status === 'ACTIVE').length}</p>
               <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
-                <Button size="sm" variant="outline" onClick={() => setActiveTab('availability')}>Schedule</Button>
-                <Button size="sm" variant="outline" onClick={() => setActiveTab('offers')}>Offers</Button>
+                <Button size="sm" variant="outline" onClick={() => handleTabChange('availability')}>Schedule</Button>
+                <Button size="sm" variant="outline" onClick={() => handleTabChange('offers')}>Offers</Button>
               </div>
             </CardContent>
           </Card>

@@ -14,14 +14,10 @@ export const AdminShell: React.FC<{ children?: ReactNode }> = ({
 }) => {
   const adminNav = [
     { label: "Platform Metrics", href: "/admin", icon: "📈" },
-    { label: "Doctor Verification", href: "/admin/doctors", icon: "🛡️" },
-    {
-      label: "Financial Reconciliation",
-      href: "/admin/reconciliation",
-      icon: "💰",
-    },
-    { label: "Audit Logs", href: "/admin/audit", icon: "📜" },
-    { label: "System Configuration", href: "/admin/config", icon: "⚙️" },
+    { label: "Doctor Verification", href: "/admin/doctor-verification", icon: "🛡️" },
+    { label: "Doctor Directory", href: "/admin/doctors", icon: "🩺" },
+    { label: "User Governance", href: "/admin/users", icon: "👥" },
+    { label: "Audit Trail", href: "/admin/audit", icon: "📜" },
   ];
 
   return (

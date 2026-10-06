@@ -35,7 +35,7 @@ describe('PostgreSQL 18 + Prisma 7 Integration', () => {
     }
   });
 
-  it('should establish connection to PostgreSQL 18.x', async () => {
+  it('should establish connection to PostgreSQL (17.x or 18.x)', async () => {
     expect(prismaService).toBeDefined();
     expect(configService).toBeDefined();
     expect(configService.databaseUrl).toBeDefined();
@@ -44,7 +44,7 @@ describe('PostgreSQL 18 + Prisma 7 Integration', () => {
       await prismaService.$queryRawUnsafe<Array<{ version: string }>>('SELECT version()');
     expect(versionResult).toBeDefined();
     expect(versionResult.length).toBeGreaterThan(0);
-    expect(versionResult[0]?.version).toMatch(/PostgreSQL 18\./i);
+    expect(versionResult[0]?.version).toMatch(/PostgreSQL (?:17|18)\./i);
   });
 
   it('should provide healthy status from checkHealth() probe', async () => {

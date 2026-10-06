@@ -6,6 +6,15 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
+    env: {
+      NODE_ENV: 'test',
+      TEST_DATABASE_URL:
+        process.env.TEST_DATABASE_URL ||
+        'postgresql://postgres:postgres@localhost:5432/manvia_dev?schema=public',
+      DATABASE_URL:
+        process.env.TEST_DATABASE_URL ||
+        'postgresql://postgres:postgres@localhost:5432/manvia_dev?schema=public',
+    },
     hookTimeout: 60000,
     testTimeout: 30000,
     include: ['src/**/*.{test,spec}.ts', 'test/**/*.{test,spec}.ts'],

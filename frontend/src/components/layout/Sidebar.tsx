@@ -89,7 +89,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ title, items }) => {
         }}
       >
         {items.map((item) => {
-          const isActive = location.pathname === item.href;
+          const isActive =
+            item.href === "/app"
+              ? location.pathname === "/app"
+              : location.pathname === item.href ||
+                location.pathname.startsWith(`${item.href}/`);
           return (
             <Link
               key={item.href}

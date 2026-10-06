@@ -1,9 +1,11 @@
-import { useEffect } from 'react';
-import { NavLink, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/auth/AuthContext';
+import React from 'react';
+import { NavLink } from 'react-router-dom';
 import { AppHeader } from './AppHeader';
-import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 
+/**
+ * @deprecated PatientLayout is legacy. Use PatientShell with nested routes in /app/*.
+ * Retained for backwards compatibility without independent authentication side-effects.
+ */
 export function PatientLayout({
   children,
   activeTab,
@@ -11,27 +13,6 @@ export function PatientLayout({
   children: React.ReactNode;
   activeTab?: 'wellness' | 'timeline' | 'doctors' | 'appointments' | 'account' | 'companion' | 'records';
 }) {
-  const { isAuthenticated, isLoading } = useAuth();
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      navigate('/login?redirect=' + encodeURIComponent(window.location.pathname));
-    }
-  }, [isAuthenticated, isLoading, navigate]);
-
-  if (isLoading) {
-    return (
-      <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center' }}>
-        <LoadingSpinner message="Verifying session..." size="large" />
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return null;
-  }
-
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#f8fafc' }}>
       <AppHeader />
@@ -60,7 +41,7 @@ export function PatientLayout({
             <span style={{ color: '#cbd5e1' }}>•</span>
             <nav style={{ display: 'flex', gap: '8px' }}>
               <NavLink
-                to="/wellness"
+                to="/app/wellness"
                 style={{
                   fontSize: '13px',
                   fontWeight: activeTab === 'wellness' ? 700 : 500,
@@ -75,7 +56,7 @@ export function PatientLayout({
                 ◌ Wellness
               </NavLink>
               <NavLink
-                to="/health-timeline"
+                to="/app/health-timeline"
                 style={{
                   fontSize: '13px',
                   fontWeight: activeTab === 'timeline' ? 700 : 500,
@@ -90,7 +71,7 @@ export function PatientLayout({
                 ◷ Health Timeline
               </NavLink>
               <NavLink
-                to="/doctors"
+                to="/app/doctors"
                 style={{
                   fontSize: '13px',
                   fontWeight: activeTab === 'doctors' ? 700 : 500,
@@ -105,7 +86,7 @@ export function PatientLayout({
                 ⚕ Find Doctors
               </NavLink>
               <NavLink
-                to="/appointments"
+                to="/app/appointments"
                 style={{
                   fontSize: '13px',
                   fontWeight: activeTab === 'appointments' ? 700 : 500,
@@ -120,7 +101,7 @@ export function PatientLayout({
                 📅 Appointments
               </NavLink>
               <NavLink
-                to="/health-records"
+                to="/app/health-records"
                 style={{
                   fontSize: '13px',
                   fontWeight: activeTab === 'records' ? 700 : 500,

@@ -175,13 +175,24 @@ describe('Phase 8 — Appointments & Pre-Consultation', () => {
   });
 
   describe('AppointmentsPage', () => {
+    const mockTestUser = {
+      id: 'patient-1',
+      email: 'patient@example.com',
+      phone: null,
+      roles: ['PATIENT'] as Array<'PATIENT'>,
+      emailVerified: true,
+      phoneVerified: false,
+      status: 'ACTIVE' as const,
+      createdAt: '2026-09-01T00:00:00.000Z',
+    };
+
     it('renders loading skeleton state initially', () => {
       vi.spyOn(appointmentsApi, 'getPatientAppointmentsApi').mockReturnValue(new Promise(() => {}));
 
       const queryClient = createTestQueryClient();
       render(
         <QueryClientProvider client={queryClient}>
-          <AuthProvider>
+          <AuthProvider initialState={{ status: 'AUTHENTICATED', user: mockTestUser }}>
             <MemoryRouter>
               <AppointmentsPage />
             </MemoryRouter>
@@ -204,7 +215,7 @@ describe('Phase 8 — Appointments & Pre-Consultation', () => {
       const queryClient = createTestQueryClient();
       render(
         <QueryClientProvider client={queryClient}>
-          <AuthProvider>
+          <AuthProvider initialState={{ status: 'AUTHENTICATED', user: mockTestUser }}>
             <MemoryRouter>
               <AppointmentsPage />
             </MemoryRouter>
@@ -226,7 +237,7 @@ describe('Phase 8 — Appointments & Pre-Consultation', () => {
       const queryClient = createTestQueryClient();
       render(
         <QueryClientProvider client={queryClient}>
-          <AuthProvider>
+          <AuthProvider initialState={{ status: 'AUTHENTICATED', user: mockTestUser }}>
             <MemoryRouter>
               <AppointmentsPage />
             </MemoryRouter>
@@ -262,7 +273,7 @@ describe('Phase 8 — Appointments & Pre-Consultation', () => {
       const queryClient = createTestQueryClient();
       render(
         <QueryClientProvider client={queryClient}>
-          <AuthProvider>
+          <AuthProvider initialState={{ status: 'AUTHENTICATED', user: mockTestUser }}>
             <MemoryRouter>
               <AppointmentsPage />
             </MemoryRouter>

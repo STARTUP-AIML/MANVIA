@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { PatientLayout } from '@/components/layout/PatientLayout';
 import { WellnessSummaryCards } from '@/features/wellness/components/WellnessSummaryCards';
 import { WellnessTrendsSection } from '@/features/wellness/components/WellnessTrendsSection';
 import { WellnessHistoryTable } from '@/features/wellness/components/WellnessHistoryTable';
@@ -13,7 +12,16 @@ export function WellnessPage() {
   const { data: summary } = useWellnessSummary(timezone);
 
   return (
-    <PatientLayout activeTab="wellness">
+    <div
+      style={{
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 'var(--space-6)',
+        maxWidth: '1120px',
+        margin: '0 auto',
+      }}
+      data-testid="wellness-page"
+    >
       {/* Header Banner */}
       <div
         style={{
@@ -26,7 +34,7 @@ export function WellnessPage() {
         }}
       >
         <div>
-          <div className="eyebrow">PHASE 5 ENGINE</div>
+          <div className="eyebrow">WELLNESS TRACKING</div>
           <h1 style={{ fontSize: '32px', fontWeight: 800, margin: '6px 0 4px', color: '#073a78' }}>
             Wellness & Daily Check-ins
           </h1>
@@ -78,6 +86,6 @@ export function WellnessPage() {
         isOpen={isCheckInOpen}
         onClose={() => setIsCheckInOpen(false)}
       />
-    </PatientLayout>
+    </div>
   );
 }

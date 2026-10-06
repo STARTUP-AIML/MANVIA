@@ -48,7 +48,7 @@ export const Footer: React.FC = () => {
               gap: "1.5rem",
             }}
           >
-            <span>Frontend Phase 0: Foundation</span>
+            <span>Integrated Care</span>
             <span>Security First</span>
             <span>Privacy Assured</span>
           </div>

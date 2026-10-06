@@ -129,13 +129,29 @@ const mockConsentDetail: ConsentDetailResponseDto = {
   ],
 };
 
+const mockTestUser = {
+  id: 'patient-1',
+  email: 'patient@example.com',
+  phone: null,
+  roles: ['PATIENT'] as Array<'PATIENT'>,
+  emailVerified: true,
+  phoneVerified: false,
+  status: 'ACTIVE' as const,
+  createdAt: '2026-09-01T00:00:00.000Z',
+};
+
 function renderWithProviders(ui: React.ReactElement, initialRoute = '/health-records') {
   const queryClient = createTestQueryClient();
 
   return {
     ...render(
       <QueryClientProvider client={queryClient}>
-        <AuthProvider>
+        <AuthProvider
+          initialState={{
+            status: 'AUTHENTICATED',
+            user: mockTestUser,
+          }}
+        >
           <MemoryRouter initialEntries={[initialRoute]}>
             {ui}
           </MemoryRouter>

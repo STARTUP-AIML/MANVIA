@@ -65,11 +65,14 @@ export class ConfigService {
 
   // Database Configuration (Phase 3)
   public get databaseUrl(): string {
+    if (this.nodeEnv === 'test' && this.config.TEST_DATABASE_URL) {
+      return this.config.TEST_DATABASE_URL;
+    }
     return this.config.DATABASE_URL;
   }
 
   public get sanitizedDatabaseUrl(): string {
-    return sanitizeDatabaseUrl(this.config.DATABASE_URL);
+    return sanitizeDatabaseUrl(this.databaseUrl);
   }
 
   public get databasePoolMin(): number {

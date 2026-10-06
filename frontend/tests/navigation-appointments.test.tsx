@@ -6,6 +6,46 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AuthProvider } from '@/auth/AuthContext';
 import App from '@/app/app';
 
+vi.mock('@/auth/authService', async () => {
+  const actual = await vi.importActual<typeof import('@/auth/authService')>('@/auth/authService');
+  return {
+    ...actual,
+    authService: {
+      ...actual.authService,
+      getMe: vi.fn().mockImplementation(async () => {
+        const storedUser = sessionStorage.getItem('manvia_auth_user');
+        if (storedUser) {
+          try {
+            const parsed = JSON.parse(storedUser);
+            return {
+              id: parsed.id || 'pat-auth-test',
+              email: parsed.email || 'patient.auth@manvia.health',
+              phone: null,
+              roles: parsed.roles || ['PATIENT'],
+              emailVerified: true,
+              phoneVerified: false,
+              status: 'ACTIVE',
+              createdAt: new Date().toISOString(),
+            };
+          } catch {
+            // ignore
+          }
+        }
+        return {
+          id: 'pat-auth-test',
+          email: 'patient.auth@manvia.health',
+          phone: null,
+          roles: ['PATIENT'],
+          emailVerified: true,
+          phoneVerified: false,
+          status: 'ACTIVE',
+          createdAt: new Date().toISOString(),
+        };
+      }),
+    },
+  };
+});
+
 vi.mock('@/api/appointments', async () => {
   const actual = await vi.importActual('@/api/appointments');
   return {

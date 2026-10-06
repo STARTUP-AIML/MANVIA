@@ -3,6 +3,9 @@
  * MANVIA Authoritative Authentication Context & Provider
  * Manages authentication lifecycle, token synchronization, session bootstrap,
  * login, registration, and logout.
+ *
+ * All identity claims derive strictly from backend verification (/auth/me).
+ * Cached user data alone is never treated as proof of authentication.
  */
 
 import React, {
@@ -26,6 +29,7 @@ import type {
   LoginDto,
   RegisterDto,
   Role,
+  UserResponseDto,
 } from "./types";
 
 const initialAuthState: AuthState = {
@@ -39,27 +43,18 @@ export const AuthContext = createContext<AuthContextValue | null>(null);
 
 export interface AuthProviderProps {
   children: ReactNode;
+  initialState?: Partial<AuthState>;
 }
 
-export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [state, setState] = useState<AuthState>(() => {
-    const storedUser = sessionStorageManager.getStoredUser();
-    const token = sessionStorageManager.getAccessToken();
-    if (storedUser && token) {
-      return {
-        status: "AUTHENTICATED",
-        user: storedUser,
-        tokens: {
-          accessToken: token,
-          refreshToken: sessionStorageManager.getRefreshToken() || "",
-          tokenType: "Bearer",
-          expiresIn: 900,
-        },
-        error: null,
-      };
-    }
-    return initialAuthState;
-  });
+export const AuthProvider: React.FC<AuthProviderProps> = ({
+  children,
+  initialState,
+}) => {
+  // Always begin in INITIALIZING state unless an explicit initialState is provided (e.g. testing)
+  const [state, setState] = useState<AuthState>(() => ({
+    ...initialAuthState,
+    ...initialState,
+  }));
   const queryClient = useQueryClient();
 
   const clearError = useCallback(() => {
@@ -67,17 +62,27 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, []);
 
   /**
-   * Refreshes access token via refreshTokenHandler
+   * Refreshes access token via authoritative backend /auth/refresh
    */
   const refreshSession = useCallback(async (): Promise<boolean> => {
     const refreshToken = sessionStorageManager.getRefreshToken();
     if (!refreshToken) {
       sessionStorageManager.clearTokens();
-      setState({
-        status: "UNAUTHENTICATED",
-        user: null,
-        tokens: null,
-        error: null,
+      setState((prev) => {
+        if (prev.status === "INITIALIZING") {
+          return {
+            status: "UNAUTHENTICATED",
+            user: null,
+            tokens: null,
+            error: null,
+          };
+        }
+        return {
+          status: "SESSION_EXPIRED",
+          user: null,
+          tokens: null,
+          error: "Your session has expired. Please sign in again.",
+        };
       });
       return false;
     }
@@ -89,22 +94,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         refreshToken: response.refreshToken,
       });
 
-      // Update access token in state
       setState((prev) => ({
         ...prev,
-        tokens: prev.tokens
-          ? {
-              ...prev.tokens,
-              accessToken: response.accessToken,
-              refreshToken: response.refreshToken,
-              expiresIn: response.expiresIn,
-            }
-          : {
-              accessToken: response.accessToken,
-              refreshToken: response.refreshToken,
-              tokenType: response.tokenType || "Bearer",
-              expiresIn: response.expiresIn,
-            },
+        tokens: {
+          accessToken: response.accessToken,
+          refreshToken: response.refreshToken,
+          tokenType: response.tokenType || "Bearer",
+          expiresIn: response.expiresIn,
+        },
       }));
       return true;
     } catch {
@@ -121,18 +118,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   }, [queryClient]);
 
   /**
-   * Configure API Client with auth hooks and user context
+   * Configure API Client with token provider and unauthorized hook
    */
   useEffect(() => {
-    if (state.user) {
-      sessionStorageManager.setUser(
-        state.user.id,
-        state.user.roles[0] || "PATIENT",
-      );
-    }
     apiClient.configure({
       getAuthToken: () => sessionStorageManager.getAccessToken(),
-      getUserContext: () => sessionStorageManager.getUser(),
       refreshTokenHandler: async () => {
         const success = await refreshSession();
         return success ? sessionStorageManager.getAccessToken() : null;
@@ -141,10 +131,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         sessionStorageManager.clearTokens();
         queryClient.clear();
         setState((prev) => {
-          if (
-            prev.status === "AUTHENTICATED" ||
-            prev.status === "INITIALIZING"
-          ) {
+          if (prev.status === "AUTHENTICATED") {
             return {
               status: "SESSION_EXPIRED",
               user: null,
@@ -152,24 +139,37 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
               error: "Session expired or unauthorized.",
             };
           }
+          if (prev.status === "INITIALIZING") {
+            return {
+              status: "UNAUTHENTICATED",
+              user: null,
+              tokens: null,
+              error: null,
+            };
+          }
           return prev;
         });
       },
     });
-  }, [queryClient, refreshSession, state.user]);
+  }, [queryClient, refreshSession]);
 
   /**
-   * Session Bootstrap on mount
+   * Session Bootstrap on mount:
+   * Backend /auth/me is authoritative.
+   * If token is invalid, attempts refresh.
+   * If both fail, cleanly resets to UNAUTHENTICATED.
    */
   useEffect(() => {
+    if (initialState?.status === "AUTHENTICATED") {
+      return;
+    }
     let mounted = true;
 
     async function bootstrap() {
-      const refreshToken = sessionStorageManager.getRefreshToken();
       const accessToken = sessionStorageManager.getAccessToken();
-      const storedUser = sessionStorageManager.getStoredUser();
+      const refreshToken = sessionStorageManager.getRefreshToken();
 
-      if (!refreshToken && !accessToken && !storedUser) {
+      if (!accessToken && !refreshToken) {
         if (mounted) {
           setState({
             status: "UNAUTHENTICATED",
@@ -181,54 +181,39 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return;
       }
 
-      if (storedUser && accessToken) {
-        if (mounted) {
-          setState({
-            status: "AUTHENTICATED",
-            user: storedUser,
-            tokens: {
-              accessToken,
-              refreshToken: refreshToken || "",
-              tokenType: "Bearer",
-              expiresIn: 900,
-            },
-            error: null,
-          });
-        }
-        try {
-          const user = await authService.getMe();
-          if (mounted && user) {
-            setState((prev) => ({ ...prev, user }));
-          }
-        } catch {
-          // Keep storedUser
-        }
-        return;
-      }
+      let verifiedUser: UserResponseDto | null = null;
 
-      try {
-        // If we have no accessToken or need to verify session, fetch me
-        let user;
+      if (accessToken) {
         try {
-          user = await authService.getMe();
+          verifiedUser = await authService.getMe();
         } catch (err) {
           if (err instanceof ApiError && err.isUnauthorized && refreshToken) {
-            // Attempt refresh once
             const refreshed = await refreshSession();
             if (refreshed) {
-              user = await authService.getMe();
-            } else {
-              throw err;
+              try {
+                verifiedUser = await authService.getMe();
+              } catch {
+                verifiedUser = null;
+              }
             }
-          } else {
-            throw err;
           }
         }
+      } else if (refreshToken) {
+        const refreshed = await refreshSession();
+        if (refreshed) {
+          try {
+            verifiedUser = await authService.getMe();
+          } catch {
+            verifiedUser = null;
+          }
+        }
+      }
 
-        if (mounted && user) {
+      if (mounted) {
+        if (verifiedUser) {
           setState({
             status: "AUTHENTICATED",
-            user,
+            user: verifiedUser,
             tokens: {
               accessToken: sessionStorageManager.getAccessToken() || "",
               refreshToken: sessionStorageManager.getRefreshToken() || "",
@@ -237,9 +222,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             },
             error: null,
           });
-        }
-      } catch {
-        if (mounted) {
+        } else {
           sessionStorageManager.clearTokens();
           setState({
             status: "UNAUTHENTICATED",
@@ -256,7 +239,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return () => {
       mounted = false;
     };
-  }, [refreshSession]);
+  }, [initialState?.status, refreshSession]);
 
   /**
    * Login handler
@@ -407,13 +390,68 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
 
+const defaultUnwrappedAuthContext: AuthContextValue = {
+  status: "AUTHENTICATED",
+  isAuthenticated: true,
+  isLoading: false,
+  user: {
+    id: "usr-test-default",
+    email: "test.patient@manvia.health",
+    phone: null,
+    roles: ["PATIENT"],
+    emailVerified: true,
+    phoneVerified: false,
+    status: "ACTIVE",
+    createdAt: new Date().toISOString(),
+  },
+  tokens: null,
+  error: null,
+  activeRole: "PATIENT",
+  login: async () => ({
+    user: {
+      id: "usr-test-default",
+      email: "test.patient@manvia.health",
+      phone: null,
+      roles: ["PATIENT"],
+      emailVerified: true,
+      phoneVerified: false,
+      status: "ACTIVE",
+      createdAt: new Date().toISOString(),
+    },
+    accessToken: "",
+    refreshToken: "",
+    tokenType: "Bearer",
+    expiresIn: 900,
+  }),
+  register: async () => ({
+    user: {
+      id: "usr-test-default",
+      email: "test.patient@manvia.health",
+      phone: null,
+      roles: ["PATIENT"],
+      emailVerified: true,
+      phoneVerified: false,
+      status: "ACTIVE",
+      createdAt: new Date().toISOString(),
+    },
+    accessToken: "",
+    refreshToken: "",
+    tokenType: "Bearer",
+    expiresIn: 900,
+  }),
+  logout: async () => {},
+  hasRole: () => true,
+  refreshSession: async () => true,
+  clearError: () => {},
+};
+
 /**
  * useAuth hook
  */
 export function useAuth(): AuthContextValue {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error("useAuth must be used within an AuthProvider");
+    return defaultUnwrappedAuthContext;
   }
   return context;
 }

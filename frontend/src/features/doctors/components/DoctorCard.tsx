@@ -181,7 +181,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({ doctor }) => {
         </div>
 
         <Link
-          to={`/doctors/${doctor.publicDoctorId}`}
+          to={`/app/doctors/${doctor.publicDoctorId}`}
           style={{
             display: 'inline-flex',
             alignItems: 'center',

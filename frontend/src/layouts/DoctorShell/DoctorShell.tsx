@@ -14,10 +14,11 @@ export const DoctorShell: React.FC<{ children?: ReactNode }> = ({
 }) => {
   const doctorNav = [
     { label: "Clinical Dashboard", href: "/doctor", icon: "🩺" },
-    { label: "Patient Queue", href: "/doctor/queue", icon: "👥" },
-    { label: "Schedule & Slots", href: "/doctor/schedule", icon: "📆" },
-    { label: "Consultations", href: "/doctor/consultations", icon: "🩺" },
-    { label: "Payouts & Earnings", href: "/doctor/payouts", icon: "💳" },
+    { label: "Appointments", href: "/doctor/appointments", icon: "📆" },
+    { label: "Availability", href: "/doctor/availability", icon: "⏱️" },
+    { label: "Consultation Offers", href: "/doctor/offers", icon: "💼" },
+    { label: "Practitioner Profile", href: "/doctor/profile", icon: "👤" },
+    { label: "Verification Status", href: "/doctor/verification", icon: "🛡️" },
     { label: "Clinical Settings", href: "/doctor/settings", icon: "⚙️" },
   ];
 

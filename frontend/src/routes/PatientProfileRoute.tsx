@@ -20,9 +20,13 @@ import { Skeleton } from "@/components/ui/Skeleton";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { useToast } from "@/components/feedback/Toast/ToastContext";
+import { useAuth } from "@/auth/AuthContext";
 
 export const PatientProfileRoute: React.FC = () => {
+  const { isAuthenticated, status } = useAuth();
+  const isAuthReady = isAuthenticated && status === "AUTHENTICATED";
   const { data: profile, isLoading, error, refetch } = usePatientProfileQuery();
+  const isPageLoading = isLoading || !isAuthReady;
   const createMutation = useCreatePatientProfileMutation();
   const updateMutation = useUpdatePatientProfileMutation();
   const toast = useToast();
@@ -107,7 +111,7 @@ export const PatientProfileRoute: React.FC = () => {
       </div>
 
       {/* Loading Skeleton State */}
-      {isLoading && (
+      {isPageLoading && (
         <div
           data-testid="profile-loading-skeleton"
           aria-busy="true"
@@ -194,7 +198,7 @@ export const PatientProfileRoute: React.FC = () => {
       )}
 
       {/* Error State (Non-404) */}
-      {!isLoading && error && !isProfileNotFound && (
+      {!isPageLoading && error && !isProfileNotFound && (
         <Card data-testid="profile-error-card">
           <CardContent
             style={{
@@ -248,7 +252,7 @@ export const PatientProfileRoute: React.FC = () => {
       )}
 
       {/* 404 Initial Setup State */}
-      {!isLoading && isProfileNotFound && (
+      {!isPageLoading && isProfileNotFound && (
         <div data-testid="profile-onboarding-section">
           <div
             style={{
@@ -289,7 +293,7 @@ export const PatientProfileRoute: React.FC = () => {
       )}
 
       {/* Normal Profile Flow: View or Edit */}
-      {!isLoading && profile && !isProfileNotFound && (
+      {!isPageLoading && profile && !isProfileNotFound && (
         <>
           {isEditing ? (
             <ProfileForm

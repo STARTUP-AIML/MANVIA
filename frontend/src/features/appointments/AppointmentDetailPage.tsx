@@ -44,7 +44,7 @@ export const AppointmentDetailPage: React.FC = () => {
           </p>
           <button
             type="button"
-            onClick={() => navigate('/appointments')}
+            onClick={() => navigate('/app/appointments')}
             className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold"
           >
             Return to Appointments
@@ -100,7 +100,7 @@ export const AppointmentDetailPage: React.FC = () => {
       {/* Navigation breadcrumb */}
       <div>
         <Link
-          to="/appointments"
+          to="/app/appointments"
           className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors"
         >
           &larr; Back to My Appointments
@@ -154,7 +154,7 @@ export const AppointmentDetailPage: React.FC = () => {
             </p>
             {appointment.publicDoctorId && (
               <Link
-                to={`/doctors/${appointment.publicDoctorId}`}
+                to={`/app/doctors/${appointment.publicDoctorId}`}
                 className="text-xs text-teal-600 hover:text-teal-700 font-semibold underline block"
               >
                 View Physician Profile
@@ -260,7 +260,7 @@ export const AppointmentDetailPage: React.FC = () => {
 
         <div className="ml-auto">
           <Link
-            to="/appointments"
+            to="/app/appointments"
             className="py-2.5 px-5 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors inline-block"
           >
             Back to List

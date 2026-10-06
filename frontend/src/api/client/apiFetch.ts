@@ -5,6 +5,7 @@
  */
 
 import { apiClient } from "./apiClient";
+import { ApiError } from "../errors/apiError";
 import { sessionStorageManager } from "@/auth/sessionStorage";
 
 export const API_BASE_URL =
@@ -19,14 +20,8 @@ export async function apiFetch<T>(
   // If uploading FormData or doing raw binary, dispatch via native fetch
   if (options.body instanceof FormData || options.body instanceof Blob) {
     const token = sessionStorageManager.getAccessToken();
-    const user = sessionStorageManager.getUser();
     const headers = new Headers(options.headers || {});
     if (token) headers.set("Authorization", `Bearer ${token}`);
-    if (user) {
-      headers.set("x-user-id", user.userId);
-      headers.set("x-user-role", user.activeRole);
-      headers.set("x-active-role", user.activeRole);
-    }
 
     const url = endpoint.startsWith("http")
       ? endpoint
@@ -42,7 +37,11 @@ export async function apiFetch<T>(
       } catch {
         if (text) errorMsg = text;
       }
-      throw new Error(errorMsg);
+      throw new ApiError({
+        statusCode: res.status,
+        error: `HTTP_${res.status}`,
+        message: errorMsg,
+      });
     }
     if (res.status === 204) return undefined as unknown as T;
     return (await res.json()) as T;
@@ -81,7 +80,7 @@ export function getStoredToken(): string | null {
 }
 
 export function getStoredUser<T = unknown>(): T | null {
-  return sessionStorageManager.getUser() as T | null;
+  return null;
 }
 
 export function clearSession(): void {

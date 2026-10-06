@@ -11,3 +11,4 @@ export * from "./invoices";
 export * from "./payouts";
 export * from "./refunds";
 export * from "./notifications";
+export * from "./admin";

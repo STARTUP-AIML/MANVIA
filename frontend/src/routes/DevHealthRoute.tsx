@@ -92,7 +92,7 @@ export const DevHealthRoute: React.FC = () => {
         checkedAt: new Date().toLocaleTimeString(),
       });
       toast.error(
-        "Could not connect to backend at http://localhost:3000",
+        `Could not connect to backend at ${env.backendUrl}`,
         "Backend Unreachable",
       );
     }

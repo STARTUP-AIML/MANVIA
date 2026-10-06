@@ -51,28 +51,28 @@ export function AppHeader() {
         {isAuthenticated && (
           <>
             <NavLink
-              to="/wellness"
+              to="/app/wellness"
               className={({ isActive }) => (isActive ? 'active-nav' : '')}
               onClick={() => setOpen(false)}
             >
               Wellness
             </NavLink>
             <NavLink
-              to="/health-timeline"
+              to="/app/health-timeline"
               className={({ isActive }) => (isActive ? 'active-nav' : '')}
               onClick={() => setOpen(false)}
             >
               Health Timeline
             </NavLink>
             <NavLink
-              to="/doctors"
+              to="/app/doctors"
               className={({ isActive }) => (isActive ? 'active-nav' : '')}
               onClick={() => setOpen(false)}
             >
               Doctors
             </NavLink>
             <NavLink
-              to="/appointments"
+              to="/app/appointments"
               className={({ isActive }) => (isActive ? 'active-nav' : '')}
               onClick={() => setOpen(false)}
             >
@@ -81,7 +81,7 @@ export function AppHeader() {
           </>
         )}
         <NavLink
-          to="/ai-companion"
+          to="/app/ai"
           className={({ isActive }) => (isActive ? 'active-nav' : '')}
           onClick={() => setOpen(false)}
         >
@@ -89,7 +89,7 @@ export function AppHeader() {
         </NavLink>
         {isAuthenticated && (
           <NavLink
-            to="/account"
+            to="/app/account"
             className={({ isActive }) => (isActive ? 'active-nav' : '')}
             onClick={() => setOpen(false)}
           >
