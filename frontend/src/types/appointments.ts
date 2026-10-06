@@ -119,6 +119,8 @@ export interface PaginatedAppointmentsResponseDto {
 export interface AppointmentQueryParams {
   status?: AppointmentStatus;
   timeFilter?: 'UPCOMING' | 'PAST' | 'ALL';
+  upcoming?: boolean;
+  past?: boolean;
   page?: number;
   limit?: number;
 }

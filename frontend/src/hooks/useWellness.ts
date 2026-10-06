@@ -90,6 +90,8 @@ export function useCreateWellnessCheckIn() {
       queryClient.invalidateQueries({ queryKey: wellnessQueryKeys.all });
       // Invalidate health timeline as well
       queryClient.invalidateQueries({ queryKey: ['health-timeline'] });
+      // Invalidate dashboard queries (wellness summary widget)
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 }

@@ -146,7 +146,10 @@ export class ApiClient {
       headers.set("x-request-id", this.generateRequestId());
     }
 
-    if (body !== undefined && !headers.has("Content-Type")) {
+    const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
+    const isBlob = typeof Blob !== "undefined" && body instanceof Blob;
+
+    if (body !== undefined && !isFormData && !headers.has("Content-Type")) {
       headers.set("Content-Type", "application/json");
     }
 
@@ -165,8 +168,8 @@ export class ApiClient {
         headers,
         body:
           body !== undefined
-            ? typeof body === "string"
-              ? body
+            ? isFormData || isBlob || typeof body === "string"
+              ? (body as BodyInit)
               : JSON.stringify(body)
             : undefined,
         signal: controller.signal,

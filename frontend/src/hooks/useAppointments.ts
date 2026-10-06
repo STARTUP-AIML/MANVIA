@@ -47,6 +47,8 @@ export function useCreateAppointment() {
       // Invalidate relevant queries: patient's appointment list and doctor availability
       queryClient.invalidateQueries({ queryKey: APPOINTMENT_KEYS.all });
       queryClient.invalidateQueries({ queryKey: ['doctors', 'availability', variables.doctorId] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['health-timeline'] });
     },
   });
 }
@@ -114,6 +116,8 @@ export function useCancelAppointment() {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({ queryKey: APPOINTMENT_KEYS.all });
       queryClient.invalidateQueries({ queryKey: APPOINTMENT_KEYS.detail(variables.appointmentId) });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['health-timeline'] });
     },
   });
 }

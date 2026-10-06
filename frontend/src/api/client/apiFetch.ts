@@ -5,6 +5,7 @@
  */
 
 import { apiClient } from "./apiClient";
+import { ApiError } from "../errors/apiError";
 import { sessionStorageManager } from "@/auth/sessionStorage";
 
 export const API_BASE_URL =
@@ -36,7 +37,11 @@ export async function apiFetch<T>(
       } catch {
         if (text) errorMsg = text;
       }
-      throw new Error(errorMsg);
+      throw new ApiError({
+        statusCode: res.status,
+        error: `HTTP_${res.status}`,
+        message: errorMsg,
+      });
     }
     if (res.status === 204) return undefined as unknown as T;
     return (await res.json()) as T;

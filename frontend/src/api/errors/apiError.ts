@@ -65,7 +65,19 @@ export class ApiError extends Error {
   }
 
   public get isValidationError(): boolean {
-    return this.statusCode === 400 || this.error === "VALIDATION_FAILED";
+    return this.statusCode === 400 || this.statusCode === 422 || this.error === "VALIDATION_FAILED";
+  }
+
+  public get isBadRequest(): boolean {
+    return this.statusCode === 400;
+  }
+
+  public get isConflict(): boolean {
+    return this.statusCode === 409 || this.error === "CONFLICT";
+  }
+
+  public get isRateLimited(): boolean {
+    return this.statusCode === 429 || this.error === "TOO_MANY_REQUESTS";
   }
 
   public get isClientError(): boolean {

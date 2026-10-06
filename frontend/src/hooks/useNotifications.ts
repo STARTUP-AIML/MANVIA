@@ -47,6 +47,7 @@ export function useMarkNotificationRead() {
     mutationFn: (id: string) => markNotificationReadApi(id),
     onSuccess: (updated) => {
       queryClient.invalidateQueries({ queryKey: NOTIFICATION_KEYS.all });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       queryClient.setQueryData(NOTIFICATION_KEYS.detail(updated.id), updated);
     },
   });
@@ -58,6 +59,7 @@ export function useMarkAllNotificationsRead() {
     mutationFn: () => markAllNotificationsReadApi(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: NOTIFICATION_KEYS.all });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 }
@@ -68,6 +70,7 @@ export function useDeleteNotification() {
     mutationFn: (id: string) => deleteNotificationApi(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: NOTIFICATION_KEYS.all });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 }

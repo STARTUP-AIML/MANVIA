@@ -52,8 +52,10 @@ export async function getPatientAppointmentsApi(
   if (params?.status) {
     query.set('status', params.status);
   }
-  if (params?.timeFilter) {
-    query.set('timeFilter', params.timeFilter);
+  if (params?.upcoming || params?.timeFilter === 'UPCOMING') {
+    query.set('upcoming', 'true');
+  } else if (params?.past || params?.timeFilter === 'PAST') {
+    query.set('past', 'true');
   }
   if (params?.page !== undefined) {
     query.set('page', String(params.page));
@@ -151,8 +153,10 @@ export async function getDoctorAppointmentsApi(
   if (params?.status) {
     query.set('status', params.status);
   }
-  if (params?.timeFilter) {
-    query.set('timeFilter', params.timeFilter);
+  if (params?.upcoming || params?.timeFilter === 'UPCOMING') {
+    query.set('upcoming', 'true');
+  } else if (params?.past || params?.timeFilter === 'PAST') {
+    query.set('past', 'true');
   }
   if (params?.page !== undefined) {
     query.set('page', String(params.page));
