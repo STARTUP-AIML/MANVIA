@@ -344,6 +344,61 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
     }
   }, [queryClient]);
 
+function parseJwtRole(token: string | null | undefined): Role | null {
+  if (!token) return null;
+  try {
+    const parts = token.split(".");
+    const base64Url = parts[1];
+    if (parts.length === 3 && base64Url) {
+      const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+      const jsonPayload = decodeURIComponent(
+        atob(base64)
+          .split("")
+          .map((c) => "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2))
+          .join("")
+      );
+      const parsed = JSON.parse(jsonPayload);
+      if (parsed && typeof parsed.activeRole === "string") {
+        return parsed.activeRole as Role;
+      }
+    }
+  } catch {
+    // Ignore malformed token
+  }
+  return null;
+}
+
+  /**
+   * Switches active role for multi-role session via backend
+   */
+  const switchRole = useCallback(
+    async (role: Role) => {
+      const response = await authService.switchRole({ role });
+      const currentRefresh = sessionStorageManager.getRefreshToken() || "";
+      sessionStorageManager.setTokens({
+        accessToken: response.accessToken,
+        refreshToken: currentRefresh,
+      });
+      setState((prev) => ({
+        ...prev,
+        tokens: prev.tokens
+          ? {
+              ...prev.tokens,
+              accessToken: response.accessToken,
+              expiresIn: response.expiresInSeconds,
+            }
+          : {
+              accessToken: response.accessToken,
+              refreshToken: currentRefresh,
+              tokenType: "Bearer",
+              expiresIn: response.expiresInSeconds,
+            },
+      }));
+      return response;
+    },
+    [],
+  );
+
   /**
    * Role check helper
    */
@@ -358,8 +413,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
 
   const activeRole = useMemo<Role | null>(() => {
     if (!state.user || state.user.roles.length === 0) return null;
+    const tokenRole = parseJwtRole(
+      state.tokens?.accessToken || sessionStorageManager.getAccessToken(),
+    );
+    if (tokenRole && state.user.roles.includes(tokenRole)) {
+      return tokenRole;
+    }
     return state.user.roles[0] ?? null;
-  }, [state.user]);
+  }, [state.user, state.tokens?.accessToken]);
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -372,6 +433,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
       register,
       logout,
       hasRole,
+      switchRole,
       refreshSession,
       clearError,
     }),
@@ -382,6 +444,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({
       register,
       logout,
       hasRole,
+      switchRole,
       refreshSession,
       clearError,
     ],
@@ -441,6 +504,12 @@ const defaultUnwrappedAuthContext: AuthContextValue = {
   }),
   logout: async () => {},
   hasRole: () => true,
+  switchRole: async (role: Role) => ({
+    accessToken: "",
+    expiresInSeconds: 900,
+    activeRole: role,
+    roles: [role],
+  }),
   refreshSession: async () => true,
   clearError: () => {},
 };

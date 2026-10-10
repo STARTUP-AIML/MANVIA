@@ -58,6 +58,9 @@ import {
 import { RefundsService } from '../../refunds/services/refunds.service.js';
 import type { RefundResponseDto } from '../../refunds/dto/refund-response.dto.js';
 import { WaitlistService } from '../../waitlist/services/waitlist.service.js';
+import { NotificationOrchestratorService } from '../../notifications/services/notification-orchestrator.service.js';
+import { NotificationType } from '../../notifications/enums/index.js';
+import { PrismaService } from '../../../database/prisma.service.js';
 
 @Injectable()
 export class AppointmentsService {
@@ -90,6 +93,12 @@ export class AppointmentsService {
     @Optional()
     @Inject(NOTIFICATION_SERVICE)
     private readonly notificationService?: INotificationService,
+    @Optional()
+    @Inject(forwardRef(() => NotificationOrchestratorService))
+    private readonly notificationOrchestrator?: NotificationOrchestratorService,
+    @Optional()
+    @Inject(PrismaService)
+    private readonly prisma?: PrismaService,
   ) {}
 
   /**
@@ -252,6 +261,48 @@ export class AppointmentsService {
           this.logger.warn(`Failed to fulfill active waitlist on booking: ${err.message}`);
         });
     }
+
+    // Persistent In-App Notifications
+    const notificationParams = {
+      date: appointment.startAt,
+      doctorName: `Dr. ${doctor.displayName}`,
+      patientName: patient.displayName || `${patient.legalFirstName} ${patient.legalLastName}`,
+      duration: offer.durationMinutes,
+      price: offer.fee,
+      currency: offer.currency,
+    };
+    const notificationMeta = {
+      appointmentId: appointment.id,
+      publicAppointmentId: appointment.publicAppointmentId,
+      doctorId: doctor.id,
+      patientId: patient.id,
+    };
+
+    // 1. Notify Patient
+    await this.dispatchAppointmentNotification(
+      patientUserId,
+      NotificationType.APPOINTMENT_REQUESTED,
+      notificationParams,
+      notificationMeta,
+      `appt_req:patient:${appointment.id}`,
+    );
+
+    // 2. Notify Doctor
+    await this.dispatchAppointmentNotification(
+      doctor.userId,
+      NotificationType.APPOINTMENT_REQUESTED,
+      notificationParams,
+      notificationMeta,
+      `appt_req:doc:${appointment.id}`,
+    );
+
+    // 3. Notify Admins
+    await this.notifyAdmins(
+      NotificationType.APPOINTMENT_REQUESTED,
+      notificationParams,
+      notificationMeta,
+      `appt_req:${appointment.id}`,
+    );
 
     return this.buildResponseDto(
       appointment,
@@ -575,6 +626,36 @@ export class AppointmentsService {
       },
     });
 
+    // Notify Patient of Confirmation
+    const patientUser = await this.careRelRepo.findPatientById(updated.patientId);
+    if (patientUser?.userId) {
+      await this.dispatchAppointmentNotification(
+        patientUser.userId,
+        NotificationType.APPOINTMENT_CONFIRMED,
+        {
+          date: updated.startAt,
+          doctorName: `Dr. ${doctor.displayName}`,
+        },
+        {
+          appointmentId: updated.id,
+          publicAppointmentId: updated.publicAppointmentId,
+        },
+        `appt_confirm:patient:${updated.id}`,
+      );
+    }
+    await this.notifyAdmins(
+      NotificationType.APPOINTMENT_CONFIRMED,
+      {
+        date: updated.startAt,
+        doctorName: `Dr. ${doctor.displayName}`,
+      },
+      {
+        appointmentId: updated.id,
+        publicAppointmentId: updated.publicAppointmentId,
+      },
+      `appt_confirm:${updated.id}`,
+    );
+
     const patient = await this.careRelRepo.findPatientById(updated.patientId);
     const offer = await this.availabilityRepo.findOfferById(updated.consultationOfferId);
     return this.buildResponseDto(updated, patient ?? undefined, doctor, offer ?? undefined);
@@ -621,6 +702,40 @@ export class AppointmentsService {
         reason: dto.reason.trim(),
       },
     });
+
+    // Notify Patient of Decline
+    const patientUser = await this.careRelRepo.findPatientById(updated.patientId);
+    if (patientUser?.userId) {
+      await this.dispatchAppointmentNotification(
+        patientUser.userId,
+        NotificationType.APPOINTMENT_DECLINED,
+        {
+          date: updated.startAt,
+          doctorName: `Dr. ${doctor.displayName}`,
+          reason: dto.reason.trim(),
+        },
+        {
+          appointmentId: updated.id,
+          publicAppointmentId: updated.publicAppointmentId,
+          reason: dto.reason.trim(),
+        },
+        `appt_decline:patient:${updated.id}`,
+      );
+    }
+    await this.notifyAdmins(
+      NotificationType.APPOINTMENT_DECLINED,
+      {
+        date: updated.startAt,
+        doctorName: `Dr. ${doctor.displayName}`,
+        reason: dto.reason.trim(),
+      },
+      {
+        appointmentId: updated.id,
+        publicAppointmentId: updated.publicAppointmentId,
+        reason: dto.reason.trim(),
+      },
+      `appt_decline:${updated.id}`,
+    );
 
     const patient = await this.careRelRepo.findPatientById(updated.patientId);
     const offer = await this.availabilityRepo.findOfferById(updated.consultationOfferId);
@@ -1317,5 +1432,55 @@ export class AppointmentsService {
     dto.createdAt = entity.createdAt.toISOString();
     dto.updatedAt = entity.updatedAt.toISOString();
     return dto;
+  }
+
+  private async dispatchAppointmentNotification(
+    userId: string,
+    type: NotificationType,
+    params: Record<string, unknown>,
+    metadata: Record<string, unknown>,
+    idempotencyKey?: string,
+  ): Promise<void> {
+    try {
+      if (this.notificationOrchestrator) {
+        await this.notificationOrchestrator.trigger({
+          userId,
+          type,
+          params,
+          metadata,
+          idempotencyKey,
+        });
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Failed to dispatch notification (${type}) to user ${userId}: ${message}`);
+    }
+  }
+
+  private async notifyAdmins(
+    type: NotificationType,
+    params: Record<string, unknown>,
+    metadata: Record<string, unknown>,
+    idempotencyPrefix?: string,
+  ): Promise<void> {
+    try {
+      if (!this.prisma) return;
+      const admins = await this.prisma.user.findMany({
+        where: { roles: { has: 'ADMIN' } },
+        select: { id: true },
+      });
+      for (const admin of admins) {
+        await this.dispatchAppointmentNotification(
+          admin.id,
+          type,
+          params,
+          metadata,
+          idempotencyPrefix ? `${idempotencyPrefix}:admin:${admin.id}` : undefined,
+        );
+      }
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      this.logger.warn(`Failed to notify admins for ${type}: ${message}`);
+    }
   }
 }

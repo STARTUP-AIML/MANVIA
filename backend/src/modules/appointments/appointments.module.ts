@@ -5,6 +5,7 @@ import { CareRelationshipsModule } from '../care-relationships/care-relationship
 import { DoctorAvailabilityModule } from '../doctor-availability/doctor-availability.module.js';
 import { RefundsModule } from '../refunds/refunds.module.js';
 import { WaitlistModule } from '../waitlist/waitlist.module.js';
+import { NotificationsModule } from '../notifications/notifications.module.js';
 import { PatientAppointmentsController } from './controllers/patient-appointments.controller.js';
 import { DoctorAppointmentsController } from './controllers/doctor-appointments.controller.js';
 import { AppointmentsService } from './services/appointments.service.js';
@@ -23,6 +24,7 @@ import { APPOINTMENT_AUDIT_SERVICE } from './interfaces/appointment-audit-servic
     DoctorsModule,
     CareRelationshipsModule,
     DoctorAvailabilityModule,
+    forwardRef(() => NotificationsModule),
     forwardRef(() => RefundsModule),
     forwardRef(() => WaitlistModule),
   ],

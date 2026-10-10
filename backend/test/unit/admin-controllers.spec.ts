@@ -14,6 +14,7 @@ import type { AdminAuditService } from '../../src/modules/admin/services/admin-a
 import type { AdminAISafetyService } from '../../src/modules/admin/services/admin-ai-safety.service.js';
 import type { SystemKillSwitchService } from '../../src/modules/admin/services/system-kill-switch.service.js';
 import type { AdminClinicalIncidentService } from '../../src/modules/admin/services/admin-clinical-incident.service.js';
+import type { AppointmentsService } from '../../src/modules/appointments/services/appointments.service.js';
 import type { CurrentUserContext } from '../../src/modules/doctors/interfaces/auth-context.interface.js';
 import { UnauthorizedError, ForbiddenError } from '../../src/common/errors/app-error.js';
 import { UserStatus, AIHandoffStatus } from '@prisma/client';
@@ -123,9 +124,14 @@ describe('Admin Controllers & Guards (Unit)', () => {
       listPatients: ReturnType<typeof vi.fn>;
       listDoctors: ReturnType<typeof vi.fn>;
       listAppointments: ReturnType<typeof vi.fn>;
+      getAppointmentDetails: ReturnType<typeof vi.fn>;
       listCareRelationships: ReturnType<typeof vi.fn>;
       getPaymentsOverview: ReturnType<typeof vi.fn>;
       getNotificationsOverview: ReturnType<typeof vi.fn>;
+      getDashboardOverview: ReturnType<typeof vi.fn>;
+    };
+    let mockAppointmentsService: {
+      cancelAdminAppointment: ReturnType<typeof vi.fn>;
     };
 
     beforeEach(() => {
@@ -133,11 +139,19 @@ describe('Admin Controllers & Guards (Unit)', () => {
         listPatients: vi.fn().mockResolvedValue({ items: [], total: 0 }),
         listDoctors: vi.fn().mockResolvedValue({ items: [], total: 0 }),
         listAppointments: vi.fn().mockResolvedValue({ items: [], total: 0 }),
+        getAppointmentDetails: vi.fn().mockResolvedValue({ id: 'apt-1', status: 'CONFIRMED' }),
         listCareRelationships: vi.fn().mockResolvedValue({ items: [], total: 0 }),
         getPaymentsOverview: vi.fn().mockResolvedValue({ total: 0 }),
         getNotificationsOverview: vi.fn().mockResolvedValue({ deliveries: {} }),
+        getDashboardOverview: vi.fn().mockResolvedValue({ users: { total: 10 } }),
       };
-      controller = new AdminOversightController(mockService as unknown as AdminOversightService);
+      mockAppointmentsService = {
+        cancelAdminAppointment: vi.fn().mockResolvedValue({ id: 'apt-1', status: 'CANCELLED' }),
+      };
+      controller = new AdminOversightController(
+        mockService as unknown as AdminOversightService,
+        mockAppointmentsService as unknown as AppointmentsService,
+      );
     });
 
     it('should delegate listPatients, listDoctors, and appointments', async () => {
@@ -153,6 +167,32 @@ describe('Admin Controllers & Guards (Unit)', () => {
 
       await controller.listAppointments({ page: 1, limit: 10 });
       expect(mockService.listAppointments).toHaveBeenCalled();
+    });
+
+    it('should delegate getDashboardOverview to service', async () => {
+      const res = await controller.getDashboardOverview();
+      expect(res.users.total).toBe(10);
+      expect(mockService.getDashboardOverview).toHaveBeenCalled();
+    });
+
+    it('should delegate getAppointmentDetails to service', async () => {
+      const res = await controller.getAppointmentDetails('apt-1');
+      expect(res.id).toBe('apt-1');
+      expect(mockService.getAppointmentDetails).toHaveBeenCalledWith('apt-1');
+    });
+
+    it('should delegate cancelAppointment to appointmentsService', async () => {
+      const res = await controller.cancelAppointment(
+        'apt-1',
+        { reason: 'Administrative schedule conflict override' },
+        { userId: 'admin-1', activeRole: 'ADMIN' },
+      );
+      expect(res.status).toBe('CANCELLED');
+      expect(mockAppointmentsService.cancelAdminAppointment).toHaveBeenCalledWith(
+        'admin-1',
+        'apt-1',
+        { reason: 'Administrative schedule conflict override' },
+      );
     });
   });
 

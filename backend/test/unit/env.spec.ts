@@ -113,4 +113,46 @@ describe('Environment Configuration (Unit)', () => {
     expect(sanitized).toContain('admin');
     expect(sanitized).toContain('prod-cluster.aws.internal');
   });
+
+  it('should load default Groq configuration', () => {
+    const config = validateEnv({});
+    expect(config.GROQ_API_KEY).toBe('');
+    expect(config.GROQ_MODEL).toBe('openai/gpt-oss-20b');
+    expect(config.AI_PROVIDER).toBe('gemini');
+  });
+
+  it('should accept valid AI_PROVIDER settings', () => {
+    const groqConfig = validateEnv({ AI_PROVIDER: 'groq' });
+    expect(groqConfig.AI_PROVIDER).toBe('groq');
+
+    const mockConfig = validateEnv({ AI_PROVIDER: 'mock' });
+    expect(mockConfig.AI_PROVIDER).toBe('mock');
+
+    const geminiConfig = validateEnv({ AI_PROVIDER: 'gemini' });
+    expect(geminiConfig.AI_PROVIDER).toBe('gemini');
+  });
+
+  it('should reject invalid AI_PROVIDER settings', () => {
+    expect(() => validateEnv({ AI_PROVIDER: 'invalid_ai' })).toThrow(/Invalid AI_PROVIDER/);
+  });
+
+  it('should require GROQ_API_KEY in production when AI_PROVIDER is groq', () => {
+    expect(() =>
+      validateEnv({
+        NODE_ENV: 'production',
+        AI_PROVIDER: 'groq',
+        JWT_SECRET: 'production-super-secret-jwt-key-minimum-32-chars-ok',
+        JWT_REFRESH_SECRET: 'production-super-secret-refresh-key-minimum-32-chars-ok',
+      }),
+    ).toThrow(/In production with AI_PROVIDER=groq, GROQ_API_KEY must be configured/);
+
+    const validProd = validateEnv({
+      NODE_ENV: 'production',
+      AI_PROVIDER: 'groq',
+      GROQ_API_KEY: 'gsk_real_production_secret_key_12345',
+      JWT_SECRET: 'production-super-secret-jwt-key-minimum-32-chars-ok',
+      JWT_REFRESH_SECRET: 'production-super-secret-refresh-key-minimum-32-chars-ok',
+    });
+    expect(validProd.AI_PROVIDER).toBe('groq');
+  });
 });

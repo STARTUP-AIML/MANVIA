@@ -1,17 +1,54 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Optional,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiResponse,
+  ApiTags,
+} from '@nestjs/swagger';
 import { AdminAuthGuard } from '../guards/admin-auth.guard.js';
+import { AdminUser } from '../decorators/admin-user.decorator.js';
+import type { CurrentUserContext } from '../../doctors/interfaces/auth-context.interface.js';
 import { AdminOversightService } from '../services/admin-oversight.service.js';
 import { AdminAppointmentQueryDto } from '../dto/admin-appointment-query.dto.js';
 import { AdminCareRelationshipQueryDto } from '../dto/admin-care-relationship-query.dto.js';
 import { AdminPaymentQueryDto } from '../dto/admin-payment-query.dto.js';
+import { AppointmentsService } from '../../appointments/services/appointments.service.js';
+import { CancelAppointmentDto } from '../../appointments/dto/cancel-appointment.dto.js';
+import { ConflictError } from '../../../common/errors/app-error.js';
 
 @ApiTags('Admin Oversight & Governance')
 @Controller('admin')
 @UseGuards(AdminAuthGuard)
 @ApiBearerAuth('bearer-auth')
 export class AdminOversightController {
-  constructor(private readonly adminOversightService: AdminOversightService) {}
+  constructor(
+    private readonly adminOversightService: AdminOversightService,
+    @Optional() private readonly appointmentsService?: AppointmentsService,
+  ) {}
+
+  @Get('overview')
+  @ApiOperation({
+    summary: 'Platform overview metrics & operational dashboard (Admin Only)',
+    description:
+      'Aggregates users by role, verification queue counts, appointment lifecycle metrics, financial snapshot, and operational alerts.',
+  })
+  @ApiResponse({ status: 200, description: 'Overview metrics retrieved successfully' })
+  public async getDashboardOverview() {
+    return this.adminOversightService.getDashboardOverview();
+  }
 
   @Get('patients')
   @ApiOperation({
@@ -76,6 +113,41 @@ export class AdminOversightController {
   @ApiResponse({ status: 200, description: 'Appointments list retrieved successfully' })
   public async listAppointments(@Query() query: AdminAppointmentQueryDto) {
     return this.adminOversightService.listAppointments(query);
+  }
+
+  @Get('appointments/:appointmentId')
+  @ApiOperation({
+    summary: 'Retrieve detailed administrative appointment record (Admin Only)',
+    description:
+      'Returns appointment metadata, scheduling timestamps, lifecycle milestones, and cancellation details without clinical records.',
+  })
+  @ApiParam({ name: 'appointmentId', description: 'Appointment UUID or APT-XXXX public ID' })
+  @ApiResponse({ status: 200, description: 'Appointment details retrieved successfully' })
+  @ApiResponse({ status: 404, description: 'Appointment not found' })
+  public async getAppointmentDetails(@Param('appointmentId') appointmentId: string) {
+    return this.adminOversightService.getAppointmentDetails(appointmentId);
+  }
+
+  @Post('appointments/:appointmentId/cancel')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Administrative appointment cancellation with refund processing (Admin Only)',
+    description:
+      'Enforces state machine transition, computes refunds according to policy, updates reservation state, and logs an immutable audit event.',
+  })
+  @ApiParam({ name: 'appointmentId', description: 'Appointment UUID or APT-XXXX public ID' })
+  @ApiResponse({ status: 200, description: 'Appointment cancelled successfully' })
+  @ApiResponse({ status: 404, description: 'Appointment not found' })
+  @ApiResponse({ status: 409, description: 'Invalid state transition' })
+  public async cancelAppointment(
+    @Param('appointmentId') appointmentId: string,
+    @Body() dto: CancelAppointmentDto,
+    @AdminUser() adminUser: CurrentUserContext,
+  ) {
+    if (!this.appointmentsService) {
+      throw new ConflictError('Appointment service is not configured');
+    }
+    return this.appointmentsService.cancelAdminAppointment(adminUser.userId, appointmentId, dto);
   }
 
   @Get('care-relationships')

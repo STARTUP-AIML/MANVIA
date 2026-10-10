@@ -214,6 +214,14 @@ model DoctorProfile {
   verificationStatus        VerificationStatus    @default(DRAFT) @map("verification_status")
   defaultConsultationFee    Decimal               @default(0.00) @map("default_consultation_fee") @db.Decimal(10, 2)
   currency                  String                @default("USD") @db.VarChar(3)
+  clinicName                String?               @map("clinic_name") @db.VarChar(200)
+  city                      String?               @db.VarChar(100)
+  state                     String?               @db.VarChar(100)
+  clinicalInterests         String[]              @default([]) @map("clinical_interests")
+  consultationModes         String[]              @default(["VIDEO", "IN_PERSON"]) @map("consultation_modes")
+  contactDisplay            String?               @map("contact_display") @db.VarChar(64)
+  profileImageUrl           String?               @map("profile_image_url") @db.VarChar(512)
+  isDemo                    Boolean               @default(false) @map("is_demo")
   verifiedAt                DateTime?             @map("verified_at") @db.Timestamptz(6)
   createdAt                 DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt                 DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -236,6 +244,7 @@ model DoctorProfile {
   @@index([publicDoctorId])
   @@index([verificationStatus])
   @@index([medicalRegistrationNumber])
+  @@index([isDemo])
   @@map("doctor_profiles")
 }
 

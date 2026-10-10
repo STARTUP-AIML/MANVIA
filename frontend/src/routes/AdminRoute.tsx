@@ -17,12 +17,16 @@ import { Input } from '@/components/ui/Input';
 import { Spinner } from '@/components/ui/Spinner';
 import { useAuth } from '@/auth';
 import {
+  getAdminDashboardOverviewApi,
   listAdminVerificationsApi,
   getAdminVerificationDetailApi,
   approveDoctorVerificationApi,
   rejectDoctorVerificationApi,
   getAdminDocumentAccessUrlApi,
   listAdminDoctorsApi,
+  listAdminAppointmentsApi,
+  getAdminAppointmentByIdApi,
+  cancelAdminAppointmentApi,
   listAdminUsersApi,
   updateAdminUserStatusApi,
   queryAdminAuditLogsApi,
@@ -34,9 +38,12 @@ import type {
   AdminUserListItem,
   AdminAuditLogItem,
   AdminPaymentsOverview,
+  AdminDashboardOverview,
+  AdminAppointmentListItem,
+  AdminAppointmentDetail,
 } from '@/types/';
 
-type AdminTab = 'overview' | 'verification' | 'doctors' | 'users' | 'audit';
+type AdminTab = 'overview' | 'verification' | 'doctors' | 'appointments' | 'users' | 'audit';
 
 export const AdminRoute: React.FC = () => {
   const { user } = useAuth();
@@ -50,6 +57,8 @@ export const AdminRoute: React.FC = () => {
     const path = location.pathname.toLowerCase();
     if (path.includes('/admin/doctor-verification') || path.includes('/admin/verification')) {
       setActiveTab('verification');
+    } else if (path.includes('/admin/appointments')) {
+      setActiveTab('appointments');
     } else if (path.includes('/admin/doctors')) {
       setActiveTab('doctors');
     } else if (path.includes('/admin/users')) {
@@ -79,10 +88,8 @@ export const AdminRoute: React.FC = () => {
 
   // TAB 1: OVERVIEW METRICS STATE
   const [overviewLoading, setOverviewLoading] = useState(false);
+  const [dashboardOverview, setDashboardOverview] = useState<AdminDashboardOverview | null>(null);
   const [paymentsOverview, setPaymentsOverview] = useState<AdminPaymentsOverview | null>(null);
-  const [pendingVerificationsCount, setPendingVerificationsCount] = useState<number>(0);
-  const [totalDoctorsCount, setTotalDoctorsCount] = useState<number>(0);
-  const [totalUsersCount, setTotalUsersCount] = useState<number>(0);
 
   // TAB 2: VERIFICATION QUEUE STATE
   const [verifications, setVerifications] = useState<AdminVerificationDetail[]>([]);
@@ -101,7 +108,23 @@ export const AdminRoute: React.FC = () => {
   const [doctorSearch, setDoctorSearch] = useState('');
   const [doctorVerificationFilter, setDoctorVerificationFilter] = useState('');
 
-  // TAB 4: USER GOVERNANCE STATE
+  // TAB 4: APPOINTMENT OPERATIONS STATE
+  const [appointmentsList, setAppointmentsList] = useState<AdminAppointmentListItem[]>([]);
+  const [appointmentsTotal, setAppointmentsTotal] = useState(0);
+  const [appointmentsPage, setAppointmentsPage] = useState(1);
+  const [appointmentSearch, setAppointmentSearch] = useState('');
+  const [appointmentStatusFilter, setAppointmentStatusFilter] = useState('ALL');
+  const [appointmentsLoading, setAppointmentsLoading] = useState(false);
+  const [selectedAppointment, setSelectedAppointment] = useState<AdminAppointmentDetail | null>(null);
+  const [isAppointmentDetailLoading, setIsAppointmentDetailLoading] = useState(false);
+  const [showInspectionModal, setShowInspectionModal] = useState(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelAppointmentTarget, setCancelAppointmentTarget] = useState<AdminAppointmentListItem | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelReasonCode, setCancelReasonCode] = useState('ADMIN_CANCELLATION');
+  const [cancelRequestRefund, setCancelRequestRefund] = useState(true);
+
+  // TAB 5: USER GOVERNANCE STATE
   const [usersList, setUsersList] = useState<AdminUserListItem[]>([]);
   const [usersLoading, setUsersLoading] = useState(false);
   const [userSearch, setUserSearch] = useState('');
@@ -111,7 +134,7 @@ export const AdminRoute: React.FC = () => {
   const [newStatusValue, setNewStatusValue] = useState('SUSPENDED');
   const [statusReason, setStatusReason] = useState('');
 
-  // TAB 5: AUDIT LOGS STATE
+  // TAB 6: AUDIT LOGS STATE
   const [auditLogs, setAuditLogs] = useState<AdminAuditLogItem[]>([]);
   const [auditLoading, setAuditLoading] = useState(false);
   const [auditActionSearch, setAuditActionSearch] = useState('');
@@ -125,16 +148,12 @@ export const AdminRoute: React.FC = () => {
     setOverviewLoading(true);
     setErrorMessage(null);
     try {
-      const [payments, verifs, docs, usrs] = await Promise.all([
+      const [overviewData, paymentsData] = await Promise.all([
+        getAdminDashboardOverviewApi().catch(() => null),
         getAdminPaymentsOverviewApi().catch(() => null),
-        listAdminVerificationsApi({ status: 'PENDING_REVIEW', limit: 1 }).catch(() => ({ items: [], total: 0 })),
-        listAdminDoctorsApi({ limit: 1 }).catch(() => ({ items: [], total: 0 })),
-        listAdminUsersApi({ limit: 1 }).catch(() => ({ items: [], total: 0 })),
       ]);
-      setPaymentsOverview(payments);
-      setPendingVerificationsCount(verifs.total);
-      setTotalDoctorsCount(docs.total);
-      setTotalUsersCount(usrs.total);
+      setDashboardOverview(overviewData);
+      setPaymentsOverview(paymentsData);
     } catch {
       setErrorMessage('Failed to load administrative overview metrics.');
     } finally {
@@ -202,6 +221,38 @@ export const AdminRoute: React.FC = () => {
     }
   }, [userSearch, userRoleFilter, userStatusFilter]);
 
+  // LOAD APPOINTMENTS OPERATIONS
+  const loadAppointments = useCallback(async () => {
+    setAppointmentsLoading(true);
+    setErrorMessage(null);
+    try {
+      const response = await listAdminAppointmentsApi({
+        status: appointmentStatusFilter === 'ALL' ? undefined : appointmentStatusFilter,
+        page: appointmentsPage,
+        limit: 20,
+      });
+      let items = response.items;
+      if (appointmentSearch.trim()) {
+        const q = appointmentSearch.toLowerCase().trim();
+        items = items.filter(
+          (apt) =>
+            apt.publicAppointmentId?.toLowerCase().includes(q) ||
+            apt.doctor?.displayName?.toLowerCase().includes(q) ||
+            apt.doctor?.publicDoctorId?.toLowerCase().includes(q) ||
+            apt.patient?.displayName?.toLowerCase().includes(q) ||
+            apt.patient?.publicPatientId?.toLowerCase().includes(q)
+        );
+      }
+      setAppointmentsList(items);
+      setAppointmentsTotal(response.total);
+    } catch (err: unknown) {
+      const msg = (err as { message?: string })?.message || 'Failed to load appointments.';
+      setErrorMessage(msg);
+    } finally {
+      setAppointmentsLoading(false);
+    }
+  }, [appointmentSearch, appointmentStatusFilter, appointmentsPage]);
+
   // LOAD AUDIT LOGS
   const loadAuditLogs = useCallback(async () => {
     setAuditLoading(true);
@@ -230,12 +281,14 @@ export const AdminRoute: React.FC = () => {
       void loadVerificationQueue();
     } else if (activeTab === 'doctors') {
       void loadDoctorsDirectory();
+    } else if (activeTab === 'appointments') {
+      void loadAppointments();
     } else if (activeTab === 'users') {
       void loadUsersGovernance();
     } else if (activeTab === 'audit') {
       void loadAuditLogs();
     }
-  }, [isAdmin, activeTab, loadOverviewMetrics, loadVerificationQueue, loadDoctorsDirectory, loadUsersGovernance, loadAuditLogs]);
+  }, [isAdmin, activeTab, loadOverviewMetrics, loadVerificationQueue, loadDoctorsDirectory, loadAppointments, loadUsersGovernance, loadAuditLogs]);
 
   // VERIFICATION HANDLERS
   const handleSelectVerification = async (id: string) => {
@@ -343,6 +396,60 @@ export const AdminRoute: React.FC = () => {
     }
   };
 
+  // APPOINTMENT OPERATIONS HANDLERS
+  const handleInspectAppointment = async (appointmentId: string) => {
+    setIsAppointmentDetailLoading(true);
+    setShowInspectionModal(true);
+    setErrorMessage(null);
+    try {
+      const detail = await getAdminAppointmentByIdApi(appointmentId);
+      setSelectedAppointment(detail);
+    } catch (err: unknown) {
+      const msg = (err as { message?: string })?.message || 'Failed to load appointment details.';
+      setErrorMessage(msg);
+      setShowInspectionModal(false);
+    } finally {
+      setIsAppointmentDetailLoading(false);
+    }
+  };
+
+  const handleOpenCancelModal = (appointment: AdminAppointmentListItem) => {
+    setCancelAppointmentTarget(appointment);
+    setCancelReason('');
+    setCancelReasonCode('ADMIN_CANCELLATION');
+    setCancelRequestRefund(true);
+    setShowCancelModal(true);
+  };
+
+  const handleConfirmCancelAppointment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cancelAppointmentTarget) return;
+    if (!cancelReason.trim() || cancelReason.trim().length < 3) {
+      setErrorMessage('Cancellation reason must be at least 3 characters long.');
+      return;
+    }
+    setIsSubmitting(true);
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    try {
+      await cancelAdminAppointmentApi(cancelAppointmentTarget.id, {
+        reason: cancelReason.trim(),
+        reasonCode: cancelReasonCode,
+        requestRefund: cancelRequestRefund,
+      });
+      setSuccessMessage(`Appointment ${cancelAppointmentTarget.publicAppointmentId} successfully cancelled by Administrator.`);
+      setShowCancelModal(false);
+      setCancelAppointmentTarget(null);
+      void loadAppointments();
+      void loadOverviewMetrics();
+    } catch (err: unknown) {
+      const msg = (err as { message?: string })?.message || 'Failed to cancel appointment.';
+      setErrorMessage(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   if (!isAdmin) {
     return (
       <div style={{ padding: '2rem', textAlign: 'center', maxWidth: '600px', margin: '3rem auto' }}>
@@ -397,6 +504,7 @@ export const AdminRoute: React.FC = () => {
           { id: 'overview', label: 'Platform Metrics' },
           { id: 'verification', label: 'Doctor Verification' },
           { id: 'doctors', label: 'Doctor Directory' },
+          { id: 'appointments', label: 'Appointment Operations' },
           { id: 'users', label: 'User Governance' },
           { id: 'audit', label: 'Audit Trail' },
         ].map((tab) => (
@@ -421,11 +529,40 @@ export const AdminRoute: React.FC = () => {
       {/* TAB 1: PLATFORM OVERVIEW */}
       {activeTab === 'overview' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1rem' }}>
+          {/* Active Operational Alerts Banner */}
+          {dashboardOverview?.operationalAlerts && dashboardOverview.operationalAlerts.length > 0 && (
+            <div
+              style={{
+                backgroundColor: '#fffbeb',
+                border: '1px solid #f59e0b',
+                borderRadius: '8px',
+                padding: '1rem 1.25rem',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.5rem',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontSize: '1.25rem' }}>⚠️</span>
+                <strong style={{ color: '#b45309' }}>Active Operational Alerts ({dashboardOverview.operationalAlerts.length})</strong>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.875rem', color: '#92400e' }}>
+                {dashboardOverview.operationalAlerts.map((alert) => (
+                  <div key={alert.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Badge variant={alert.type === 'CRITICAL' ? 'danger' : 'warning'}>{alert.type}</Badge>
+                    <span>{alert.message}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Metric Cards Grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
             {/* Card: Pending Doctor Verifications */}
             <Card>
               <CardHeader>
-                <CardTitle>Verification Queue</CardTitle>
+                <CardTitle>Doctor Verification</CardTitle>
               </CardHeader>
               <CardContent>
                 {overviewLoading ? (
@@ -433,11 +570,18 @@ export const AdminRoute: React.FC = () => {
                 ) : (
                   <div>
                     <span style={{ fontSize: '2rem', fontWeight: 700, color: '#2563eb' }}>
-                      {pendingVerificationsCount}
+                      {dashboardOverview?.doctorVerifications?.pendingReviewCount ?? 0}
                     </span>
                     <p className="text-muted" style={{ fontSize: '0.875rem', marginTop: '0.25rem' }}>
-                      {pendingVerificationsCount === 1 ? 'Submission awaiting review' : 'Submissions awaiting review'}
+                      {(dashboardOverview?.doctorVerifications?.pendingReviewCount ?? 0) === 1
+                        ? 'Submission awaiting review'
+                        : 'Submissions awaiting review'}
                     </p>
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', fontSize: '0.8rem', color: '#64748b' }}>
+                      <span>Approved: {dashboardOverview?.doctorVerifications?.byStatus?.APPROVED ?? 0}</span>
+                      <span>•</span>
+                      <span>Rejected: {dashboardOverview?.doctorVerifications?.byStatus?.REJECTED ?? 0}</span>
+                    </div>
                     <Button
                       size="sm"
                       variant="outline"
@@ -451,10 +595,10 @@ export const AdminRoute: React.FC = () => {
               </CardContent>
             </Card>
 
-            {/* Card: Total Registered Doctors */}
+            {/* Card: Appointment Operations */}
             <Card>
               <CardHeader>
-                <CardTitle>Doctor Directory</CardTitle>
+                <CardTitle>Appointment Operations</CardTitle>
               </CardHeader>
               <CardContent>
                 {overviewLoading ? (
@@ -462,25 +606,32 @@ export const AdminRoute: React.FC = () => {
                 ) : (
                   <div>
                     <span style={{ fontSize: '2rem', fontWeight: 700, color: '#0f172a' }}>
-                      {totalDoctorsCount}
+                      {dashboardOverview?.appointments?.total ?? 0}
                     </span>
                     <p className="text-muted" style={{ fontSize: '0.875rem', marginTop: '0.25rem' }}>
-                      Total practitioner profiles
+                      Total platform bookings
                     </p>
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', fontSize: '0.8rem', color: '#64748b', flexWrap: 'wrap' }}>
+                      <span>Confirmed: {dashboardOverview?.appointments?.byStatus?.CONFIRMED ?? 0}</span>
+                      <span>•</span>
+                      <span>Completed: {dashboardOverview?.appointments?.byStatus?.COMPLETED ?? 0}</span>
+                      <span>•</span>
+                      <span>Cancelled: {dashboardOverview?.appointments?.byStatus?.CANCELLED ?? 0}</span>
+                    </div>
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => handleTabChange('doctors')}
+                      onClick={() => handleTabChange('appointments')}
                       style={{ marginTop: '0.75rem' }}
                     >
-                      Browse Doctors
+                      Manage Bookings
                     </Button>
                   </div>
                 )}
               </CardContent>
             </Card>
 
-            {/* Card: Total Registered Accounts */}
+            {/* Card: User Governance */}
             <Card>
               <CardHeader>
                 <CardTitle>User Governance</CardTitle>
@@ -491,25 +642,30 @@ export const AdminRoute: React.FC = () => {
                 ) : (
                   <div>
                     <span style={{ fontSize: '2rem', fontWeight: 700, color: '#0f172a' }}>
-                      {totalUsersCount}
+                      {dashboardOverview?.users?.total ?? 0}
                     </span>
                     <p className="text-muted" style={{ fontSize: '0.875rem', marginTop: '0.25rem' }}>
-                      Total user accounts
+                      Patients: {dashboardOverview?.users?.byRole?.PATIENT ?? 0} • Doctors: {dashboardOverview?.users?.byRole?.DOCTOR ?? 0} • Admins: {dashboardOverview?.users?.byRole?.ADMIN ?? 0}
                     </p>
+                    <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', fontSize: '0.8rem', color: '#64748b' }}>
+                      <span>Active: {dashboardOverview?.users?.byStatus?.ACTIVE ?? 0}</span>
+                      <span>•</span>
+                      <span>Suspended: {dashboardOverview?.users?.byStatus?.SUSPENDED ?? 0}</span>
+                    </div>
                     <Button
                       size="sm"
                       variant="outline"
                       onClick={() => handleTabChange('users')}
                       style={{ marginTop: '0.75rem' }}
                     >
-                      Manage Users
+                      Manage Accounts
                     </Button>
                   </div>
                 )}
               </CardContent>
             </Card>
 
-            {/* Card: Financial Health Overview */}
+            {/* Card: Financial Reconciliation */}
             <Card>
               <CardHeader>
                 <CardTitle>Financial Reconciliation</CardTitle>
@@ -520,21 +676,84 @@ export const AdminRoute: React.FC = () => {
                 ) : (
                   <div>
                     <span style={{ fontSize: '2rem', fontWeight: 700, color: '#16a34a' }}>
-                      ${((paymentsOverview?.metrics?.totalSucceededRevenue || 0) / 100).toFixed(2)}
+                      ${(((dashboardOverview?.finances?.totalSucceededRevenue ?? paymentsOverview?.metrics?.totalSucceededRevenue ?? 0)) / 100).toFixed(2)}
                     </span>
                     <p className="text-muted" style={{ fontSize: '0.875rem', marginTop: '0.25rem' }}>
-                      Succeeded Revenue ({paymentsOverview?.metrics?.succeededCount || 0} transactions)
+                      Succeeded Revenue ({dashboardOverview?.finances?.totalSucceededTransactions ?? paymentsOverview?.metrics?.succeededCount ?? 0} transactions)
                     </p>
                     <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', fontSize: '0.8rem', color: '#64748b' }}>
-                      <span>Refunds: {paymentsOverview?.metrics?.pendingRefundsCount || 0}</span>
+                      <span>Refunds: {dashboardOverview?.finances?.pendingRefundsCount ?? paymentsOverview?.metrics?.pendingRefundsCount ?? 0}</span>
                       <span>•</span>
-                      <span>Payouts: {paymentsOverview?.metrics?.pendingPayoutsCount || 0}</span>
+                      <span>Payouts: {dashboardOverview?.finances?.pendingPayoutsCount ?? paymentsOverview?.metrics?.pendingPayoutsCount ?? 0}</span>
                     </div>
                   </div>
                 )}
               </CardContent>
             </Card>
           </div>
+
+          {/* Recent Administrative Activity Section */}
+          <Card>
+            <CardHeader>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <CardTitle>Recent Administrative Activity</CardTitle>
+                  <p className="text-muted" style={{ fontSize: '0.875rem' }}>
+                    Latest privileged operations and state modifications
+                  </p>
+                </div>
+                <Button size="sm" variant="outline" onClick={() => handleTabChange('audit')}>
+                  View Full Audit Trail
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {overviewLoading ? (
+                <div style={{ padding: '2rem', textAlign: 'center' }}>
+                  <Spinner size="sm" />
+                </div>
+              ) : !dashboardOverview?.recentActivity || dashboardOverview.recentActivity.length === 0 ? (
+                <p className="text-muted" style={{ textAlign: 'center', padding: '1.5rem' }}>
+                  No recent administrative activity recorded.
+                </p>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid #e2e8f0', textAlign: 'left', color: '#64748b' }}>
+                        <th style={{ padding: '0.5rem' }}>Timestamp</th>
+                        <th style={{ padding: '0.5rem' }}>Action</th>
+                        <th style={{ padding: '0.5rem' }}>Resource</th>
+                        <th style={{ padding: '0.5rem' }}>Actor</th>
+                        <th style={{ padding: '0.5rem' }}>Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dashboardOverview.recentActivity.map((act) => (
+                        <tr key={act.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                          <td style={{ padding: '0.5rem', color: '#64748b', whiteSpace: 'nowrap' }}>
+                            {new Date(act.createdAt).toLocaleString()}
+                          </td>
+                          <td style={{ padding: '0.5rem', fontWeight: 600 }}>{act.action}</td>
+                          <td style={{ padding: '0.5rem' }}>
+                            {act.resourceType} {act.resourceId ? `(${act.resourceId.slice(0, 8)}...)` : ''}
+                          </td>
+                          <td style={{ padding: '0.5rem', color: '#64748b' }}>
+                            {act.actorUserId ? act.actorUserId.slice(0, 8) + '...' : 'SYSTEM'}
+                          </td>
+                          <td style={{ padding: '0.5rem' }}>
+                            <Badge variant={act.status === 'SUCCESS' ? 'success' : 'danger'}>
+                              {act.status}
+                            </Badge>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
       )}
 
@@ -928,6 +1147,150 @@ export const AdminRoute: React.FC = () => {
         </Card>
       )}
 
+      {/* TAB: APPOINTMENT OPERATIONS */}
+      {activeTab === 'appointments' && (
+        <Card>
+          <CardHeader>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+              <div>
+                <CardTitle>Appointment Operations & Telehealth Lifecycle</CardTitle>
+                <p className="text-muted" style={{ fontSize: '0.875rem' }}>
+                  Operational booking management, state transitions, scheduling oversight ({appointmentsTotal} total records).
+                </p>
+              </div>
+              <Button size="sm" variant="outline" onClick={() => void loadAppointments()} isLoading={appointmentsLoading}>
+                Refresh Appointments
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {/* Search and Filters */}
+            <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+              <div style={{ flex: 1, minWidth: '240px' }}>
+                <Input
+                  label="Search Booking (Reference, Doctor or Patient ID)"
+                  value={appointmentSearch}
+                  onChange={(e) => {
+                    setAppointmentSearch(e.target.value);
+                    setAppointmentsPage(1);
+                  }}
+                  placeholder="e.g. APT-2026, Dr. Smith..."
+                />
+              </div>
+              <div style={{ minWidth: '200px' }}>
+                <label className="manvia-label">Lifecycle Status</label>
+                <select
+                  className="manvia-input"
+                  style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                  value={appointmentStatusFilter}
+                  onChange={(e) => {
+                    setAppointmentStatusFilter(e.target.value);
+                    setAppointmentsPage(1);
+                  }}
+                >
+                  <option value="ALL">All Statuses</option>
+                  <option value="REQUESTED">REQUESTED</option>
+                  <option value="CONFIRMED">CONFIRMED</option>
+                  <option value="IN_PROGRESS">IN_PROGRESS</option>
+                  <option value="COMPLETED">COMPLETED</option>
+                  <option value="CANCELLED">CANCELLED</option>
+                  <option value="NO_SHOW">NO_SHOW</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Appointment Table */}
+            {appointmentsLoading ? (
+              <div style={{ padding: '3rem', textAlign: 'center' }}>
+                <Spinner size="md" />
+                <p className="text-muted" style={{ marginTop: '0.5rem' }}>Loading appointments...</p>
+              </div>
+            ) : appointmentsList.length === 0 ? (
+              <div style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
+                <p>No appointments found matching search criteria.</p>
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', fontSize: '0.875rem' }}>
+                  <thead>
+                    <tr style={{ borderBottom: '2px solid #e2e8f0', color: '#475569' }}>
+                      <th style={{ padding: '0.75rem' }}>Reference ID</th>
+                      <th style={{ padding: '0.75rem' }}>Doctor</th>
+                      <th style={{ padding: '0.75rem' }}>Patient</th>
+                      <th style={{ padding: '0.75rem' }}>Scheduled Window</th>
+                      <th style={{ padding: '0.75rem' }}>Status</th>
+                      <th style={{ padding: '0.75rem' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {appointmentsList.map((apt) => (
+                      <tr key={apt.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                        <td style={{ padding: '0.75rem', fontFamily: 'monospace', fontWeight: 600 }}>
+                          {apt.publicAppointmentId}
+                        </td>
+                        <td style={{ padding: '0.75rem' }}>
+                          <div>{apt.doctor?.displayName || 'Practitioner'}</div>
+                          <div style={{ fontSize: '0.75rem', color: '#64748b', fontFamily: 'monospace' }}>
+                            {apt.doctor?.publicDoctorId}
+                          </div>
+                        </td>
+                        <td style={{ padding: '0.75rem' }}>
+                          <div>{apt.patient?.displayName || 'Patient'}</div>
+                          <div style={{ fontSize: '0.75rem', color: '#64748b', fontFamily: 'monospace' }}>
+                            {apt.patient?.publicPatientId}
+                          </div>
+                        </td>
+                        <td style={{ padding: '0.75rem', color: '#334155' }}>
+                          <div>{new Date(apt.startAt).toLocaleDateString()}</div>
+                          <div style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                            {new Date(apt.startAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} - {new Date(apt.endAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        </td>
+                        <td style={{ padding: '0.75rem' }}>
+                          <Badge
+                            variant={
+                              apt.status === 'CONFIRMED' || apt.status === 'COMPLETED'
+                                ? 'success'
+                                : apt.status === 'REQUESTED' || apt.status === 'IN_PROGRESS'
+                                ? 'info'
+                                : apt.status === 'CANCELLED'
+                                ? 'danger'
+                                : 'warning'
+                            }
+                          >
+                            {apt.status}
+                          </Badge>
+                        </td>
+                        <td style={{ padding: '0.75rem' }}>
+                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => void handleInspectAppointment(apt.id)}
+                            >
+                              Inspect
+                            </Button>
+                            {apt.status !== 'COMPLETED' && apt.status !== 'CANCELLED' && apt.status !== 'DECLINED' && (
+                              <Button
+                                size="sm"
+                                variant="danger"
+                                onClick={() => handleOpenCancelModal(apt)}
+                              >
+                                Cancel
+                              </Button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {/* TAB 4: USER GOVERNANCE */}
       {activeTab === 'users' && (
         <Card>
@@ -1294,6 +1657,245 @@ export const AdminRoute: React.FC = () => {
                 </Button>
                 <Button type="submit" variant="primary" isLoading={isSubmitting} disabled={statusReason.trim().length < 5}>
                   Save Status
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Appointment Inspection Modal */}
+      {showInspectionModal && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '1rem',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '8px',
+              maxWidth: '680px',
+              width: '100%',
+              padding: '1.75rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1rem',
+              maxHeight: '90vh',
+              overflowY: 'auto',
+            }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h2 className="heading-2">Appointment Operational Inspection</h2>
+              <Button size="sm" variant="ghost" onClick={() => setShowInspectionModal(false)}>✕</Button>
+            </div>
+
+            {isAppointmentDetailLoading ? (
+              <div style={{ padding: '3rem', textAlign: 'center' }}>
+                <Spinner size="md" />
+                <p className="text-muted" style={{ marginTop: '0.5rem' }}>Loading appointment details...</p>
+              </div>
+            ) : selectedAppointment ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {/* Privacy Assurance Banner */}
+                <div style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', padding: '0.75rem 1rem', fontSize: '0.8rem', color: '#1e40af' }}>
+                  🔒 <strong>Healthcare Privacy Protection:</strong> Patient clinical records, medical consultations, private notes, and live transcripts are strictly isolated from administrative operations oversight.
+                </div>
+
+                {/* Identity & Status */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#f8fafc', padding: '0.75rem 1rem', borderRadius: '6px' }}>
+                  <div>
+                    <span style={{ fontSize: '0.75rem', color: '#64748b' }}>REFERENCE ID</span>
+                    <div style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '1.1rem' }}>
+                      {selectedAppointment.publicAppointmentId}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <Badge variant="info">Status: {selectedAppointment.status}</Badge>
+                    <Badge variant="neutral">Reservation: {selectedAppointment.reservationState}</Badge>
+                  </div>
+                </div>
+
+                {/* Grid details */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
+                  {/* Doctor Info */}
+                  <div style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.75rem' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>PRACTITIONER</span>
+                    <div style={{ fontWeight: 600, marginTop: '0.25rem' }}>
+                      {selectedAppointment.doctor?.displayName || 'Physician'}
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: '#64748b', fontFamily: 'monospace' }}>
+                      ID: {selectedAppointment.doctor?.publicDoctorId}
+                    </div>
+                    {selectedAppointment.doctor?.medicalRegistrationNumber && (
+                      <div style={{ fontSize: '0.8rem', color: '#334155', marginTop: '0.25rem' }}>
+                        Reg #: {selectedAppointment.doctor.medicalRegistrationNumber} ({selectedAppointment.doctor.licensingCouncil})
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Patient Info */}
+                  <div style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.75rem' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>PATIENT</span>
+                    <div style={{ fontWeight: 600, marginTop: '0.25rem' }}>
+                      {selectedAppointment.patient?.displayName || 'Patient'}
+                    </div>
+                    <div style={{ fontSize: '0.8rem', color: '#64748b', fontFamily: 'monospace' }}>
+                      ID: {selectedAppointment.patient?.publicPatientId}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Offer & Scheduling Details */}
+                <div style={{ border: '1px solid #e2e8f0', borderRadius: '6px', padding: '0.75rem' }}>
+                  <span style={{ fontSize: '0.75rem', fontWeight: 600, color: '#64748b' }}>CONSULTATION & SCHEDULE</span>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.5rem', marginTop: '0.5rem', fontSize: '0.85rem' }}>
+                    <div>
+                      <strong>Consultation:</strong>{' '}
+                      {selectedAppointment.consultationOffer?.title || 'Standard Consultation'}
+                    </div>
+                    <div>
+                      <strong>Duration:</strong>{' '}
+                      {selectedAppointment.consultationOffer?.durationMinutes || 30} mins
+                    </div>
+                    <div>
+                      <strong>Fee:</strong>{' '}
+                      {selectedAppointment.consultationOffer?.fee}{' '}
+                      {selectedAppointment.consultationOffer?.currency || 'USD'}
+                    </div>
+                    <div>
+                      <strong>Scheduled Window:</strong>{' '}
+                      {new Date(selectedAppointment.startAt).toLocaleString()}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Cancellation Details if present */}
+                {(selectedAppointment.cancelledAt || selectedAppointment.cancellation) && (
+                  <div style={{ backgroundColor: '#fef2f2', border: '1px solid #fecaca', borderRadius: '6px', padding: '0.75rem' }}>
+                    <span style={{ fontSize: '0.75rem', fontWeight: 700, color: '#991b1b' }}>CANCELLATION RECORD</span>
+                    <div style={{ marginTop: '0.25rem', fontSize: '0.85rem', color: '#7f1d1d' }}>
+                      <div>
+                        <strong>Cancelled At:</strong>{' '}
+                        {new Date(selectedAppointment.cancelledAt || selectedAppointment.cancellation?.cancelledAt || '').toLocaleString()}
+                      </div>
+                      <div>
+                        <strong>Cancelled By:</strong>{' '}
+                        {selectedAppointment.cancellation?.cancellationActorType || selectedAppointment.cancelledBy || 'ADMIN'}
+                      </div>
+                      <div>
+                        <strong>Reason:</strong>{' '}
+                        {selectedAppointment.cancellationReason || selectedAppointment.cancellation?.reason || '—'}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '0.5rem' }}>
+                  <Button variant="outline" onClick={() => setShowInspectionModal(false)}>
+                    Close
+                  </Button>
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
+
+      {/* Appointment Cancellation Modal */}
+      {showCancelModal && cancelAppointmentTarget && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 1000,
+            padding: '1rem',
+          }}
+        >
+          <div
+            style={{
+              backgroundColor: '#ffffff',
+              borderRadius: '8px',
+              maxWidth: '540px',
+              width: '100%',
+              padding: '1.5rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1rem',
+            }}
+          >
+            <h2 className="heading-2">Administrative Cancellation</h2>
+            <p className="body-regular text-muted">
+              Cancelling appointment <strong>{cancelAppointmentTarget.publicAppointmentId}</strong> will execute the administrative lifecycle state transition, release held slots, and initiate payment reconciliation.
+            </p>
+
+            <form onSubmit={handleConfirmCancelAppointment} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label className="manvia-label">Reason Code</label>
+                <select
+                  className="manvia-input"
+                  style={{ width: '100%', padding: '0.6rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                  value={cancelReasonCode}
+                  onChange={(e) => setCancelReasonCode(e.target.value)}
+                  disabled={isSubmitting}
+                >
+                  <option value="ADMIN_CANCELLATION">Administrative Intervention</option>
+                  <option value="OPERATIONAL_CONFLICT">Operational / System Conflict</option>
+                  <option value="DOCTOR_UNAVAILABLE">Practitioner Unavailable</option>
+                  <option value="PATIENT_REQUEST">Patient Direct Request</option>
+                </select>
+              </div>
+
+              <div className="manvia-input-group">
+                <label className="manvia-label">
+                  Cancellation Reason <span style={{ color: '#dc2626' }}>*</span> (min. 3 chars)
+                </label>
+                <textarea
+                  required
+                  className="manvia-input"
+                  style={{ minHeight: '80px', width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1' }}
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  placeholder="e.g. Cancelled due to scheduled maintenance and doctor emergency leave."
+                  disabled={isSubmitting}
+                />
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <input
+                  type="checkbox"
+                  id="admin-refund-checkbox"
+                  checked={cancelRequestRefund}
+                  onChange={(e) => setCancelRequestRefund(e.target.checked)}
+                  disabled={isSubmitting}
+                />
+                <label htmlFor="admin-refund-checkbox" style={{ fontSize: '0.875rem', cursor: 'pointer' }}>
+                  Issue automatic refund to patient if payment was captured
+                </label>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+                <Button variant="outline" onClick={() => setShowCancelModal(false)} disabled={isSubmitting}>
+                  Back
+                </Button>
+                <Button
+                  type="submit"
+                  variant="danger"
+                  isLoading={isSubmitting}
+                  disabled={cancelReason.trim().length < 3}
+                >
+                  Confirm Cancellation
                 </Button>
               </div>
             </form>

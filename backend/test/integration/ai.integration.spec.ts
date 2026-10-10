@@ -76,5 +76,29 @@ describe('AI Module Integration', () => {
     expect(detail.messages).toHaveLength(2);
     expect(detail.messages[0]?.role).toBe(AIMessageRole.USER);
     expect(detail.messages[1]?.role).toBe(AIMessageRole.ASSISTANT);
+
+    // 5. Rename conversation
+    const renamed = await companionService.updateConversation(conv.id, 'test-usr-1', {
+      title: 'Renamed Morning Habit Session',
+    });
+    expect(renamed.title).toBe('Renamed Morning Habit Session');
+
+    // 6. Transcribe speech audio (mock fallback in test environment)
+    const transcription = await companionService.transcribeAudio('test-usr-1', {
+      audioBase64: Buffer.from('mock speech audio').toString('base64'),
+      mimeType: 'audio/webm',
+    });
+    expect(transcription.text).toBeDefined();
+    expect(transcription.text.length).toBeGreaterThan(0);
+
+    // 7. Process document attachment
+    const attachmentResult = await companionService.processAttachment('test-usr-1', {
+      fileName: 'health_notes.txt',
+      mimeType: 'text/plain',
+      fileSizeBytes: 45,
+      contentBase64: Buffer.from('Blood pressure reading: 120/80 mmHg').toString('base64'),
+    });
+    expect(attachmentResult.filename).toBe('health_notes.txt');
+    expect(attachmentResult.extractedText).toContain('120/80 mmHg');
   });
 });

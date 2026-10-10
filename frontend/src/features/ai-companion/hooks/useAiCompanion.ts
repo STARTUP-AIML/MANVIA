@@ -11,6 +11,7 @@ import {
   type UseMutationResult,
   type UseQueryResult,
 } from "@tanstack/react-query";
+import { useAuth } from "@/auth/AuthContext";
 import { aiCompanionService } from '@/features/ai-companion/api/aiCompanionService';
 import {
   AIMessageRole,
@@ -24,6 +25,7 @@ import {
   type SendAIMessageDto,
   type SendAIMessageResponseDto,
   type SubmitAIFeedbackDto,
+  type UpdateAIConversationDto,
 } from "../types";
 import type { ApiError } from "@/api/errors/apiError";
 
@@ -40,15 +42,21 @@ export const AI_QUERY_KEYS = {
 /**
  * Hook to retrieve paginated AI conversation sessions.
  */
-export function useAiConversationsQuery(params?: {
-  page?: number;
-  limit?: number;
-  status?: AIConversationStatus;
-}): UseQueryResult<PaginatedAIConversationsResponseDto, ApiError> {
+export function useAiConversationsQuery(
+  params?: {
+    page?: number;
+    limit?: number;
+    status?: AIConversationStatus;
+  },
+  options?: { enabled?: boolean },
+): UseQueryResult<PaginatedAIConversationsResponseDto, ApiError> {
+  const { isAuthenticated, status } = useAuth();
+  const isAuthReady = isAuthenticated && status === "AUTHENTICATED";
   return useQuery<PaginatedAIConversationsResponseDto, ApiError>({
     queryKey: AI_QUERY_KEYS.conversations(params),
     queryFn: () => aiCompanionService.listConversations(params),
     staleTime: 1000 * 60 * 1, // 1 minute
+    enabled: isAuthReady && (options?.enabled ?? true),
   });
 }
 
@@ -57,11 +65,17 @@ export function useAiConversationsQuery(params?: {
  */
 export function useAiConversationQuery(
   conversationId?: string,
+  options?: { enabled?: boolean },
 ): UseQueryResult<AIConversationDetailResponseDto, ApiError> {
+  const { isAuthenticated, status } = useAuth();
+  const isAuthReady = isAuthenticated && status === "AUTHENTICATED";
   return useQuery<AIConversationDetailResponseDto, ApiError>({
     queryKey: AI_QUERY_KEYS.conversation(conversationId || ""),
     queryFn: () => aiCompanionService.getConversation(conversationId!),
-    enabled: Boolean(conversationId && conversationId.trim().length > 0),
+    enabled:
+      isAuthReady &&
+      Boolean(conversationId && conversationId.trim().length > 0) &&
+      (options?.enabled ?? true),
     staleTime: 1000 * 30, // 30 seconds
   });
 }
@@ -211,6 +225,43 @@ export function useSendAiMessageMutation(): UseMutationResult<
       queryClient.invalidateQueries({
         queryKey: ["ai", "conversations"],
       });
+    },
+  });
+}
+
+/**
+ * Hook to update or rename a conversation.
+ */
+export function useUpdateConversationMutation(): UseMutationResult<
+  AIConversationResponseDto,
+  ApiError,
+  { conversationId: string; data: UpdateAIConversationDto }
+> {
+  const queryClient = useQueryClient();
+
+  return useMutation<
+    AIConversationResponseDto,
+    ApiError,
+    { conversationId: string; data: UpdateAIConversationDto }
+  >({
+    mutationFn: ({ conversationId, data }) =>
+      aiCompanionService.updateConversation(conversationId, data),
+    onSuccess: (updated) => {
+      queryClient.invalidateQueries({
+        queryKey: ["ai", "conversations"],
+      });
+      const current = queryClient.getQueryData<AIConversationDetailResponseDto>(
+        AI_QUERY_KEYS.conversation(updated.id),
+      );
+      if (current) {
+        queryClient.setQueryData<AIConversationDetailResponseDto>(
+          AI_QUERY_KEYS.conversation(updated.id),
+          {
+            ...current,
+            conversation: updated,
+          },
+        );
+      }
     },
   });
 }

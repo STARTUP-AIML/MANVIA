@@ -4,6 +4,14 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class DoctorQueryDto {
   @ApiPropertyOptional({
+    description: 'Search by doctor name or keywords',
+    example: 'Bennett',
+  })
+  @IsOptional()
+  @IsString()
+  query?: string | undefined;
+
+  @ApiPropertyOptional({
     description: 'Filter by specialty code or name (e.g. CARDIO or Cardiology)',
     example: 'Cardiology',
   })

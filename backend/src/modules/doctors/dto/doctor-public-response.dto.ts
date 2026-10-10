@@ -77,6 +77,30 @@ export class DoctorPublicResponseDto {
   })
   verificationStatus!: string;
 
+  @ApiPropertyOptional({ example: 'MindWell Neuropsychiatric Clinic' })
+  clinicName?: string | null | undefined;
+
+  @ApiPropertyOptional({ example: 'Bengaluru' })
+  city?: string | null | undefined;
+
+  @ApiPropertyOptional({ example: 'Karnataka' })
+  state?: string | null | undefined;
+
+  @ApiProperty({ example: ['Anxiety Disorders', 'Sleep Health'], type: [String] })
+  clinicalInterests!: string[];
+
+  @ApiProperty({ example: ['VIDEO', 'IN_PERSON'], type: [String] })
+  consultationModes!: string[];
+
+  @ApiPropertyOptional({ example: 'DEMO-87421903' })
+  contactDisplay?: string | null | undefined;
+
+  @ApiPropertyOptional({ example: '/avatars/doctor-ananya-rao.jpg' })
+  profileImageUrl?: string | null | undefined;
+
+  @ApiProperty({ example: true })
+  isDemo!: boolean;
+
   @ApiProperty({
     description: 'Public qualifications',
     type: [DoctorPublicQualificationDto],

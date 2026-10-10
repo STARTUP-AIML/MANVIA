@@ -70,6 +70,14 @@ interface RawDoctorProfile {
   verificationStatus: string;
   defaultConsultationFee: string | number;
   currency: string;
+  clinicName?: string | null;
+  city?: string | null;
+  state?: string | null;
+  clinicalInterests?: string[];
+  consultationModes?: string[];
+  contactDisplay?: string | null;
+  profileImageUrl?: string | null;
+  isDemo?: boolean;
   verifiedAt: string | Date | null;
   createdAt: string | Date;
   updatedAt: string | Date;
@@ -375,6 +383,19 @@ export class PrismaDoctorsRepository implements IDoctorsRepository {
       verificationStatus: VerificationStatus.VERIFIED,
     };
 
+    if (criteria.isDemo !== undefined) {
+      where.isDemo = criteria.isDemo;
+    }
+
+    if (criteria.query && criteria.query.trim()) {
+      where.OR = [
+        { displayName: { contains: criteria.query.trim(), mode: 'insensitive' } },
+        { clinicName: { contains: criteria.query.trim(), mode: 'insensitive' } },
+        { city: { contains: criteria.query.trim(), mode: 'insensitive' } },
+        { state: { contains: criteria.query.trim(), mode: 'insensitive' } },
+      ];
+    }
+
     if (criteria.specialty) {
       where.specialties = {
         some: {
@@ -411,7 +432,7 @@ export class PrismaDoctorsRepository implements IDoctorsRepository {
           languages: { include: { language: true } },
           qualifications: true,
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { publicDoctorId: 'asc' },
       }),
       this.prisma.doctorProfile.count({ where }),
     ]);
@@ -534,6 +555,14 @@ export class PrismaDoctorsRepository implements IDoctorsRepository {
       verificationStatus: record.verificationStatus as VerificationStatus,
       defaultConsultationFee: Number(record.defaultConsultationFee),
       currency: record.currency,
+      clinicName: record.clinicName ?? null,
+      city: record.city ?? null,
+      state: record.state ?? null,
+      clinicalInterests: record.clinicalInterests ?? [],
+      consultationModes: record.consultationModes ?? ['VIDEO', 'IN_PERSON'],
+      contactDisplay: record.contactDisplay ?? null,
+      profileImageUrl: record.profileImageUrl ?? null,
+      isDemo: Boolean(record.isDemo),
       verifiedAt: record.verifiedAt ? new Date(record.verifiedAt) : null,
       createdAt: new Date(record.createdAt),
       updatedAt: new Date(record.updatedAt),

@@ -26,6 +26,11 @@ export async function searchDoctorsApi(
   params?: DoctorQueryParams
 ): Promise<PaginatedDoctorsResponse> {
   const query = new URLSearchParams();
+  if (params?.query) {
+    query.set('query', params.query);
+  } else if (params?.search) {
+    query.set('query', params.search);
+  }
   if (params?.specialty) {
     query.set('specialty', params.specialty);
   }

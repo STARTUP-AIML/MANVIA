@@ -24,12 +24,11 @@ import {
   LoginRoute,
   RegisterRoute,
   PatientHomeRoute,
-  PatientProfileRoute,
   PatientSettingsRoute,
   AiCompanionRoute,
   DoctorRoute,
   AdminRoute,
-  DevHealthRoute,
+  PlatformHealthRoute,
   NotFoundRoute,
 } from "@/routes";
 
@@ -44,7 +43,6 @@ import { AppointmentDetailPage } from "@/features/appointments/AppointmentDetail
 import { PreConsultationPage } from "@/features/appointments/PreConsultationPage";
 import { HealthRecordsPage } from "@/features/health-records/HealthRecordsPage";
 import { HealthRecordDetailPage } from "@/features/health-records/HealthRecordDetailPage";
-import { AccountPage } from "@/features/patient/AccountPage";
 
 // Helper components for preserving query strings and route params during redirects
 const RedirectWithSearch: React.FC<{ to: string }> = ({ to }) => {
@@ -68,7 +66,7 @@ export const AppRoutes: React.FC = () => {
       <Route path="/login" element={<LoginRoute />} />
       <Route path="/register" element={<RegisterRoute />} />
       <Route path="/get-started" element={<Navigate to="/register" replace />} />
-      <Route path="/dev-health" element={<DevHealthRoute />} />
+      <Route path="/dev-health" element={<Navigate to="/admin/platform-health" replace />} />
 
       {/* Legacy Patient Routes -> Redirects to Canonical /app/* */}
       <Route path="/wellness" element={<RedirectWithSearch to="/app/wellness" />} />
@@ -163,7 +161,8 @@ export const AppRoutes: React.FC = () => {
         path="/consents"
         element={<RedirectWithSearch to="/app/health-records?tab=consents" />}
       />
-      <Route path="/account" element={<RedirectWithSearch to="/app/account" />} />
+      <Route path="/account" element={<RedirectWithSearch to="/app/settings" />} />
+      <Route path="/profile" element={<RedirectWithSearch to="/app/settings" />} />
       <Route path="/ai-companion" element={<RedirectWithSearch to="/app/ai" />} />
 
       {/* Canonical Patient Domain (Protected via PatientShell + Outlet) */}
@@ -191,8 +190,8 @@ export const AppRoutes: React.FC = () => {
         />
         <Route path="health-records" element={<HealthRecordsPage />} />
         <Route path="health-records/:recordId" element={<HealthRecordDetailPage />} />
-        <Route path="account" element={<AccountPage />} />
-        <Route path="profile" element={<PatientProfileRoute />} />
+        <Route path="account" element={<Navigate to="/app/settings" replace />} />
+        <Route path="profile" element={<Navigate to="/app/settings" replace />} />
         <Route path="settings" element={<PatientSettingsRoute />} />
         <Route path="records" element={<Navigate to="/app/health-records" replace />} />
         <Route path="consultations" element={<Navigate to="/app/doctors" replace />} />
@@ -222,6 +221,7 @@ export const AppRoutes: React.FC = () => {
         }
       >
         <Route index element={<AdminRoute />} />
+        <Route path="platform-health" element={<PlatformHealthRoute />} />
         <Route path="*" element={<AdminRoute />} />
       </Route>
 

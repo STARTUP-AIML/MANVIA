@@ -9,4 +9,5 @@ export * from "./AiCompanionRoute";
 export * from "./DoctorRoute";
 export * from "./AdminRoute";
 export * from "./DevHealthRoute";
+export * from "./PlatformHealthRoute";
 export * from "./NotFoundRoute";

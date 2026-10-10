@@ -16,6 +16,8 @@ import type {
   LoginDto,
   RegisterDto,
   RefreshTokenDto,
+  SwitchRoleDto,
+  SwitchRoleResponseDto,
   TokenRefreshResponseDto,
   UserResponseDto,
 } from "./types";
@@ -67,5 +69,12 @@ export const authService = {
    */
   async changePassword(dto: ChangePasswordDto): Promise<{ message: string }> {
     return apiClient.post<{ message: string }>("auth/change-password", dto);
+  },
+
+  /**
+   * Switches active role for multi-role authenticated session.
+   */
+  async switchRole(dto: SwitchRoleDto): Promise<SwitchRoleResponseDto> {
+    return apiClient.post<SwitchRoleResponseDto>("auth/switch-role", dto);
   },
 };

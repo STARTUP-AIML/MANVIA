@@ -11,3 +11,5 @@ export * from "./components/ChatMessageList";
 export * from "./components/MessageComposer";
 export * from "./components/EmptyChatState";
 export * from "./components/ConversationListPanel";
+export * from "./components/ManviaAvatar3D";
+export * from "./hooks/useSpeechSynthesis";

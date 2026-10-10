@@ -17,9 +17,14 @@ import type {
   AIFeedbackResponseDto,
   CreateAIConversationDto,
   PaginatedAIConversationsResponseDto,
+  ProcessAttachmentDto,
+  ProcessAttachmentResponseDto,
   SendAIMessageDto,
   SendAIMessageResponseDto,
   SubmitAIFeedbackDto,
+  TranscribeAudioDto,
+  TranscribeAudioResponseDto,
+  UpdateAIConversationDto,
 } from "../types";
 
 export const aiCompanionService = {
@@ -83,6 +88,40 @@ export const aiCompanionService = {
   ): Promise<{ success: boolean; id: string }> {
     return apiClient.delete<{ success: boolean; id: string }>(
       `ai/conversations/${conversationId}`,
+    );
+  },
+
+  /**
+   * Updates or renames an AI Companion conversation.
+   */
+  async updateConversation(
+    conversationId: string,
+    data: UpdateAIConversationDto,
+  ): Promise<AIConversationResponseDto> {
+    return apiClient.patch<AIConversationResponseDto>(
+      `ai/conversations/${conversationId}`,
+      data,
+    );
+  },
+
+  /**
+   * Transcribes recorded speech audio into text using backend Groq Whisper.
+   */
+  async transcribeAudio(
+    data: TranscribeAudioDto,
+  ): Promise<TranscribeAudioResponseDto> {
+    return apiClient.post<TranscribeAudioResponseDto>("ai/transcribe", data);
+  },
+
+  /**
+   * Processes and extracts plain text from supported document attachments.
+   */
+  async processAttachment(
+    data: ProcessAttachmentDto,
+  ): Promise<ProcessAttachmentResponseDto> {
+    return apiClient.post<ProcessAttachmentResponseDto>(
+      "ai/attachments/process",
+      data,
     );
   },
 

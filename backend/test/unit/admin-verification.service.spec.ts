@@ -10,6 +10,7 @@ import { VerificationDocumentType } from '../../src/modules/doctor-verification/
 import { VerificationStatus } from '../../src/modules/doctors/enums/verification-status.enum.js';
 import {
   ConflictError,
+  ForbiddenError,
   NotFoundError,
   ValidationError,
 } from '../../src/common/errors/app-error.js';
@@ -184,6 +185,28 @@ describe('AdminVerificationService (Unit Tests)', () => {
       await expect(adminService.approveVerification(draft.id, ADMIN_USER_ID, {})).rejects.toThrow(
         ConflictError,
       );
+    });
+
+    it('should throw ForbiddenError if administrator attempts to self-approve their own physician verification', async () => {
+      const submitted = await setupSubmittedVerification();
+
+      // Attempt approval where adminId is the doctor's userId
+      await expect(
+        adminService.approveVerification(submitted.id, DOCTOR_USER_ID, {
+          notes: 'Self-approval attempt',
+        }),
+      ).rejects.toThrow(ForbiddenError);
+    });
+
+    it('should throw ForbiddenError if administrator attempts to self-reject their own physician verification', async () => {
+      const submitted = await setupSubmittedVerification();
+
+      // Attempt rejection where adminId is the doctor's userId
+      await expect(
+        adminService.rejectVerification(submitted.id, DOCTOR_USER_ID, {
+          reason: 'Self-rejection attempt',
+        }),
+      ).rejects.toThrow(ForbiddenError);
     });
   });
 

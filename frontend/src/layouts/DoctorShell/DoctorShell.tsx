@@ -5,7 +5,7 @@
 
 import React, { type ReactNode } from "react";
 import { Outlet } from "react-router-dom";
-import { Header } from "@/components/layout/Header";
+import { DoctorHeader } from "@/components/layout/DoctorHeader";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Footer } from "@/components/layout/Footer";
 
@@ -26,7 +26,7 @@ export const DoctorShell: React.FC<{ children?: ReactNode }> = ({
     <div
       style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}
     >
-      <Header />
+      <DoctorHeader />
       <div style={{ display: "flex", flex: 1 }}>
         <Sidebar title="Clinical Workspace" items={doctorNav} />
         <main

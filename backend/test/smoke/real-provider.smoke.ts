@@ -6,6 +6,7 @@ import pg from 'pg';
 import { PrismaClient } from '@prisma/client';
 import { ConfigService } from '../../src/config/config.service.js';
 import { GeminiAIProvider } from '../../src/modules/ai/providers/gemini-ai.provider.js';
+import { GroqAIProvider } from '../../src/modules/ai/providers/groq-ai.provider.js';
 import { PrismaMedicalRetriever } from '../../src/modules/ai/rag/prisma-medical.retriever.js';
 import { LayeredSafetyClassifier } from '../../src/modules/ai/safety/layered-safety.classifier.js';
 import { GeminiRealtimeProvider } from '../../src/modules/ai/realtime/gemini-realtime.provider.js';
@@ -24,12 +25,14 @@ async function runSmokeTests() {
   }) as unknown as import('../../src/database/prisma.service.js').PrismaService;
 
   // ------------------------------------------------------------------
-  // 1. MAIN AI PROVIDER (Gemini)
+  // 1. MAIN AI PROVIDER (Groq or Gemini)
   // ------------------------------------------------------------------
-  console.log('--- 1. Testing Real Main AI Provider (Gemini) ---');
-  const geminiProvider = new GeminiAIProvider(config);
+  const activeProviderName = (config.aiProvider || 'gemini').toLowerCase();
+  console.log(`--- 1. Testing Real Main AI Provider (${activeProviderName.toUpperCase()}) ---`);
+  const aiProvider =
+    activeProviderName === 'groq' ? new GroqAIProvider(config) : new GeminiAIProvider(config);
   const aiStart = performance.now();
-  const aiResponse = await geminiProvider.generateResponse({
+  const aiResponse = await aiProvider.generateResponse({
     systemInstruction: DEFAULT_AI_SYSTEM_INSTRUCTION,
     messages: [
       {

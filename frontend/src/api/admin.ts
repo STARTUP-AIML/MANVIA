@@ -10,6 +10,12 @@ import type {
   PaginatedAdminAuditLogsResponse,
   AdminPaymentsOverview,
   AdminUserListItem,
+  AdminDashboardOverview,
+  PaginatedAdminAppointmentsResponse,
+  AdminAppointmentDetail,
+  CancelAdminAppointmentPayload,
+  AdminSystemStatus,
+  SubsystemState,
 } from '@/types/';
 
 export {
@@ -137,4 +143,95 @@ export async function queryAdminAuditLogsApi(
  */
 export async function getAdminPaymentsOverviewApi(): Promise<AdminPaymentsOverview> {
   return apiFetch<AdminPaymentsOverview>('/admin/payments/overview');
+}
+
+/**
+ * Real operational overview and platform metrics (Admin Only)
+ * GET /api/v1/admin/overview
+ */
+export async function getAdminDashboardOverviewApi(): Promise<AdminDashboardOverview> {
+  return apiFetch<AdminDashboardOverview>('/admin/overview');
+}
+
+export interface AdminAppointmentsQueryParams {
+  page?: number;
+  limit?: number;
+  status?: string;
+  doctorId?: string;
+  patientId?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+/**
+ * System-wide appointment schedule oversight (Admin Only)
+ * GET /api/v1/admin/appointments
+ */
+export async function listAdminAppointmentsApi(
+  params?: AdminAppointmentsQueryParams
+): Promise<PaginatedAdminAppointmentsResponse> {
+  const query = new URLSearchParams();
+  if (params?.page !== undefined) query.set('page', String(params.page));
+  if (params?.limit !== undefined) query.set('limit', String(params.limit));
+  if (params?.status) query.set('status', params.status);
+  if (params?.doctorId) query.set('doctorId', params.doctorId);
+  if (params?.patientId) query.set('patientId', params.patientId);
+  if (params?.startDate) query.set('startDate', params.startDate);
+  if (params?.endDate) query.set('endDate', params.endDate);
+
+  const qs = query.toString();
+  const endpoint = qs ? `/admin/appointments?${qs}` : '/admin/appointments';
+  return apiFetch<PaginatedAdminAppointmentsResponse>(endpoint);
+}
+
+/**
+ * Retrieve detailed appointment record (Admin Only)
+ * GET /api/v1/admin/appointments/:appointmentId
+ */
+export async function getAdminAppointmentByIdApi(
+  appointmentId: string
+): Promise<AdminAppointmentDetail> {
+  return apiFetch<AdminAppointmentDetail>(
+    `/admin/appointments/${encodeURIComponent(appointmentId)}`
+  );
+}
+
+/**
+ * Cancel an appointment administratively with reason and refund processing (Admin Only)
+ * POST /api/v1/admin/appointments/:appointmentId/cancel
+ */
+export async function cancelAdminAppointmentApi(
+  appointmentId: string,
+  payload: CancelAdminAppointmentPayload
+): Promise<AdminAppointmentDetail> {
+  return apiFetch<AdminAppointmentDetail>(
+    `/admin/appointments/${encodeURIComponent(appointmentId)}/cancel`,
+    {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }
+  );
+}
+
+/**
+ * Retrieve operational system status and emergency switch states (Admin Only)
+ * GET /api/v1/admin/system/status
+ */
+export async function getAdminSystemStatusApi(): Promise<AdminSystemStatus> {
+  return apiFetch<AdminSystemStatus>('/admin/system/status');
+}
+
+/**
+ * Toggle emergency subsystem kill switch (Admin Only)
+ * POST /api/v1/admin/system/kill-switches
+ */
+export async function toggleAdminKillSwitchApi(dto: {
+  subsystem: string;
+  enabled: boolean;
+  justification: string;
+}): Promise<SubsystemState> {
+  return apiFetch<SubsystemState>('/admin/system/kill-switches', {
+    method: 'POST',
+    body: JSON.stringify(dto),
+  });
 }

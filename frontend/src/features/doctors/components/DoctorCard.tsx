@@ -11,7 +11,7 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({ doctor }) => {
   const primarySpec = doctor.primarySpecialty || 'General Practice';
   const feeDisplay =
     doctor.defaultConsultationFee > 0
-      ? `${doctor.currency} ${doctor.defaultConsultationFee.toFixed(2)}`
+      ? `${doctor.currency === 'INR' ? '₹' : doctor.currency} ${doctor.defaultConsultationFee}`
       : 'Consultation upon request';
 
   return (
@@ -73,11 +73,17 @@ export const DoctorCard: React.FC<DoctorCardProps> = ({ doctor }) => {
             fontSize: '11px',
             color: '#94a3b8',
             fontFamily: 'monospace',
-            marginBottom: '12px',
+            marginBottom: '8px',
           }}
         >
           ID: {doctor.publicDoctorId}
         </div>
+
+        {doctor.clinicName && (
+          <div style={{ fontSize: '12px', color: '#0f766e', fontWeight: 600, marginBottom: '10px' }}>
+            📍 {doctor.clinicName}{doctor.city ? ` • ${doctor.city}` : ''}
+          </div>
+        )}
 
         {/* Biography Snippet */}
         {doctor.bio && (

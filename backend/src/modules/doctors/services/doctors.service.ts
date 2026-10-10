@@ -128,6 +128,14 @@ export class DoctorsService {
    */
   public async getPublicDoctorById(identifier: string): Promise<DoctorPublicResponseDto> {
     const isPublicId = identifier.startsWith('DOC-');
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      identifier,
+    );
+
+    if (!isPublicId && !isUuid) {
+      throw new NotFoundError(`Doctor not found with identifier '${identifier}'`);
+    }
+
     const profile = isPublicId
       ? await this.repository.findByPublicId(identifier)
       : await this.repository.findById(identifier);
@@ -152,10 +160,12 @@ export class DoctorsService {
     const offset = query.offset ?? 0;
 
     const { doctors, total } = await this.repository.findPublicDoctors({
+      query: query.query,
       specialty: query.specialty,
       language: query.language,
       limit,
       offset,
+      isDemo: true,
     });
 
     return {
@@ -233,6 +243,14 @@ export class DoctorsService {
       defaultConsultationFee: entity.defaultConsultationFee,
       currency: entity.currency,
       verificationStatus: entity.verificationStatus,
+      clinicName: entity.clinicName ?? null,
+      city: entity.city ?? null,
+      state: entity.state ?? null,
+      clinicalInterests: entity.clinicalInterests ?? [],
+      consultationModes: entity.consultationModes ?? ['VIDEO', 'IN_PERSON'],
+      contactDisplay: entity.contactDisplay ?? null,
+      profileImageUrl: entity.profileImageUrl ?? null,
+      isDemo: Boolean(entity.isDemo),
       qualifications: entity.qualifications.map((q) => ({
         qualification: q.qualification,
         institution: q.institution,

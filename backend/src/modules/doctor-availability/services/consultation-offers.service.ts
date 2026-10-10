@@ -176,7 +176,15 @@ export class ConsultationOffersService {
   public async getDoctorPublicOffers(
     publicDoctorId: string,
   ): Promise<PatientDoctorOfferResponseDto[]> {
-    const doctor = await this.doctorsRepo.findByPublicId(publicDoctorId);
+    let doctor = await this.doctorsRepo.findByPublicId(publicDoctorId);
+    if (!doctor) {
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        publicDoctorId,
+      );
+      if (isUuid) {
+        doctor = await this.doctorsRepo.findById(publicDoctorId);
+      }
+    }
     if (!doctor) {
       throw new NotFoundError(`Doctor with public ID '${publicDoctorId}' not found`);
     }

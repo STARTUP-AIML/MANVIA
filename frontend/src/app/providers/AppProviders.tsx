@@ -8,12 +8,44 @@
  * 5. ToastProvider (notification primitive)
  */
 
-import React, { type ReactNode } from "react";
+import React, { useEffect, type ReactNode } from "react";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { QueryProvider } from "./QueryProvider";
 import { AuthProvider } from "@/auth/AuthContext";
 import { I18nProvider } from "@/i18n/i18nContext";
 import { ToastProvider } from "@/components/feedback/Toast/ToastContext";
+import { useUIStore } from "@/state/uiStore";
+
+const ThemeSync: React.FC = () => {
+  const themeMode = useUIStore((s) => s.themeMode);
+
+  useEffect(() => {
+    const applyTheme = () => {
+      let resolved = themeMode;
+      if (themeMode === "system") {
+        resolved =
+          typeof window !== "undefined" &&
+          window.matchMedia?.("(prefers-color-scheme: dark)")?.matches
+            ? "dark"
+            : "light";
+      }
+      if (typeof document !== "undefined") {
+        document.documentElement.setAttribute("data-theme", resolved);
+      }
+    };
+
+    applyTheme();
+
+    if (themeMode === "system" && typeof window !== "undefined" && window.matchMedia) {
+      const media = window.matchMedia("(prefers-color-scheme: dark)");
+      const listener = () => applyTheme();
+      media.addEventListener("change", listener);
+      return () => media.removeEventListener("change", listener);
+    }
+  }, [themeMode]);
+
+  return null;
+};
 
 export interface AppProvidersProps {
   children: ReactNode;
@@ -22,6 +54,7 @@ export interface AppProvidersProps {
 export const AppProviders: React.FC<AppProvidersProps> = ({ children }) => {
   return (
     <ErrorBoundary>
+      <ThemeSync />
       <QueryProvider>
         <AuthProvider>
           <I18nProvider>

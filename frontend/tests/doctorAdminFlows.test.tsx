@@ -329,6 +329,31 @@ describe('P5: Admin Portal Governance Flows', () => {
         pendingPayoutsCount: 1,
       },
     });
+    vi.spyOn(adminApi, 'getAdminDashboardOverviewApi').mockResolvedValue({
+      users: {
+        total: 14,
+        byRole: { PATIENT: 8, DOCTOR: 5, ADMIN: 1 },
+        byStatus: { ACTIVE: 13, SUSPENDED: 1 },
+      },
+      doctorVerifications: {
+        total: 2,
+        byStatus: { APPROVED: 1, REJECTED: 0, PENDING_REVIEW: 2 },
+        pendingReviewCount: 2,
+      },
+      appointments: {
+        total: 10,
+        byStatus: { CONFIRMED: 4, COMPLETED: 3, CANCELLED: 1, REQUESTED: 2 },
+      },
+      finances: {
+        totalSucceededRevenue: 45000,
+        totalSucceededTransactions: 3,
+        pendingRefundsCount: 0,
+        pendingPayoutsCount: 1,
+      },
+      operationalAlerts: [],
+      recentActivity: [],
+      timestamp: '2026-02-01T00:00:00Z',
+    });
     vi.spyOn(adminApi, 'listAdminVerificationsApi').mockResolvedValue({
       items: [],
       total: 2,
@@ -356,7 +381,7 @@ describe('P5: Admin Portal Governance Flows', () => {
       expect(screen.getByRole('heading', { name: /Practitioner Vetting Console & Platform Governance/i })).toBeInTheDocument();
       expect(screen.getByText('$450.00')).toBeInTheDocument();
       expect(screen.getByText('2')).toBeInTheDocument();
-      expect(screen.getByText('5')).toBeInTheDocument();
+      expect(screen.getByText('10')).toBeInTheDocument();
       expect(screen.getByText('14')).toBeInTheDocument();
     });
   });

@@ -70,7 +70,7 @@ export const DoctorProfilePage: React.FC = () => {
   const primarySpec = doctor.primarySpecialty || 'General Practice';
   const feeDisplay =
     doctor.defaultConsultationFee > 0
-      ? `${doctor.currency} ${doctor.defaultConsultationFee.toFixed(2)}`
+      ? `${doctor.currency === 'INR' ? '₹' : doctor.currency} ${doctor.defaultConsultationFee}`
       : 'Consultation fee provided upon request';
 
   return (
@@ -243,6 +243,40 @@ export const DoctorProfilePage: React.FC = () => {
             </div>
           </div>
 
+          {doctor.clinicName && (
+            <div>
+              <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>
+                Clinic / Workplace
+              </div>
+              <div style={{ fontSize: '14px', fontWeight: 600, color: '#1e293b' }}>
+                {doctor.clinicName}
+                {doctor.city ? ` (${doctor.city}, ${doctor.state})` : ''}
+              </div>
+            </div>
+          )}
+
+          {doctor.contactDisplay && (
+            <div>
+              <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>
+                Demo Contact ID
+              </div>
+              <div style={{ fontSize: '14px', fontWeight: 600, color: '#0f766e', fontFamily: 'monospace' }}>
+                {doctor.contactDisplay}
+              </div>
+            </div>
+          )}
+
+          {doctor.clinicalInterests && doctor.clinicalInterests.length > 0 && (
+            <div>
+              <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>
+                Clinical Focus
+              </div>
+              <div style={{ fontSize: '14px', fontWeight: 600, color: '#0284c7' }}>
+                {doctor.clinicalInterests.join(' • ')}
+              </div>
+            </div>
+          )}
+
           {doctor.subSpecialties && doctor.subSpecialties.length > 0 && (
             <div>
               <div style={{ fontSize: '12px', color: '#64748b', marginBottom: '4px' }}>
@@ -357,7 +391,7 @@ export const DoctorProfilePage: React.FC = () => {
         </div>
 
         <Link
-          to={`/doctors/${doctor.publicDoctorId}/book`}
+          to={`/app/doctors/${doctor.publicDoctorId}/book`}
           style={{
             display: 'inline-flex',
             alignItems: 'center',

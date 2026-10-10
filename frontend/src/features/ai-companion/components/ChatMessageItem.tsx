@@ -1,32 +1,42 @@
 /**
  * MANVIA Chat Message Item Component
  * Renders individual user messages or AI companion responses with role-specific styling,
- * timestamps, medical evidence citations, and feedback actions.
+ * GitHub Flavored Markdown rendering, scrollable tables, timestamps, medical citations,
+ * copy response utility, and feedback controls.
  */
 
 import React, { useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { Badge } from "@/components/ui/Badge";
 import {
   AIFeedbackRating,
   AIMessageRole,
   type AIMessageResponseDto,
 } from "../types";
-import { useSubmitFeedbackMutation } from '@/features/ai-companion/hooks/useAiCompanion';
+import { useSubmitFeedbackMutation } from "@/features/ai-companion/hooks/useAiCompanion";
 
 export interface ChatMessageItemProps {
   message: AIMessageResponseDto;
+  isPlaying?: boolean;
+  onPlaySpeech?: (text: string, messageId: string) => void;
+  onStopSpeech?: () => void;
+  voiceEnabled?: boolean;
 }
 
 export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
   message,
+  isPlaying = false,
+  onPlaySpeech,
+  onStopSpeech,
+  voiceEnabled = true,
 }) => {
   const isAssistant = message.role === AIMessageRole.ASSISTANT;
   const isUser = message.role === AIMessageRole.USER;
 
   const [showCitations, setShowCitations] = useState(false);
-  const [feedbackSent, setFeedbackSent] = useState<AIFeedbackRating | null>(
-    null,
-  );
+  const [feedbackSent, setFeedbackSent] = useState<AIFeedbackRating | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const feedbackMutation = useSubmitFeedbackMutation();
 
@@ -45,6 +55,17 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
     );
   };
 
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(message.content);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Fallback
+      setCopied(false);
+    }
+  };
+
   const formattedTime = new Date(message.createdAt).toLocaleTimeString([], {
     hour: "2-digit",
     minute: "2-digit",
@@ -59,8 +80,9 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
         display: "flex",
         flexDirection: "column",
         alignItems: isUser ? "flex-end" : "flex-start",
-        marginBottom: "var(--space-4)",
+        marginBottom: "var(--space-5)",
         maxWidth: "100%",
+        width: "100%",
       }}
     >
       {/* Sender Header */}
@@ -70,15 +92,15 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
           alignItems: "center",
           gap: "var(--space-2)",
           marginBottom: "var(--space-1)",
-          paddingLeft: isUser ? 0 : "var(--space-2)",
-          paddingRight: isUser ? "var(--space-2)" : 0,
+          paddingLeft: isUser ? 0 : "var(--space-1)",
+          paddingRight: isUser ? "var(--space-1)" : 0,
         }}
       >
         <span
           style={{
             fontSize: "var(--font-size-xs)",
-            fontWeight: "var(--font-weight-semibold)",
-            color: "var(--color-text-secondary)",
+            fontWeight: 600,
+            color: isUser ? "var(--color-primary)" : "var(--color-text-secondary)",
           }}
         >
           {isUser ? "You" : "MANVIA AI"}
@@ -87,9 +109,9 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
         {isAssistant && (
           <Badge
             variant="neutral"
-            style={{ fontSize: "0.65rem", padding: "1px 6px" }}
+            style={{ fontSize: "0.65rem", padding: "1px 6px", borderRadius: "10px" }}
           >
-            Automated
+            AI · Non-Diagnostic
           </Badge>
         )}
 
@@ -107,31 +129,175 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
       {/* Message Bubble */}
       <div
         style={{
-          maxWidth: "80%",
+          maxWidth: isUser ? "80%" : "92%",
+          width: isUser ? "auto" : "100%",
           padding: "var(--space-3) var(--space-4)",
           borderRadius: "var(--radius-lg)",
-          borderTopRightRadius: isUser
-            ? "var(--radius-sm)"
-            : "var(--radius-lg)",
-          borderTopLeftRadius: isAssistant
-            ? "var(--radius-sm)"
-            : "var(--radius-lg)",
-          backgroundColor: isUser
-            ? "var(--color-primary)"
-            : "var(--color-bg-surface-elevated)",
+          borderTopRightRadius: isUser ? "var(--radius-xs)" : "var(--radius-lg)",
+          borderTopLeftRadius: isAssistant ? "var(--radius-xs)" : "var(--radius-lg)",
+          backgroundColor: isUser ? "var(--color-primary)" : "var(--color-bg-surface)",
           color: isUser ? "#ffffff" : "var(--color-text-primary)",
           border: isUser
             ? "1px solid var(--color-primary)"
             : "1px solid var(--color-border-subtle)",
-          boxShadow: "var(--shadow-sm)",
+          boxShadow: isUser ? "0 1px 3px rgba(0,0,0,0.1)" : "0 1px 2px rgba(0,0,0,0.05)",
           wordBreak: "break-word",
-          whiteSpace: "pre-wrap",
-          lineHeight: "var(--line-height-relaxed)",
+          lineHeight: 1.6,
           fontSize: "var(--font-size-sm)",
+          overflowWrap: "anywhere",
         }}
         data-testid="message-content"
       >
-        {message.content}
+        {isAssistant ? (
+          <div className="manvia-markdown-body" style={{ overflowX: "auto" }}>
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                p: ({ children }) => (
+                  <p style={{ margin: "0.5rem 0", lineHeight: 1.6 }}>{children}</p>
+                ),
+                h1: ({ children }) => (
+                  <h1 style={{ fontSize: "1.25rem", fontWeight: 700, margin: "0.75rem 0 0.5rem", color: "var(--color-text-primary)" }}>{children}</h1>
+                ),
+                h2: ({ children }) => (
+                  <h2 style={{ fontSize: "1.1rem", fontWeight: 600, margin: "0.65rem 0 0.4rem", color: "var(--color-text-primary)" }}>{children}</h2>
+                ),
+                h3: ({ children }) => (
+                  <h3 style={{ fontSize: "1rem", fontWeight: 600, margin: "0.5rem 0 0.35rem", color: "var(--color-text-primary)" }}>{children}</h3>
+                ),
+                ul: ({ children }) => (
+                  <ul style={{ paddingLeft: "1.25rem", margin: "0.5rem 0" }}>{children}</ul>
+                ),
+                ol: ({ children }) => (
+                  <ol style={{ paddingLeft: "1.25rem", margin: "0.5rem 0" }}>{children}</ol>
+                ),
+                li: ({ children }) => (
+                  <li style={{ margin: "0.25rem 0" }}>{children}</li>
+                ),
+                blockquote: ({ children }) => (
+                  <blockquote style={{
+                    borderLeft: "3px solid var(--color-primary)",
+                    margin: "0.5rem 0",
+                    paddingLeft: "0.75rem",
+                    color: "var(--color-text-secondary)",
+                    fontStyle: "italic",
+                    backgroundColor: "var(--color-bg-subtle)",
+                    padding: "4px 8px 4px 12px",
+                    borderRadius: "0 4px 4px 0",
+                  }}>{children}</blockquote>
+                ),
+                a: ({ href, children }) => (
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: "var(--color-primary)", textDecoration: "underline", fontWeight: 500 }}
+                  >
+                    {children}
+                  </a>
+                ),
+                table: ({ children }) => (
+                  <div
+                    style={{
+                      overflowX: "auto",
+                      margin: "0.75rem 0",
+                      maxWidth: "100%",
+                      borderRadius: "6px",
+                      border: "1px solid var(--color-border-subtle)",
+                    }}
+                  >
+                    <table
+                      style={{
+                        borderCollapse: "collapse",
+                        width: "100%",
+                        fontSize: "0.85rem",
+                        textAlign: "left",
+                      }}
+                    >
+                      {children}
+                    </table>
+                  </div>
+                ),
+                th: ({ children }) => (
+                  <th
+                    style={{
+                      borderBottom: "2px solid var(--color-border-subtle)",
+                      backgroundColor: "var(--color-bg-subtle)",
+                      padding: "8px 12px",
+                      fontWeight: 600,
+                      color: "var(--color-text-primary)",
+                    }}
+                  >
+                    {children}
+                  </th>
+                ),
+                td: ({ children }) => (
+                  <td
+                    style={{
+                      borderBottom: "1px solid var(--color-border-subtle)",
+                      padding: "8px 12px",
+                      color: "var(--color-text-secondary)",
+                    }}
+                  >
+                    {children}
+                  </td>
+                ),
+                pre: ({ children }) => (
+                  <div
+                    style={{
+                      margin: "0.75rem 0",
+                      borderRadius: "6px",
+                      overflow: "hidden",
+                      border: "1px solid var(--color-border-subtle)",
+                    }}
+                  >
+                    <pre
+                      style={{
+                        overflowX: "auto",
+                        padding: "10px 14px",
+                        backgroundColor: "#1e293b",
+                        color: "#f8fafc",
+                        fontSize: "0.82rem",
+                        margin: 0,
+                        fontFamily: "monospace",
+                      }}
+                    >
+                      {children}
+                    </pre>
+                  </div>
+                ),
+                code: ({ className, children, ...props }) => {
+                  const isInline = !className;
+                  return isInline ? (
+                    <code
+                      style={{
+                        backgroundColor: "var(--color-bg-subtle)",
+                        color: "var(--color-primary)",
+                        padding: "2px 5px",
+                        borderRadius: "4px",
+                        fontSize: "0.85em",
+                        fontFamily: "monospace",
+                      }}
+                      {...props}
+                    >
+                      {children}
+                    </code>
+                  ) : (
+                    <code className={className} {...props}>
+                      {children}
+                    </code>
+                  );
+                },
+              }}
+            >
+              {message.content}
+            </ReactMarkdown>
+          </div>
+        ) : (
+          <div style={{ whiteSpace: "pre-wrap", lineHeight: 1.6 }}>
+            {message.content}
+          </div>
+        )}
       </div>
 
       {/* Assistant Evidence Citations */}
@@ -139,7 +305,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
         <div
           style={{
             marginTop: "var(--space-2)",
-            maxWidth: "80%",
+            maxWidth: "92%",
             fontSize: "var(--font-size-xs)",
           }}
           data-testid="citations-container"
@@ -154,7 +320,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
               cursor: "pointer",
               padding: 0,
               fontSize: "var(--font-size-xs)",
-              fontWeight: "var(--font-weight-medium)",
+              fontWeight: 500,
               display: "flex",
               alignItems: "center",
               gap: "var(--space-1)",
@@ -185,13 +351,9 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
                   key={`${citation.documentId}-${idx}`}
                   style={{
                     marginBottom:
-                      idx < message.citations!.length - 1
-                        ? "var(--space-2)"
-                        : 0,
+                      idx < message.citations!.length - 1 ? "var(--space-2)" : 0,
                     paddingBottom:
-                      idx < message.citations!.length - 1
-                        ? "var(--space-2)"
-                        : 0,
+                      idx < message.citations!.length - 1 ? "var(--space-2)" : 0,
                     borderBottom:
                       idx < message.citations!.length - 1
                         ? "1px dashed var(--color-border-subtle)"
@@ -200,7 +362,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
                 >
                   <div
                     style={{
-                      fontWeight: "var(--font-weight-semibold)",
+                      fontWeight: 600,
                       color: "var(--color-text-primary)",
                     }}
                   >
@@ -231,17 +393,82 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
         </div>
       )}
 
-      {/* Assistant Feedback Controls */}
+      {/* Assistant Utility and Feedback Controls */}
       {isAssistant && (
         <div
           style={{
             display: "flex",
             alignItems: "center",
-            gap: "var(--space-2)",
-            marginTop: "var(--space-1)",
-            paddingLeft: "var(--space-2)",
+            gap: "var(--space-3)",
+            marginTop: "var(--space-2)",
+            paddingLeft: "var(--space-1)",
           }}
         >
+          {/* Copy Response Button */}
+          <button
+            type="button"
+            onClick={handleCopy}
+            aria-label="Copy assistant response"
+            title="Copy response to clipboard"
+            style={{
+              background: "none",
+              border: "1px solid var(--color-border-subtle)",
+              borderRadius: "4px",
+              cursor: "pointer",
+              fontSize: "var(--font-size-xs)",
+              padding: "2px 8px",
+              color: copied ? "var(--color-success)" : "var(--color-text-muted)",
+              display: "flex",
+              alignItems: "center",
+              gap: "4px",
+              transition: "color 0.15s, border-color 0.15s",
+            }}
+          >
+            <span>{copied ? "✓" : "📋"}</span>
+            <span>{copied ? "Copied" : "Copy"}</span>
+          </button>
+
+          {/* Read Aloud / Audio Playback Button */}
+          {onPlaySpeech && (
+            <button
+              type="button"
+              onClick={() => {
+                if (isPlaying) {
+                  onStopSpeech?.();
+                } else {
+                  onPlaySpeech(message.content, message.id);
+                }
+              }}
+              disabled={!voiceEnabled && !isPlaying}
+              aria-label={isPlaying ? "Stop spoken audio" : "Read assistant response aloud"}
+              title={isPlaying ? "Stop audio" : voiceEnabled ? "Read response aloud" : "Voice output disabled"}
+              data-testid={`speech-btn-${message.id}`}
+              style={{
+                background: isPlaying ? "var(--color-primary-subtle, #e0f2fe)" : "none",
+                border: isPlaying
+                  ? "1px solid var(--color-primary, #0284c7)"
+                  : "1px solid var(--color-border-subtle)",
+                borderRadius: "4px",
+                cursor: !voiceEnabled && !isPlaying ? "not-allowed" : "pointer",
+                fontSize: "var(--font-size-xs)",
+                padding: "2px 8px",
+                color: isPlaying
+                  ? "var(--color-primary, #0284c7)"
+                  : !voiceEnabled
+                    ? "var(--color-text-disabled, #cbd5e1)"
+                    : "var(--color-text-muted)",
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+                transition: "color 0.15s, border-color 0.15s, background-color 0.15s",
+              }}
+            >
+              <span>{isPlaying ? "⏹" : "🔊"}</span>
+              <span>{isPlaying ? "Stop" : "Read Aloud"}</span>
+            </button>
+          )}
+
+          {/* Feedback Rating */}
           {feedbackSent ? (
             <span
               style={{
@@ -253,7 +480,7 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
               ✓ Thank you for your feedback
             </span>
           ) : (
-            <>
+            <div style={{ display: "flex", alignItems: "center", gap: "2px" }}>
               <button
                 type="button"
                 onClick={() => handleFeedback(AIFeedbackRating.POSITIVE)}
@@ -265,8 +492,9 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
                   border: "none",
                   cursor: "pointer",
                   fontSize: "var(--font-size-xs)",
-                  padding: "var(--space-1)",
+                  padding: "2px 6px",
                   color: "var(--color-text-muted)",
+                  borderRadius: "4px",
                 }}
               >
                 👍
@@ -282,13 +510,14 @@ export const ChatMessageItem: React.FC<ChatMessageItemProps> = ({
                   border: "none",
                   cursor: "pointer",
                   fontSize: "var(--font-size-xs)",
-                  padding: "var(--space-1)",
+                  padding: "2px 6px",
                   color: "var(--color-text-muted)",
+                  borderRadius: "4px",
                 }}
               >
                 👎
               </button>
-            </>
+            </div>
           )}
         </div>
       )}

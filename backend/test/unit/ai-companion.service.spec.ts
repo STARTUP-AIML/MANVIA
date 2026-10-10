@@ -252,4 +252,131 @@ describe('AICompanionService (Unit)', () => {
       }
     });
   });
+
+  describe('updateConversation', () => {
+    it('should update conversation title when caller is the owner', async () => {
+      const conv = await companionService.createConversation('usr-alice', {
+        title: 'Initial Title',
+      });
+
+      const updated = await companionService.updateConversation(conv.id, 'usr-alice', {
+        title: 'Updated Health Journal',
+      });
+
+      expect(updated.title).toBe('Updated Health Journal');
+    });
+
+    it('should throw ForbiddenError if another user tries to update the conversation', async () => {
+      const conv = await companionService.createConversation('usr-alice', {
+        title: 'Alice Topic',
+      });
+
+      await expect(
+        companionService.updateConversation(conv.id, 'usr-bob', {
+          title: 'Hacked Title',
+        }),
+      ).rejects.toThrow(ForbiddenError);
+    });
+
+    it('should throw ValidationError if updated title is empty', async () => {
+      const conv = await companionService.createConversation('usr-alice', {
+        title: 'Valid Title',
+      });
+
+      await expect(
+        companionService.updateConversation(conv.id, 'usr-alice', {
+          title: '   ',
+        }),
+      ).rejects.toThrow(ValidationError);
+    });
+  });
+
+  describe('transcribeAudio', () => {
+    it('should transcribe audio successfully in test mode', async () => {
+      const dummyBase64 = Buffer.from('mock audio wave data').toString('base64');
+      const result = await companionService.transcribeAudio('usr-alice', {
+        audioBase64: dummyBase64,
+        mimeType: 'audio/webm',
+      });
+
+      expect(result.text).toBeDefined();
+      expect(typeof result.text).toBe('string');
+      expect(result.text.length).toBeGreaterThan(0);
+    });
+
+    it('should throw ValidationError if audioBase64 is empty', async () => {
+      await expect(
+        companionService.transcribeAudio('usr-alice', {
+          audioBase64: '',
+        }),
+      ).rejects.toThrow(ValidationError);
+    });
+
+    it('should throw ValidationError if audio exceeds 10MB', async () => {
+      const hugeString = 'a'.repeat(11 * 1024 * 1024);
+      await expect(
+        companionService.transcribeAudio('usr-alice', {
+          audioBase64: hugeString,
+        }),
+      ).rejects.toThrow(ValidationError);
+    });
+  });
+
+  describe('processAttachment', () => {
+    it('should extract plain text from a text document', async () => {
+      const sampleContent = 'Patient reports normal blood pressure and good sleep routine.';
+      const base64 = Buffer.from(sampleContent).toString('base64');
+
+      const result = await companionService.processAttachment('usr-alice', {
+        fileName: 'vitals.txt',
+        mimeType: 'text/plain',
+        fileSizeBytes: Buffer.byteLength(sampleContent),
+        contentBase64: base64,
+      });
+
+      expect(result.filename).toBe('vitals.txt');
+      expect(result.extractedText).toBe(sampleContent);
+      expect(result.characterCount).toBe(sampleContent.length);
+      expect(result.truncated).toBe(false);
+    });
+
+    it('should reject image uploads with user-safe guidance', async () => {
+      const imageBase64 = Buffer.from('fake image content').toString('base64');
+
+      await expect(
+        companionService.processAttachment('usr-alice', {
+          fileName: 'chest-xray.png',
+          mimeType: 'image/png',
+          fileSizeBytes: 100,
+          contentBase64: imageBase64,
+        }),
+      ).rejects.toThrow(/Image analysis \(OCR\/vision\) is not supported/);
+    });
+
+    it('should reject executable files for safety', async () => {
+      const exeBase64 = Buffer.from('executable binary').toString('base64');
+
+      await expect(
+        companionService.processAttachment('usr-alice', {
+          fileName: 'malicious.exe',
+          mimeType: 'application/octet-stream',
+          fileSizeBytes: 100,
+          contentBase64: exeBase64,
+        }),
+      ).rejects.toThrow(/Executable and script files cannot be uploaded/);
+    });
+
+    it('should reject attachments exceeding 5MB size limit', async () => {
+      const largeBuffer = Buffer.alloc(6 * 1024 * 1024, 'a');
+
+      await expect(
+        companionService.processAttachment('usr-alice', {
+          fileName: 'large.txt',
+          mimeType: 'text/plain',
+          fileSizeBytes: 6 * 1024 * 1024,
+          contentBase64: largeBuffer.toString('base64'),
+        }),
+      ).rejects.toThrow(/File size exceeds the 5MB limit/);
+    });
+  });
 });

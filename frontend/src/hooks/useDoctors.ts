@@ -24,11 +24,12 @@ export const doctorQueryKeys = {
 };
 
 export function useDoctors(params: DoctorQueryParams = {}) {
-  const { specialty, language, limit = 20, offset = 0 } = params;
+  const { specialty, language, limit = 20, offset = 0, query, search } = params;
+  const effectiveQuery = query || search;
 
   return useQuery({
-    queryKey: doctorQueryKeys.list({ specialty, language, limit, offset }),
-    queryFn: () => searchDoctorsApi({ specialty, language, limit, offset }),
+    queryKey: doctorQueryKeys.list({ specialty, language, limit, offset, query: effectiveQuery }),
+    queryFn: () => searchDoctorsApi({ specialty, language, limit, offset, query: effectiveQuery }),
     staleTime: 60 * 1000,
   });
 }

@@ -122,6 +122,46 @@ export interface AIFeedbackResponseDto {
   updatedAt: string;
 }
 
+export interface UpdateAIConversationDto {
+  title: string;
+}
+
+export interface TranscribeAudioDto {
+  audioBase64: string;
+  mimeType?: string;
+}
+
+export interface TranscribeAudioResponseDto {
+  text: string;
+  language?: string;
+  duration?: number;
+}
+
+export interface ProcessAttachmentDto {
+  fileName: string;
+  mimeType: string;
+  fileSizeBytes: number;
+  contentBase64: string;
+}
+
+export interface ProcessAttachmentResponseDto {
+  filename: string;
+  mimeType: string;
+  extractedText: string;
+  characterCount: number;
+  truncated: boolean;
+}
+
+export interface AttachedFile {
+  id: string;
+  name: string;
+  size: number;
+  type: string;
+  extractedText?: string;
+  isProcessing?: boolean;
+  error?: string;
+}
+
 export const AI_DISCLOSURE_NOTICE =
   "MANVIA AI Companion provides health and wellness information for educational and informational purposes only. It is not a doctor, cannot provide clinical diagnosis, and cannot prescribe medication. Always consult a licensed healthcare professional for medical concerns or emergencies.";
 

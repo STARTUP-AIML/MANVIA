@@ -11,7 +11,7 @@ import { sessionStorageManager } from "@/auth/sessionStorage";
 export const API_BASE_URL =
   import.meta.env.VITE_API_URL ||
   import.meta.env.VITE_API_BASE_URL ||
-  "http://localhost:3000/api/v1";
+  "/api/v1";
 
 export async function apiFetch<T>(
   endpoint: string,
@@ -23,13 +23,60 @@ export async function apiFetch<T>(
     const headers = new Headers(options.headers || {});
     if (token) headers.set("Authorization", `Bearer ${token}`);
 
-    const url = endpoint.startsWith("http")
+    const baseClean = API_BASE_URL.replace(/\/+$/, "");
+    let pathClean = endpoint.replace(/^\/+/, "");
+    if (baseClean.endsWith("/api/v1") && (pathClean === "api/v1" || pathClean.startsWith("api/v1/"))) {
+      pathClean = pathClean.replace(/^api\/v1\/?/, "");
+    }
+    const rawUrl = endpoint.startsWith("http")
       ? endpoint
-      : `${API_BASE_URL}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`;
+      : pathClean.length > 0 ? `${baseClean}/${pathClean}` : baseClean;
 
-    const res = await fetch(url, { ...options, headers });
+    const url = new URL(
+      rawUrl,
+      typeof window !== "undefined"
+        ? window.location.origin
+        : "http://localhost",
+    ).toString();
+
+    let res: Response;
+    try {
+      res = await fetch(url, { ...options, headers });
+    } catch (err: unknown) {
+      if (
+        err instanceof TypeError ||
+        (err instanceof Error &&
+          (err.name === "TypeError" ||
+            err.message.includes("fetch") ||
+            err.message.includes("Failed to fetch") ||
+            err.message.includes("NetworkError") ||
+            err.message.includes("Load failed") ||
+            err.message.includes("network") ||
+            err.message.includes("ECONNREFUSED")))
+      ) {
+        throw ApiError.network(
+          "Network request failed. Ensure the server is reachable.",
+        );
+      }
+      throw err;
+    }
+
     if (!res.ok) {
       const text = await res.text();
+      const isProxyOrGatewayFailure =
+        (res.status === 502 || res.status === 504) &&
+        (text.includes("ECONNREFUSED") ||
+          text.includes("Proxy error") ||
+          text.includes("Gateway") ||
+          !text ||
+          text.includes("<!DOCTYPE html>"));
+
+      if (isProxyOrGatewayFailure) {
+        throw ApiError.network(
+          "Network request failed. Ensure the server is reachable.",
+        );
+      }
+
       let errorMsg = `Request failed with status ${res.status}`;
       try {
         const parsed = JSON.parse(text);

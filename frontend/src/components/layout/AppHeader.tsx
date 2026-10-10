@@ -1,13 +1,17 @@
-import { useState } from 'react';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/auth/AuthContext';
-import { NotificationCenter } from '../notifications/NotificationCenter';
+import { useState } from "react";
+import { Link, NavLink, useNavigate } from "react-router-dom";
+import { useAuth } from "@/auth/AuthContext";
+import { NotificationCenter } from "../notifications/NotificationCenter";
 
 export function Logo() {
   return (
     <Link to="/" className="logo">
       <div className="logo-badge">
-        <img src="/manvia-logo-mark.png" alt="MANVIA Logo" className="logo-img" />
+        <img
+          src="/manvia-original-logo.jpg"
+          alt="MANVIA Logo"
+          className="logo-img"
+        />
       </div>
       <div>
         <div className="logo-name">MANVIA</div>
@@ -24,7 +28,7 @@ export function AppHeader() {
 
   const handleLogout = async () => {
     await logout();
-    navigate('/');
+    navigate("/");
   };
 
   return (
@@ -39,11 +43,11 @@ export function AppHeader() {
         ☰
       </button>
 
-      <nav className={`nav ${open ? 'open' : ''}`}>
+      <nav className={`nav ${open ? "open" : ""}`}>
         <NavLink
           to="/"
           end
-          className={({ isActive }) => (isActive ? 'active-nav' : '')}
+          className={({ isActive }) => (isActive ? "active-nav" : "")}
           onClick={() => setOpen(false)}
         >
           Home
@@ -52,28 +56,28 @@ export function AppHeader() {
           <>
             <NavLink
               to="/app/wellness"
-              className={({ isActive }) => (isActive ? 'active-nav' : '')}
+              className={({ isActive }) => (isActive ? "active-nav" : "")}
               onClick={() => setOpen(false)}
             >
               Wellness
             </NavLink>
             <NavLink
               to="/app/health-timeline"
-              className={({ isActive }) => (isActive ? 'active-nav' : '')}
+              className={({ isActive }) => (isActive ? "active-nav" : "")}
               onClick={() => setOpen(false)}
             >
               Health Timeline
             </NavLink>
             <NavLink
               to="/app/doctors"
-              className={({ isActive }) => (isActive ? 'active-nav' : '')}
+              className={({ isActive }) => (isActive ? "active-nav" : "")}
               onClick={() => setOpen(false)}
             >
               Doctors
             </NavLink>
             <NavLink
               to="/app/appointments"
-              className={({ isActive }) => (isActive ? 'active-nav' : '')}
+              className={({ isActive }) => (isActive ? "active-nav" : "")}
               onClick={() => setOpen(false)}
             >
               Appointments
@@ -82,7 +86,7 @@ export function AppHeader() {
         )}
         <NavLink
           to="/app/ai"
-          className={({ isActive }) => (isActive ? 'active-nav' : '')}
+          className={({ isActive }) => (isActive ? "active-nav" : "")}
           onClick={() => setOpen(false)}
         >
           AI Companion
@@ -90,7 +94,7 @@ export function AppHeader() {
         {isAuthenticated && (
           <NavLink
             to="/app/account"
-            className={({ isActive }) => (isActive ? 'active-nav' : '')}
+            className={({ isActive }) => (isActive ? "active-nav" : "")}
             onClick={() => setOpen(false)}
           >
             Account
@@ -100,25 +104,25 @@ export function AppHeader() {
 
       <div className="header-actions">
         {isAuthenticated ? (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
             <NotificationCenter />
             <span
               style={{
-                fontSize: '11px',
+                fontSize: "11px",
                 fontWeight: 700,
-                color: '#073a78',
-                background: '#e0f2fe',
-                padding: '4px 10px',
-                borderRadius: '12px',
-                border: '1px solid #bae6fd',
+                color: "#073a78",
+                background: "#e0f2fe",
+                padding: "4px 10px",
+                borderRadius: "12px",
+                border: "1px solid #bae6fd",
               }}
             >
-              {user?.email || 'Patient'}
+              {user?.email || "Patient"}
             </span>
             <button
               type="button"
               className="outline"
-              style={{ padding: '7px 14px', fontSize: '11px' }}
+              style={{ padding: "7px 14px", fontSize: "11px" }}
               onClick={handleLogout}
             >
               Logout
@@ -126,13 +130,17 @@ export function AppHeader() {
           </div>
         ) : (
           <>
-            <button type="button" className="login" onClick={() => navigate('/login')}>
+            <button
+              type="button"
+              className="login"
+              onClick={() => navigate("/login")}
+            >
               Login
             </button>
             <button
               type="button"
               className="primary small"
-              onClick={() => navigate('/login')}
+              onClick={() => navigate("/login")}
             >
               Get Started <span>→</span>
             </button>

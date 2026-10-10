@@ -49,6 +49,11 @@ export const DoctorDiscoveryPage: React.FC = () => {
 
   const isFiltered = Boolean(searchQuery || selectedSpecialty || selectedLanguage);
 
+  const handleSearchChange = (q: string) => {
+    setSearchQuery(q);
+    setOffset(0);
+  };
+
   const handleClearFilters = () => {
     setSearchQuery('');
     setSelectedSpecialty('');
@@ -110,7 +115,7 @@ export const DoctorDiscoveryPage: React.FC = () => {
       {/* Filter & Search Bar */}
       <DoctorFilters
         searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
+        onSearchChange={handleSearchChange}
         selectedSpecialty={selectedSpecialty}
         onSpecialtyChange={handleSpecialtyChange}
         selectedLanguage={selectedLanguage}

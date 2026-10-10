@@ -33,6 +33,12 @@ describe('AdminOversightService (Unit)', () => {
     doctorPayout: {
       count: ReturnType<typeof vi.fn>;
     };
+    user: {
+      count: ReturnType<typeof vi.fn>;
+    };
+    auditLog: {
+      findMany: ReturnType<typeof vi.fn>;
+    };
     notificationDelivery: {
       count: ReturnType<typeof vi.fn>;
     };
@@ -43,6 +49,12 @@ describe('AdminOversightService (Unit)', () => {
 
   beforeEach(() => {
     mockPrisma = {
+      user: {
+        count: vi.fn(),
+      },
+      auditLog: {
+        findMany: vi.fn(),
+      },
       patientProfile: {
         findMany: vi.fn(),
         count: vi.fn(),
@@ -50,10 +62,13 @@ describe('AdminOversightService (Unit)', () => {
       doctorProfile: {
         findMany: vi.fn(),
         count: vi.fn(),
+        groupBy: vi.fn(),
       },
       appointment: {
         findMany: vi.fn(),
         count: vi.fn(),
+        findFirst: vi.fn(),
+        groupBy: vi.fn(),
       },
       careRelationship: {
         findMany: vi.fn(),
@@ -166,5 +181,116 @@ describe('AdminOversightService (Unit)', () => {
     expect(result.deliveries.delivered).toBe(45);
     expect(result.deliveries.totalDeliveries).toBe(107);
     expect(result.activeDevices).toBe(120);
+  });
+
+  it('should aggregate real dashboard overview metrics for users, verifications, appointments, and alerts', async () => {
+    mockPrisma.user.count
+      .mockResolvedValueOnce(50) // total
+      .mockResolvedValueOnce(40) // patient
+      .mockResolvedValueOnce(8) // doctor
+      .mockResolvedValueOnce(2) // admin
+      .mockResolvedValueOnce(48) // active
+      .mockResolvedValueOnce(2); // suspended
+
+    mockPrisma.doctorProfile.groupBy.mockResolvedValue([
+      { verificationStatus: 'PENDING_REVIEW', _count: { _all: 3 } },
+      { verificationStatus: 'VERIFIED', _count: { _all: 5 } },
+    ]);
+
+    mockPrisma.appointment.groupBy.mockResolvedValue([
+      { status: 'REQUESTED', _count: { _all: 4 } },
+      { status: 'CONFIRMED', _count: { _all: 10 } },
+      { status: 'COMPLETED', _count: { _all: 25 } },
+    ]);
+
+    mockPrisma.payment.findMany.mockResolvedValue([]);
+    mockPrisma.payment.count.mockResolvedValue(20);
+    mockPrisma.payment.aggregate.mockResolvedValue({ _sum: { amount: 2000 }, _count: 20 });
+    mockPrisma.refund.count.mockResolvedValue(1);
+    mockPrisma.doctorPayout.count.mockResolvedValue(0);
+
+    mockPrisma.auditLog.findMany.mockResolvedValue([
+      {
+        id: 'log-1',
+        action: 'VERIFY_DOCTOR',
+        resourceType: 'DOCTOR_VERIFICATION',
+        resourceId: 'verif-1',
+        actorUserId: 'admin-1',
+        status: 'SUCCESS',
+        createdAt: new Date(),
+        ipAddress: '127.0.0.1',
+      },
+    ]);
+
+    const overview = await service.getDashboardOverview();
+
+    expect(overview.users.total).toBe(50);
+    expect(overview.users.byRole.PATIENT).toBe(40);
+    expect(overview.users.byRole.DOCTOR).toBe(8);
+    expect(overview.users.byRole.ADMIN).toBe(2);
+    expect(overview.doctorVerifications.total).toBe(8);
+    expect(overview.doctorVerifications.pendingReviewCount).toBe(3);
+    expect(overview.appointments.total).toBe(39);
+    expect(overview.appointments.byStatus.CONFIRMED).toBe(10);
+    expect(overview.operationalAlerts.length).toBeGreaterThan(0);
+    expect(overview.operationalAlerts[0]?.id).toBe('pending-verifications');
+    expect(overview.recentActivity).toHaveLength(1);
+  });
+
+  it('should retrieve detailed appointment record without clinical notes', async () => {
+    mockPrisma.appointment.findFirst.mockResolvedValue({
+      id: 'apt-uuid-1',
+      publicAppointmentId: 'APT-12345678',
+      status: AppointmentStatus.CONFIRMED,
+      reservationState: 'BOOKED',
+      startAt: new Date('2026-10-15T10:00:00.000Z'),
+      endAt: new Date('2026-10-15T10:30:00.000Z'),
+      confirmedAt: new Date('2026-10-14T09:00:00.000Z'),
+      startedAt: null,
+      completedAt: null,
+      cancelledAt: null,
+      cancellationReason: null,
+      cancelledBy: null,
+      declineReason: null,
+      declinedAt: null,
+      createdAt: new Date('2026-10-14T08:00:00.000Z'),
+      patient: {
+        id: 'p-1',
+        publicPatientId: 'PAT-001',
+        displayName: 'John Patient',
+        user: { id: 'u-1', email: 'john@example.com', phone: null },
+      },
+      doctor: {
+        id: 'd-1',
+        publicDoctorId: 'DOC-001',
+        displayName: 'Dr. Jane Doctor',
+        medicalRegistrationNumber: 'REG-123',
+        licensingCouncil: 'Medical Board',
+        user: { id: 'u-2', email: 'jane@example.com' },
+      },
+      consultationOffer: {
+        id: 'offer-1',
+        title: 'Initial Consultation',
+        consultationType: 'INITIAL',
+        durationMinutes: 30,
+        fee: 100,
+        currency: 'USD',
+      },
+      cancellation: null,
+    });
+
+    const result = await service.getAppointmentDetails('APT-12345678');
+    expect(result.id).toBe('apt-uuid-1');
+    expect(result.publicAppointmentId).toBe('APT-12345678');
+    expect(result.status).toBe(AppointmentStatus.CONFIRMED);
+    expect(result.doctor.displayName).toBe('Dr. Jane Doctor');
+    expect(result.patient.displayName).toBe('John Patient');
+    expect((result as Record<string, unknown>).notes).toBeUndefined();
+  });
+
+  it('should throw NotFoundError if appointment record is not found', async () => {
+    mockPrisma.appointment.findFirst.mockResolvedValue(null);
+
+    await expect(service.getAppointmentDetails('non-existent')).rejects.toThrow();
   });
 });

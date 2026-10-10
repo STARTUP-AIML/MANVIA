@@ -4,10 +4,12 @@ import type { LanguageEntity } from '../entities/language.entity.js';
 import type { VerificationStatus } from '../enums/verification-status.enum.js';
 
 export interface DoctorFilterCriteria {
+  query?: string | undefined;
   specialty?: string | undefined;
   language?: string | undefined;
   limit?: number | undefined;
   offset?: number | undefined;
+  isDemo?: boolean | undefined;
 }
 
 export interface CreateDoctorProfileData {

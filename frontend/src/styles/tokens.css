@@ -149,6 +149,21 @@
   --sidebar-width: 260px;
 }
 
+/* Dark Theme Token Overrides */
+[data-theme="dark"] {
+  --color-bg-app: #090d16;
+  --color-bg-surface: #111827;
+  --color-bg-surface-subtle: #1f2937;
+  --color-bg-surface-elevated: #1f2937;
+  --color-border-subtle: #1f2937;
+  --color-border-strong: #374151;
+  --color-text-primary: #f9fafb;
+  --color-text-secondary: #9ca3af;
+  --color-text-muted: #6b7280;
+  --color-text-link: #2dd4bf;
+  --color-text-link-hover: #5eead4;
+}
+
 /* Reduced Motion Preference Accessibility */
 @media (prefers-reduced-motion: reduce) {
   :root {

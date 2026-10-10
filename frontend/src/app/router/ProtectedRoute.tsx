@@ -23,7 +23,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   redirectPath = "/login",
 }) => {
   const location = useLocation();
-  const { status, isAuthenticated, user, hasRole } = useAuth();
+  const { status, isAuthenticated, user, activeRole } = useAuth();
 
   // If session is still bootstrapping, render accessible loading indicator
   if (status === "INITIALIZING" || status === "AUTHENTICATING") {
@@ -35,9 +35,14 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to={redirectPath} state={{ from: location }} replace />;
   }
 
-  // Role verification check
+  // Role verification check against authenticated activeRole
   if (allowedRoles && allowedRoles.length > 0) {
-    const isAuthorized = allowedRoles.some((role) => hasRole(role));
+    const currentRole = activeRole || user.roles[0];
+    const isAuthorized = Boolean(
+      currentRole &&
+        allowedRoles.includes(currentRole) &&
+        user.roles.includes(currentRole),
+    );
     if (!isAuthorized) {
       return (
         <ForbiddenState

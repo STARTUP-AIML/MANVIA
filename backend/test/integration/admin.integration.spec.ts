@@ -179,11 +179,24 @@ describe('Admin Module (Integration)', () => {
     expect(auditRes.total).toBeGreaterThanOrEqual(1);
   });
 
-  it('should provide oversight aggregates for platform', async () => {
+  it('should provide oversight aggregates for platform and dashboard overview', async () => {
     const notifs = await oversightService.getNotificationsOverview();
     expect(notifs.deliveries).toBeDefined();
 
     const payments = await oversightService.getPaymentsOverview({ page: 1, limit: 10 });
     expect(payments.metrics).toBeDefined();
+
+    const overview = await oversightService.getDashboardOverview();
+    expect(overview.users.total).toBeGreaterThanOrEqual(1);
+    expect(overview.users.byRole).toHaveProperty('ADMIN');
+    expect(overview.appointments).toBeDefined();
+    expect(overview.doctorVerifications).toBeDefined();
+    expect(overview.finances).toBeDefined();
+    expect(Array.isArray(overview.operationalAlerts)).toBe(true);
+    expect(Array.isArray(overview.recentActivity)).toBe(true);
+
+    const appointments = await oversightService.listAppointments({ page: 1, limit: 10 });
+    expect(appointments).toHaveProperty('items');
+    expect(appointments).toHaveProperty('total');
   });
 });

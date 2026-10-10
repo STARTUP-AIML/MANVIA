@@ -17,6 +17,14 @@ export default defineConfig({
     // Force UTC across all test workers so timezone-sensitive slot/booking tests
     // produce identical results on Windows (IST/PST/etc.) and in GitHub Actions CI.
     env: { TZ: 'UTC' },
+    testTimeout: 10000,
+    pool: 'threads',
+    poolOptions: {
+      threads: {
+        maxThreads: 4,
+        minThreads: 1,
+      },
+    },
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

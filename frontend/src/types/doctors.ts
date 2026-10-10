@@ -30,6 +30,14 @@ export interface DoctorPublic {
   currency: string;
   verificationStatus: DoctorVerificationStatus | string;
   qualifications: DoctorQualification[];
+  clinicName?: string | null;
+  city?: string | null;
+  state?: string | null;
+  clinicalInterests?: string[];
+  consultationModes?: string[];
+  contactDisplay?: string | null;
+  profileImageUrl?: string | null;
+  isDemo?: boolean;
 }
 
 export interface Specialty {
@@ -70,6 +78,7 @@ export interface DoctorQueryParams {
   limit?: number;
   offset?: number;
   search?: string; // Client-side search enhancement
+  query?: string;
 }
 
 export interface PaginatedDoctorsResponse {

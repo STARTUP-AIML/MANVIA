@@ -125,11 +125,29 @@ describe("MANVIA Application Routes & Role-Aware Protection", () => {
     });
   });
 
-  it("renders developer health diagnostics on /dev-health", async () => {
+  it("redirects unauthenticated users accessing /dev-health to login", async () => {
     renderWithProviders(<AppRoutes />, { initialEntries: ["/dev-health"] });
     expect(
-      screen.getByText("Developer System Diagnostics"),
+      screen.getByRole("heading", { name: "Sign in to MANVIA" }),
     ).toBeInTheDocument();
+  });
+
+  it("renders platform health diagnostics on /admin/platform-health when authenticated as ADMIN", async () => {
+    sessionStorageManager.setTokens({
+      accessToken: "admin-token",
+      refreshToken: "admin-refresh",
+    });
+    vi.spyOn(authService, "getMe").mockResolvedValueOnce(mockAdminUser);
+
+    renderWithProviders(<AppRoutes />, {
+      initialEntries: ["/admin/platform-health"],
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { name: /Platform Health Diagnostics/i }),
+      ).toBeInTheDocument();
+    });
   });
 
   it("renders 404 Not Found route on unknown URL path", async () => {

@@ -1,362 +1,792 @@
 /**
- * MANVIA Application Landing & Portal Navigation
- * Combines the pixel-matched Aushvaira/MANVIA reference design with interactive AI preview,
- * modes, services, ecosystem, and portal workspaces for Patient, Doctor, Admin, and Developer Diagnostics.
+ * MANVIA Product Landing Page
+ * Premium AI Healthcare Platform Client Experience
+ * "Care that feels human."
+ *
+ * Integrates the MANVIA Care Intelligence Core 3D ecosystem,
+ * scroll choreography, interactive healthcare nodes, and accessible fallbacks.
  */
 
 import React, { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { AppHeader } from "@/components/layout/AppHeader";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/Card";
-import { Button } from "@/components/ui/Button";
-import { Badge } from "@/components/ui/Badge";
+import { useNavigate } from "react-router-dom";
+import { LandingHeader } from "@/components/layout/LandingHeader";
+import { EnterpriseMegaFooter } from "@/components/layout/EnterpriseMegaFooter";
+import { SplashScreen } from "@/features/splash";
+import {
+  CanvasContainer,
+  HeroEcosystemScene,
+  InteractiveEcosystem,
+  CareJourneyScene,
+  TrustShieldScene,
+  ManviaCore,
+  useReducedMotion,
+} from "@/components/three";
 
-const services = [
-  ["✦", "AI Health Assistant", "Get instant guidance"],
-  ["▣", "Appointments", "Book with trusted doctors"],
-  ["⌬", "Diagnostics", "Check your health"],
-  ["▤", "Medicines", "Order & get delivered"],
-  ["▥", "Health Records", "Access your reports"],
-  ["◌", "Wellness", "Track your well-being"],
-  ["♙", "Doctors", "Find the right specialist"],
-  ["♧", "Emergency Support", "Help when you need it most"],
+const implementedServices = [
+  {
+    ico: "✦",
+    title: "AI Companion",
+    sub: "24/7 conversational support and care triage guidance",
+  },
+  {
+    ico: "◌",
+    title: "Wellness Hub",
+    sub: "Daily mood, stress, sleep & longitudinal lifestyle tracking",
+  },
+  {
+    ico: "▥",
+    title: "Health Timeline",
+    sub: "Unified chronological record of care milestones & consults",
+  },
+  {
+    ico: "▤",
+    title: "Health Records",
+    sub: "Secure, consent-governed clinical documents & lab reports",
+  },
+  {
+    ico: "♙",
+    title: "Find a Doctor",
+    sub: "Discover verified specialist profiles & clinical specialties",
+  },
+  {
+    ico: "▣",
+    title: "Appointments",
+    sub: "Seamless slot booking, schedule tracking & visit management",
+  },
+  {
+    ico: "⌬",
+    title: "Pre-consultation",
+    sub: "Structured intake questionnaires before your appointments",
+  },
+  {
+    ico: "♧",
+    title: "Human Escalation",
+    sub: "Smooth handoff from AI guidance to licensed clinicians",
+  },
 ];
 
-function Ecosystem() {
+const previewScenarios = [
+  {
+    chip: "Daily Check-in",
+    userText:
+      "I want to track how my sleep has been affecting my energy this week.",
+    botReply:
+      "You can record daily sleep duration and energy scores in your Wellness Hub to review longitudinal trends and personalized lifestyle insights.",
+  },
+  {
+    chip: "Preparing for Visit",
+    userText:
+      "What should I have ready before my specialist appointment tomorrow?",
+    botReply:
+      "You can upload recent lab reports to your Health Records and complete your pre-consultation intake questionnaire so your physician has full context.",
+  },
+  {
+    chip: "Care Escalation",
+    userText:
+      "I have persistent symptoms that need medical attention from a doctor.",
+    botReply:
+      "I'll help you find an appropriate specialist on MANVIA, check upcoming consultation availability, and reserve a confirmed appointment.",
+  },
+];
+
+/* ─── 1. ECOSYSTEM SECTION ─────────────────────────────────── */
+function EcosystemSection() {
   return (
-    <section className="ecosystem wrap" id="about">
-      <div className="eco-copy">
-        <div className="eyebrow">THE INTELLIGENCE LAYER</div>
-        <h2>
-          A Connected Healthcare
-          <br />
-          Ecosystem
-        </h2>
+    <section className="section-ecosystem wrap" id="ecosystem">
+      <div className="section-header-centered" id="about">
+        <div className="eyebrow pill">THE INTELLIGENCE LAYER</div>
+        <h2>A Connected Healthcare Universe</h2>
         <p>
-          Bringing together patients, doctors, hospitals, diagnostics and more — powered by AI, for
-          better decisions and healthier lives.
+          Harmonizing empathetic AI guidance, daily proactive wellness, verified clinicians,
+          real-time appointments, and longitudinal medical records through the MANVIA Care Intelligence Core.
         </p>
-        <button className="outline eco-btn" type="button">
-          Know More <span>→</span>
-        </button>
       </div>
 
-      <div className="eco-orbit">
-        <div className="orbit-center">
-          <div className="orbit-mark">
-            <span style={{ fontSize: "28px", color: "#0ba9e7" }}>✦</span>
-          </div>
-          <div className="orbit-title">MANVIA</div>
-          <div className="orbit-sub">INTELLIGENCE LAYER</div>
-        </div>
-      </div>
+      <InteractiveEcosystem />
     </section>
   );
 }
 
-function Assistant() {
-  const [activeTab, setActiveTab] = useState(0);
-  const tabs = ["Instant Answers", "Symptom Checker", "Medication Reminders", "Health Records"];
+/* ─── 2. AI COMPANION SECTION ──────────────────────────────── */
+function AICompanionSection() {
+  const navigate = useNavigate();
+  const [activeScenario, setActiveScenario] = useState(0);
+  const currentScenario =
+    previewScenarios[activeScenario] ?? previewScenarios[0]!;
+
   return (
-    <section className="assistant wrap" id="features">
-      <div className="eyebrow" style={{ textAlign: "center", marginBottom: "8px" }}>
-        YOUR 24/7 HEALTH COMPANION
-      </div>
-      <h2>Meet the MANVIA AI Assistant</h2>
-      <p className="assistant-sub">
-        Always ready to help you navigate your health journey — from quick questions to detailed insights.
-      </p>
+    <section className="section-ai-companion wrap" id="ai-companion">
+      <div className="ai-companion-grid">
+        {/* Left: Copy & Value Proposition */}
+        <div className="ai-companion-info">
+          <div className="eyebrow pill">YOUR AI COMPANION</div>
+          <h2>
+            A little intelligence,
+            <br />
+            whenever you need it.
+          </h2>
+          <p>
+            Talk, type or speak — MANVIA AI is here 24/7 to listen, guide and
+            support your personal health journey. Seamlessly escalate to
+            licensed doctors whenever clinical care is needed.
+          </p>
 
-      <div className="assistant-tabs" role="tablist" aria-label="Assistant features">
-        {tabs.map((t, i) => (
-          <button
-            key={t}
-            type="button"
-            role="tab"
-            aria-selected={activeTab === i}
-            className={`tab ${activeTab === i ? "active" : ""}`}
-            onClick={() => setActiveTab(i)}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
-
-      <div className="assistant-preview">
-        <div className="assistant-preview-top">
-          <div className="dots">
-            <span />
-            <span />
-            <span />
-          </div>
-          <div className="assistant-title">
-            <img src="/manvia-ai-avatar.png" alt="MANVIA AI" className="assistant-logo" />
-            MANVIA AI Companion
-          </div>
-          <div style={{ fontSize: "11px", color: "#16a34a", fontWeight: 700 }}>● Online</div>
-        </div>
-
-        <div className="assistant-chat">
-          <div className="chat-msg bot">
-            <img src="/manvia-ai-avatar.png" alt="" className="chat-avatar" />
-            <div className="chat-bubble">
-              Hello! I'm your MANVIA health companion. How can I help you today? You can ask about
-              symptoms, medications, or book a consultation with our verified specialists.
+          <div className="ai-feature-list">
+            <div className="ai-feature-item">
+              <span className="ai-feature-bullet">✦</span>
+              <div>
+                <strong>24/7 Always On</strong>
+                <span>Instant conversational triage and empathetic listening</span>
+              </div>
+            </div>
+            <div className="ai-feature-item">
+              <span className="ai-feature-bullet">⌬</span>
+              <div>
+                <strong>Structured Intake</strong>
+                <span>Organize symptoms before specialist appointments</span>
+              </div>
+            </div>
+            <div className="ai-feature-item">
+              <span className="ai-feature-bullet">🛡</span>
+              <div>
+                <strong>Privacy-First & Consent-Aware</strong>
+                <span>Your conversations remain private and under your control</span>
+              </div>
             </div>
           </div>
-          <div className="chat-msg user">
-            <div className="chat-bubble">
-              Can you help me understand my blood test report and suggest next steps?
-            </div>
-            <div className="chat-avatar user-avatar">U</div>
-          </div>
-          <div className="chat-msg bot">
-            <img src="/manvia-ai-avatar.png" alt="" className="chat-avatar" />
-            <div className="chat-bubble">
-              I'd be glad to help analyze your test results! Please upload your document securely to your
-              Health Records, and I'll summarize the key findings for your doctor's review.
-            </div>
+
+          <div style={{ marginTop: "24px" }}>
+            <button
+              className="primary"
+              type="button"
+              onClick={() => navigate("/app/ai")}
+            >
+              Try AI Assistant <span>→</span>
+            </button>
           </div>
         </div>
 
-        <div className="assistant-input-bar">
-          <input
-            type="text"
-            placeholder="Ask MANVIA AI anything about your health..."
-            disabled
-            aria-label="Ask MANVIA AI preview"
-          />
-          <button className="primary small" type="button" aria-label="Send message preview">
-            Ask <span>↗</span>
-          </button>
-        </div>
+        {/* Right: Floating 3D Perspective Product Interface */}
+        <div className="floating-assistant-wrap">
+          <div className="assistant-card">
+            <div className="assistant-main">
+              <div className="assistant-title">
+                <img
+                  src="/manvia-companion-portrait.jpg"
+                  alt="MANVIA AI"
+                  className="assistant-logo"
+                />
+                <div className="assistant-info">
+                  <b>MANVIA AI Companion</b>
+                  <small>
+                    <i /> Active • Secure
+                  </small>
+                </div>
+                <span className="preview-pill">Product preview</span>
+                <button
+                  className="assistant-close"
+                  type="button"
+                  aria-label="Cycle assistant preview scenario"
+                  onClick={() =>
+                    setActiveScenario(
+                      (prev) => (prev + 1) % previewScenarios.length,
+                    )
+                  }
+                  title="Next preview scenario"
+                >
+                  ↻
+                </button>
+              </div>
 
-        <div className="assistant-badges">
-          <span>
-            <span className="badge-dot" />
-            <small>HIPAA &amp; ABDM Aligned</small>
-          </span>
-          <span>
-            <span className="badge-dot" />
-            <small>Verified Clinical Taxonomies</small>
-          </span>
-          <span>
-            <span className="badge-dot" />
-            <small>Safe &amp; Supportive</small>
-          </span>
+              <div
+                className="assistant-chips"
+                role="tablist"
+                aria-label="Interactive preview scenarios"
+              >
+                {previewScenarios.map((preset, idx) => (
+                  <button
+                    key={preset.chip}
+                    type="button"
+                    role="tab"
+                    aria-selected={activeScenario === idx}
+                    className={`assistant-chip ${activeScenario === idx ? "active" : ""}`}
+                    onClick={() => setActiveScenario(idx)}
+                  >
+                    {preset.chip}
+                  </button>
+                ))}
+              </div>
+
+              <div className="chat-messages" aria-live="polite">
+                <div className="chat-row bot">
+                  <img
+                    src="/manvia-companion-portrait.jpg"
+                    alt=""
+                    className="chat-avatar"
+                  />
+                  <div className="bubble bot">
+                    Hello! How can I assist with your care journey today?
+                  </div>
+                </div>
+
+                <div className="chat-row user">
+                  <div className="bubble user">{currentScenario.userText}</div>
+                </div>
+
+                <div className="chat-row bot">
+                  <img
+                    src="/manvia-companion-portrait.jpg"
+                    alt=""
+                    className="chat-avatar"
+                  />
+                  <div className="bubble bot">{currentScenario.botReply}</div>
+                </div>
+              </div>
+
+              <div className="chat-input-wrap">
+                <button
+                  className="chat-mic-btn"
+                  type="button"
+                  aria-label="Voice input preview"
+                  onClick={() => navigate("/app/ai")}
+                >
+                  <svg
+                    width="12"
+                    height="12"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                    <line x1="12" x2="12" y1="19" y2="22" />
+                  </svg>
+                </button>
+                <div
+                  className="chat-input"
+                  role="button"
+                  tabIndex={0}
+                  aria-label="Open AI Companion in patient workspace"
+                  onClick={() => navigate("/app/ai")}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      navigate("/app/ai");
+                    }
+                  }}
+                  style={{ cursor: "pointer" }}
+                >
+                  <span>Explore full companion in patient workspace...</span>
+                  <span className="chat-send-icon">↗</span>
+                </div>
+              </div>
+              <p className="assistant-disclaimer">
+                * Product preview demonstration. Does not provide clinical
+                diagnosis.
+              </p>
+            </div>
+
+            <div className="assistant-side">
+              <span>
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#2563eb"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+                <small>Text Guidance</small>
+              </span>
+              <span>
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#2563eb"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <circle cx="12" cy="12" r="3" />
+                </svg>
+                <small>Voice Triage</small>
+              </span>
+              <span>
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#2563eb"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <polyline points="12 6 12 12 16 14" />
+                </svg>
+                <small>24/7 Always On</small>
+              </span>
+              <span>
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#2563eb"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                </svg>
+                <small>Consent-Aware</small>
+              </span>
+            </div>
+          </div>
         </div>
       </div>
     </section>
   );
 }
 
-function Modes() {
-  const modes: [string, string, string, string, string][] = [
-    ["Guest Mode", "Explore MANVIA and learn more about our services.", "mode-guest.jpg", "♙", "/"],
-    ["User Mode", "Your personal health and wellness journey.", "mode-user.jpg", "♧", "/app"],
-    ["EMP Mode", "Healthcare operations and patient management.", "mode-emp.jpg", "♙", "/doctor"],
-    ["Admin Mode", "Platform management, users, security and more.", "mode-admin.jpg", "♢", "/admin"],
-  ];
-  return (
-    <section className="modes wrap" id="everyone">
-      <div className="modes-intro">
-        <div className="eyebrow">ONE PLATFORM. FOUR WAYS TO CONNECT.</div>
-        <h2>Choose Your Mode</h2>
-        <p>
-          Whether you're a patient, healthcare staff, organization admin or just exploring — MANVIA
-          is here for you.
-        </p>
-        <a href="#features">Learn More →</a>
-      </div>
-      {modes.map((m) => (
-        <Link to={m[4] ?? "/"} className="mode-card" key={m[0]} style={{ textDecoration: "none" }}>
-          <div
-            className="mode-card-img"
-            style={{ backgroundImage: `url('/${m[2]}')` }}
-          />
-          <div className="mode-card-body">
-            <div className="mode-icon">{m[3]}</div>
-            <div className="mode-name">{m[0]}</div>
-            <p className="mode-desc">{m[1]}</p>
-            <div className="mode-link">
-              Explore <span>→</span>
-            </div>
-          </div>
-        </Link>
-      ))}
-    </section>
-  );
-}
-
-export const LandingRoute: React.FC = () => {
+/* ─── 3. CAPABILITIES SECTION ──────────────────────────────── */
+function CapabilitiesSection() {
   const navigate = useNavigate();
 
-  const portals = [
+  const capabilities = [
     {
-      title: "Patient Portal",
-      description:
-        "AI companionship, daily wellness check-ins, appointment scheduling, and personal health records.",
-      href: "/app",
-      badge: "Foundation Ready",
-      icon: "🌿",
+      num: "01",
+      title: "MANVIA AI",
+      desc: "24/7 intelligent health companion for triage questions, symptom guidance, and empathetic support.",
+      icon: "✦",
+      path: "/app/ai",
+      actionText: "Try AI Assistant",
+      accent: "#0ea5e9",
     },
     {
-      title: "Doctor Portal",
-      description:
-        "Clinical consultation dashboard, patient queuing, schedule management, and instant payouts.",
-      href: "/doctor",
-      badge: "Foundation Ready",
-      icon: "🩺",
+      num: "02",
+      title: "Wellness",
+      desc: "Daily check-ins, mood tracking, sleep duration, stress monitoring, and longitudinal wellness trends.",
+      icon: "◌",
+      path: "/app/wellness",
+      actionText: "Open Wellness",
+      accent: "#10b981",
     },
     {
-      title: "Admin Console",
-      description:
-        "Platform governance, doctor verification, financial reconciliation, and comprehensive audit logs.",
-      href: "/admin",
-      badge: "Foundation Ready",
-      icon: "🛡️",
+      num: "03",
+      title: "Real Doctor Care",
+      desc: "Book consultations with verified medical specialists, complete pre-consultations, and manage visits.",
+      icon: "♙",
+      path: "/app/doctors",
+      actionText: "Find Doctors",
+      accent: "#2563eb",
     },
     {
-      title: "Developer Diagnostics",
-      description:
-        "Live frontend diagnostics, backend gateway connectivity status, and OpenAPI / Swagger access.",
-      href: "/dev-health",
-      badge: "Active Tool",
-      icon: "⚡",
+      num: "04",
+      title: "Health Records",
+      desc: "Secure, consent-aware repository for clinical documents, timeline history, and auditable access.",
+      icon: "▥",
+      path: "/app/health-records",
+      actionText: "View Records",
+      accent: "#6366f1",
     },
   ];
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
-      <AppHeader />
+    <section className="section-capabilities wrap" id="capabilities">
+      <div className="section-header-split">
+        <div>
+          <div className="eyebrow pill">DESIGNED FOR YOUR CARE</div>
+          <h2>Core Capabilities</h2>
+          <p>
+            Everything you need for longitudinal health, proactive wellness,
+            and expert medical consultations in one coordinated platform.
+          </p>
+        </div>
+        <a href="#services" className="outline" style={{ alignSelf: "flex-end" }}>
+          View All Services <span>→</span>
+        </a>
+      </div>
 
-      <main id="home" role="main" style={{ flex: 1 }}>
-        {/* Hero Section */}
-        <section className="hero">
-          <div className="hero-content">
-            <Badge variant="primary" style={{ marginBottom: "var(--space-3)" }}>
-              Frontend Phase 0: Foundation &amp; Project Setup
-            </Badge>
-            <h1 className="heading-display" style={{ marginBottom: "var(--space-4)" }}>
-              Care that feels human.
-            </h1>
-            <p className="hero-sub" style={{ marginBottom: "var(--space-6)" }}>
-              Your health journey, with intelligence that cares. MANVIA connects people, healthcare professionals and intelligent healthcare services in one trusted experience.
-            </p>
-            <div className="hero-actions" style={{ display: "flex", gap: "1rem", flexWrap: "wrap" }}>
-              <Button
-                variant="primary"
-                size="lg"
-                onClick={() => navigate("/wellness")}
-                aria-label="Open Wellness Hub"
-              >
-                Open Wellness Hub
-              </Button>
-              <Button
-                variant="secondary"
-                size="lg"
-                onClick={() => navigate("/app")}
-              >
-                Launch Patient Portal
-              </Button>
-              <Button
-                variant="secondary"
-                size="lg"
-                onClick={() => navigate("/dev-health")}
-              >
-                Developer Health Check
-              </Button>
-            </div>
-          </div>
-        </section>
-
-        {/* Portal Cards Grid */}
-        <section className="wrap" style={{ padding: "40px 0" }}>
-          <div className="eyebrow" style={{ textAlign: "center", marginBottom: "8px" }}>
-            PORTAL WORKSPACES
-          </div>
-          <h2 style={{ textAlign: "center", marginBottom: "32px" }}>
-            Access Your Dedicated Console
-          </h2>
+      <div className="capability-grid">
+        {capabilities.map((c) => (
           <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))",
-              gap: "var(--space-6)",
+            className="capability-card"
+            key={c.title}
+            role="button"
+            tabIndex={0}
+            aria-label={`Learn more about ${c.title}`}
+            onClick={() => navigate(c.path)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                navigate(c.path);
+              }
             }}
           >
-            {portals.map((portal) => (
-              <Card key={portal.href} interactive>
-                <CardHeader>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "flex-start",
-                    }}
-                  >
-                    <span style={{ fontSize: "2rem" }} aria-hidden="true">
-                      {portal.icon}
-                    </span>
-                    <Badge variant="neutral">{portal.badge}</Badge>
-                  </div>
-                  <CardTitle style={{ marginTop: "var(--space-2)" }}>
-                    {portal.title}
-                  </CardTitle>
-                  <CardDescription>{portal.description}</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <Link to={portal.href} style={{ textDecoration: "none" }}>
-                    <Button variant="outline" size="sm" style={{ width: "100%" }}>
-                      Open Workspace →
-                    </Button>
-                  </Link>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </section>
-
-        <Ecosystem />
-        <Assistant />
-        <Modes />
-
-        {/* Services Grid */}
-        <section className="services wrap" id="services">
-          <div className="services-head">
-            <div className="eyebrow">COMPREHENSIVE CARE</div>
-            <h2>Healthcare Services Built Around You</h2>
-            <p>
-              From primary consultations to longitudinal wellness tracking, MANVIA connects every
-              aspect of your care.
-            </p>
-          </div>
-          <div className="services-grid">
-            {services.map((s) => (
-              <div className="service-card" key={s[1]}>
-                <div className="service-icon">{s[0]}</div>
-                <div className="service-title">{s[1]}</div>
-                <div className="service-desc">{s[2]}</div>
-              </div>
-            ))}
-          </div>
-        </section>
-      </main>
-
-      <footer className="footer" role="contentinfo">
-        <div className="wrap footer-content">
-          <div className="footer-brand">
-            <div className="footer-logo">
-              <img src="/manvia-logo-mark.png" alt="MANVIA" className="footer-logo-img" />
-              <span>MANVIA</span>
+            <div className="capability-top">
+              <span className="capability-num">{c.num}</span>
+              <span
+                className="capability-icon"
+                style={{ color: c.accent, borderColor: `${c.accent}40` }}
+              >
+                {c.icon}
+              </span>
             </div>
-            <p>Care that feels human. Next-generation healthcare intelligence platform.</p>
+
+            <div className="capability-body">
+              <h3>{c.title}</h3>
+              <p>{c.desc}</p>
+            </div>
+
+            <div className="capability-footer">
+              <span className="capability-action">{c.actionText}</span>
+              <button
+                className="capability-arrow-btn"
+                aria-label={`Explore ${c.title}`}
+                type="button"
+              >
+                →
+              </button>
+            </div>
           </div>
-          <div className="footer-bottom">
-            <p>© 2026 MANVIA Health Technologies Inc. All rights reserved.</p>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ─── 4. CARE JOURNEY SECTION (NEW) ────────────────────────── */
+function CareJourneySection() {
+  return (
+    <section className="section-journey wrap" id="journey">
+      <div className="section-header-centered">
+        <div className="eyebrow pill">CONTINUITY OF CARE</div>
+        <h2>Your care journey, connected.</h2>
+        <p>
+          Experience an unbroken circle of care — from discovering symptom
+          signals to understanding insights, consulting specialists, tracking
+          milestones, and improving long-term health.
+        </p>
+      </div>
+
+      <CareJourneyScene />
+    </section>
+  );
+}
+
+/* ─── 5. SERVICES SECTION ──────────────────────────────────── */
+function ServicesSection() {
+  return (
+    <section className="section-services wrap" id="services">
+      <div className="section-header-centered">
+        <div className="eyebrow pill">COMPREHENSIVE CARE SUITE</div>
+        <h2>
+          Healthcare Services for
+          <br />
+          Every Need
+        </h2>
+        <p>
+          From everyday wellness tracking to licensed doctor consultations,
+          MANVIA supports every step of your health journey with safety and
+          precision.
+        </p>
+      </div>
+
+      <div className="service-grid-modern">
+        {implementedServices.map((svc) => (
+          <div className="service-card-modern" key={svc.title}>
+            <div className="service-icon-modern">{svc.ico}</div>
+            <div className="service-text-modern">
+              <b>{svc.title}</b>
+              <span>{svc.sub}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ─── 6. TRUST / SECURITY SECTION ──────────────────────────── */
+function TrustSection() {
+  const navigate = useNavigate();
+
+  return (
+    <section className="section-trust wrap" id="trust">
+      <div className="trust-container">
+        <div className="trust-content">
+          <div className="eyebrow pill">FOR A HEALTHIER TOMORROW</div>
+          <h2>
+            Trusted. Secure.
+            <br />
+            Human.
+          </h2>
+          <p>
+            Protected with access controls, auditable permissions, and
+            privacy-first architecture. Your data is always consent-governed
+            and guarded by human clinical oversight.
+          </p>
+
+          <div className="trust-pillars">
+            <span>🛡 Privacy-First</span>
+            <span>✓ Consent-Governed</span>
+            <span>⚖ Auditable Access</span>
+            <span>✦ Human Oversight</span>
+          </div>
+
+          <div style={{ marginTop: "24px" }}>
+            <button
+              className="primary"
+              onClick={() => navigate("/app")}
+              type="button"
+              aria-label="Explore Patient Workspace"
+            >
+              Explore Patient Workspace <span>→</span>
+            </button>
           </div>
         </div>
-      </footer>
+
+        <div className="trust-visual">
+          <TrustShieldScene />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─── 7. FINAL CALL TO ACTION ──────────────────────────────── */
+function FinalCTASection() {
+  const navigate = useNavigate();
+  const prefersReducedMotion = useReducedMotion();
+
+  return (
+    <section className="section-final-cta wrap">
+      <div className="final-cta-card">
+        {/* Background Ambient 3D Intelligence Core */}
+        <div className="final-cta-canvas-bg" aria-hidden="true">
+          <CanvasContainer
+            cameraPosition={[0, 0, 4.5]}
+            fov={40}
+            ariaLabel="Ambient MANVIA Intelligence Core"
+          >
+            <ManviaCore
+              scale={1.3}
+              reducedMotion={prefersReducedMotion}
+              highlight
+            />
+          </CanvasContainer>
+        </div>
+
+        <div className="final-cta-content">
+          <div className="eyebrow pill">CONNECTED CARE TODAY</div>
+          <h2>Healthcare should feel human.</h2>
+          <p>
+            Join thousands of patients and clinicians experiencing the next
+            generation of empathetic, intelligent, and proactive healthcare.
+          </p>
+
+          <div className="final-cta-actions">
+            <button
+              className="primary"
+              onClick={() => navigate("/app")}
+              type="button"
+              aria-label="Launch Patient Workspace"
+            >
+              Launch Patient Workspace <span>→</span>
+            </button>
+            <button
+              className="outline"
+              onClick={() => {
+                const el = document.getElementById("capabilities");
+                if (el) {
+                  el.scrollIntoView({ behavior: "smooth" });
+                } else {
+                  navigate("/app");
+                }
+              }}
+              type="button"
+              aria-label="Explore Capabilities"
+            >
+              Explore Capabilities <span>→</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ─── MAIN LANDING ROUTE ───────────────────────────────────── */
+export const LandingRoute: React.FC = () => {
+  const navigate = useNavigate();
+  const [showSplash, setShowSplash] = useState<boolean>(() => {
+    try {
+      return !sessionStorage.getItem("manvia_splash_shown");
+    } catch {
+      return false;
+    }
+  });
+
+  return (
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        background: "#ffffff",
+      }}
+    >
+      {showSplash && (
+        <SplashScreen
+          onComplete={() => {
+            try {
+              sessionStorage.setItem("manvia_splash_shown", "true");
+            } catch {
+              // ignore
+            }
+            setShowSplash(false);
+          }}
+        />
+      )}
+
+      <LandingHeader />
+
+      <main id="home" role="main" style={{ flex: 1 }}>
+        {/* ── 1. HERO ────────────────────────────────────────── */}
+        <section className="hero-modern">
+          <div className="wrap hero-inner-modern">
+            {/* Left Content */}
+            <div className="hero-copy-modern">
+              <div className="eyebrow pill">INTELLIGENCE FOR BETTER CARE</div>
+              <h1 className="hero-title-modern">
+                Care that feels <em>human.</em>
+              </h1>
+              <p className="hero-sub-modern">
+                Your health journey, with intelligence that cares. MANVIA
+                connects patients, verified clinicians, and proactive wellness
+                in one trusted, unified experience.
+              </p>
+
+              <div className="hero-actions-modern">
+                <button
+                  className="primary"
+                  onClick={() => {
+                    const el = document.getElementById("ecosystem");
+                    if (el) el.scrollIntoView({ behavior: "smooth" });
+                  }}
+                  type="button"
+                  aria-label="Explore 3D Healthcare Ecosystem"
+                >
+                  Explore 3D Ecosystem <span>↓</span>
+                </button>
+                <button
+                  className="outline"
+                  onClick={() => navigate("/app")}
+                  type="button"
+                  aria-label="Launch Patient Portal"
+                >
+                  Launch Patient Portal <span>→</span>
+                </button>
+                <button
+                  className="outline"
+                  onClick={() => navigate("/wellness")}
+                  type="button"
+                  aria-label="Open Wellness Hub"
+                >
+                  Open Wellness Hub <span>→</span>
+                </button>
+              </div>
+
+              <div className="trust-points-modern">
+                <div className="trust-point-item">
+                  <span className="trust-point-icon">⚙</span>
+                  <div>
+                    <b>AI-Powered</b>
+                    <span>Support</span>
+                  </div>
+                </div>
+                <div className="trust-point-item">
+                  <span className="trust-point-icon">♢</span>
+                  <div>
+                    <b>Verified</b>
+                    <span>Clinicians</span>
+                  </div>
+                </div>
+                <div className="trust-point-item">
+                  <span className="trust-point-icon">♙</span>
+                  <div>
+                    <b>Privacy-First</b>
+                    <span>Architecture</span>
+                  </div>
+                </div>
+                <div className="trust-point-item">
+                  <span className="trust-point-icon">♧</span>
+                  <div>
+                    <b>Consent-Aware</b>
+                    <span>Protection</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Right: Three.js Interactive Hero Ecosystem */}
+            <div className="hero-visual-modern">
+              <div className="hero-canvas-frame">
+                <CanvasContainer
+                  cameraPosition={[0, 0, 7.6]}
+                  fov={44}
+                  ariaLabel="MANVIA Care Intelligence Core and Healthcare Ecosystem 3D Scene"
+                >
+                  <HeroEcosystemScene />
+                </CanvasContainer>
+
+                <div className="hero-bubble-modern">
+                  Healthier Happier Together <span>♥</span>
+                </div>
+
+                <div className="hero-core-label">
+                  <span className="hero-core-dot" />
+                  <span>Care Intelligence Core</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* ── 2. CONNECTED HEALTHCARE ECOSYSTEM ──────────────── */}
+        <EcosystemSection />
+
+        {/* ── 3. AI COMPANION ────────────────────────────────── */}
+        <AICompanionSection />
+
+        {/* ── 4. CORE CAPABILITIES ───────────────────────────── */}
+        <CapabilitiesSection />
+
+        {/* ── 5. CARE JOURNEY (DISCOVER → IMPROVE) ───────────── */}
+        <CareJourneySection />
+
+        {/* ── 6. COMPREHENSIVE SERVICES ──────────────────────── */}
+        <ServicesSection />
+
+        {/* ── 7. TRUST & SECURITY ────────────────────────────── */}
+        <TrustSection />
+
+        {/* ── 8. FINAL CALL TO ACTION ────────────────────────── */}
+        <FinalCTASection />
+      </main>
+
+      {/* ── ENTERPRISE MEGA FOOTER ──────────────────────────── */}
+      <EnterpriseMegaFooter />
     </div>
   );
 };

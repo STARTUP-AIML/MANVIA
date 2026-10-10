@@ -30,13 +30,13 @@ export const DoctorBookingPage: React.FC = () => {
   const {
     data: offers = [],
     isLoading: isOffersLoading,
-  } = useDoctorOffers(doctorId);
+  } = useDoctorOffers(doctor?.publicDoctorId || doctorId);
 
   const {
     data: availability = [],
     isLoading: isAvailabilityLoading,
     refetch: refetchAvailability,
-  } = useDoctorAvailability(doctorId);
+  } = useDoctorAvailability(doctor?.publicDoctorId || doctorId);
 
   const createAppointmentMutation = useCreateAppointment();
 

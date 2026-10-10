@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../database/database.module.js';
 import { DoctorsModule } from '../doctors/doctors.module.js';
 import { CareRelationshipsModule } from '../care-relationships/care-relationships.module.js';
+import { HealthRecordsModule } from '../health-records/health-records.module.js';
 import { PatientWellnessController } from './controllers/patient-wellness.controller.js';
 import { DoctorWellnessController } from './controllers/doctor-wellness.controller.js';
 import { WellnessService } from './services/wellness.service.js';
@@ -12,7 +13,7 @@ import { WELLNESS_REPOSITORY } from './interfaces/wellness-repository.interface.
 import { WELLNESS_AUDIT_SERVICE } from './interfaces/wellness-audit-service.interface.js';
 
 @Module({
-  imports: [DatabaseModule, DoctorsModule, CareRelationshipsModule],
+  imports: [DatabaseModule, DoctorsModule, CareRelationshipsModule, HealthRecordsModule],
   controllers: [PatientWellnessController, DoctorWellnessController],
   providers: [
     WellnessService,

@@ -185,4 +185,85 @@ describe("Centralized ApiClient Foundation", () => {
     expect(result).toEqual({ data: "success-after-refresh" });
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
+
+  describe("P0.2 Relative Base URL & Proxy Error Handling", () => {
+    it("handles relative baseUrl /api/v1 cleanly without double prefixing", async () => {
+      const client = new ApiClient({ baseUrl: "/api/v1" });
+
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        headers: new Headers(),
+        text: () => Promise.resolve(JSON.stringify({ status: "ok" })),
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      // Call with standard endpoint
+      await client.get("/auth/me");
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const firstCallUrl = fetchMock.mock.calls[0]![0];
+      expect(firstCallUrl).toMatch(/\/api\/v1\/auth\/me$/);
+
+      // Call with endpoint already starting with /api/v1
+      await client.get("/api/v1/auth/me");
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      const secondCallUrl = fetchMock.mock.calls[1]![0];
+      expect(secondCallUrl).toMatch(/\/api\/v1\/auth\/me$/);
+      expect(secondCallUrl).not.toContain("/api/v1/api/v1");
+
+      // Call with endpoint starting with api/v1 (no leading slash)
+      await client.get("api/v1/patients/me");
+      expect(fetchMock).toHaveBeenCalledTimes(3);
+      const thirdCallUrl = fetchMock.mock.calls[2]![0];
+      expect(thirdCallUrl).toMatch(/\/api\/v1\/patients\/me$/);
+      expect(thirdCallUrl).not.toContain("/api/v1/api/v1");
+    });
+
+    it("normalizes Vite proxy 502/504 gateway error to user-friendly network error", async () => {
+      const client = new ApiClient({ baseUrl: "/api/v1" });
+
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: false,
+        status: 504,
+        statusText: "Gateway Timeout",
+        headers: new Headers(),
+        text: () =>
+          Promise.resolve(
+            "Error: connect ECONNREFUSED 127.0.0.1:3000 (proxy error)",
+          ),
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      try {
+        await client.get("/health");
+        expect.fail("Should have thrown ApiError");
+      } catch (err) {
+        expect(err).toBeInstanceOf(ApiError);
+        const apiErr = err as ApiError;
+        expect(apiErr.isNetworkError).toBe(true);
+        expect(apiErr.message).toBe(
+          "Network request failed. Ensure the server is reachable.",
+        );
+      }
+    });
+
+    it("normalizes browser TypeError fetch failure to user-friendly network error", async () => {
+      const client = new ApiClient({ baseUrl: "/api/v1" });
+
+      const fetchMock = vi.fn().mockRejectedValue(new TypeError("Failed to fetch"));
+      vi.stubGlobal("fetch", fetchMock);
+
+      try {
+        await client.get("/patients/me");
+        expect.fail("Should have thrown ApiError");
+      } catch (err) {
+        expect(err).toBeInstanceOf(ApiError);
+        const apiErr = err as ApiError;
+        expect(apiErr.isNetworkError).toBe(true);
+        expect(apiErr.message).toBe(
+          "Network request failed. Ensure the server is reachable.",
+        );
+      }
+    });
+  });
 });

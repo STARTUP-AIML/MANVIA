@@ -69,6 +69,17 @@ export interface AuthSessionTokens {
   expiresIn: number;
 }
 
+export interface SwitchRoleDto {
+  role: Role;
+}
+
+export interface SwitchRoleResponseDto {
+  accessToken: string;
+  expiresInSeconds: number;
+  activeRole: Role;
+  roles: Role[];
+}
+
 export interface AuthState {
   status: AuthStatus;
   user: UserResponseDto | null;
@@ -84,6 +95,7 @@ export interface AuthContextValue extends AuthState {
   register: (dto: RegisterDto) => Promise<AuthResponseDto>;
   logout: () => Promise<void>;
   hasRole: (roles: Role | Role[]) => boolean;
+  switchRole: (role: Role) => Promise<SwitchRoleResponseDto>;
   refreshSession: () => Promise<boolean>;
   clearError: () => void;
 }

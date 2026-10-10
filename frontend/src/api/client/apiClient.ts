@@ -62,18 +62,30 @@ export class ApiClient {
     }
 
     const statusCode = response.status;
+    const isProxyOrGatewayFailure =
+      (statusCode === 502 || statusCode === 504) &&
+      (rawText?.includes("ECONNREFUSED") ||
+        rawText?.includes("Proxy error") ||
+        rawText?.includes("Gateway") ||
+        !rawText ||
+        rawText.includes("<!DOCTYPE html>"));
+
     const message =
-      (typeof errorData?.message === "string" ? errorData.message : null) ||
-      (Array.isArray(errorData?.message)
-        ? errorData.message.join(", ")
-        : null) ||
-      response.statusText ||
-      "An unexpected error occurred";
+      isProxyOrGatewayFailure
+        ? "Network request failed. Ensure the server is reachable."
+        : (typeof errorData?.message === "string" ? errorData.message : null) ||
+          (Array.isArray(errorData?.message)
+            ? errorData.message.join(", ")
+            : null) ||
+          response.statusText ||
+          "An unexpected error occurred";
 
     const error =
-      typeof errorData?.error === "string"
-        ? errorData.error
-        : `HTTP_${statusCode}`;
+      isProxyOrGatewayFailure
+        ? "NETWORK_ERROR"
+        : typeof errorData?.error === "string"
+          ? errorData.error
+          : `HTTP_${statusCode}`;
     const timestamp =
       typeof errorData?.timestamp === "string"
         ? errorData.timestamp
@@ -84,7 +96,7 @@ export class ApiClient {
 
     const apiError = new ApiError(
       {
-        statusCode,
+        statusCode: isProxyOrGatewayFailure ? 0 : statusCode,
         error,
         message,
         details,
@@ -120,10 +132,21 @@ export class ApiClient {
     }, timeoutMs);
 
     // Build URL with query params
-    const rawUrl =
-      endpoint.startsWith("http://") || endpoint.startsWith("https://")
-        ? endpoint
-        : `${this.config.baseUrl.replace(/\/+$/, "")}/${endpoint.replace(/^\/+/, "")}`;
+    let rawUrl: string;
+    if (endpoint.startsWith("http://") || endpoint.startsWith("https://")) {
+      rawUrl = endpoint;
+    } else {
+      const baseClean = this.config.baseUrl.replace(/\/+$/, "");
+      let pathClean = endpoint.replace(/^\/+/, "");
+      // Prevent double prefixing if base already ends with /api/v1
+      if (
+        baseClean.endsWith("/api/v1") &&
+        (pathClean === "api/v1" || pathClean.startsWith("api/v1/"))
+      ) {
+        pathClean = pathClean.replace(/^api\/v1\/?/, "");
+      }
+      rawUrl = pathClean.length > 0 ? `${baseClean}/${pathClean}` : baseClean;
+    }
 
     const url = new URL(
       rawUrl,
@@ -261,7 +284,18 @@ export class ApiClient {
         );
       }
 
-      if (err instanceof TypeError && err.message.includes("fetch")) {
+      if (
+        err instanceof TypeError ||
+        (err instanceof Error &&
+          (err.name === "TypeError" ||
+            err.message.includes("fetch") ||
+            err.message.includes("Failed to fetch") ||
+            err.message.includes("NetworkError") ||
+            err.message.includes("Load failed") ||
+            err.message.includes("network") ||
+            err.message.includes("ECONNREFUSED") ||
+            err.message.includes("ECONNRESET")))
+      ) {
         throw ApiError.network(
           "Network request failed. Ensure the server is reachable.",
         );

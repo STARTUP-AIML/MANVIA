@@ -31,16 +31,22 @@ describe('Doctor Availability & Consultation Offers Integration Tests with Postg
   afterAll(async () => {
     if (createdUserIds.length > 0) {
       try {
-        await prismaService.refund.deleteMany({});
-        await prismaService.doctorPayout.deleteMany({});
-        await prismaService.invoice.deleteMany({});
-        await prismaService.paymentAttempt.deleteMany({});
-        await prismaService.payment.deleteMany({});
-        await prismaService.appointmentCancellation.deleteMany({});
-        await prismaService.preConsultation.deleteMany({});
-        await prismaService.appointment.deleteMany({});
-        await prismaService.consultationOffer.deleteMany({});
-        await prismaService.doctorAvailability.deleteMany({});
+        const testDocs = await prismaService.doctorProfile.findMany({
+          where: { userId: { in: createdUserIds } },
+          select: { id: true },
+        });
+        const testDocIds = testDocs.map((d) => d.id);
+        if (testDocIds.length > 0) {
+          await prismaService.consultationOffer.deleteMany({
+            where: { doctorId: { in: testDocIds } },
+          });
+          await prismaService.doctorAvailability.deleteMany({
+            where: { doctorId: { in: testDocIds } },
+          });
+          await prismaService.appointment.deleteMany({
+            where: { doctorId: { in: testDocIds } },
+          });
+        }
         await prismaService.doctorProfile.deleteMany({
           where: { userId: { in: createdUserIds } },
         });

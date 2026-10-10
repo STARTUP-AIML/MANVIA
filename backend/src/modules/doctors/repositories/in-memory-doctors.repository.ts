@@ -287,6 +287,11 @@ export class InMemoryDoctorsRepository implements IDoctorsRepository {
       (doc) => doc.verificationStatus === VerificationStatus.VERIFIED,
     );
 
+    if (criteria.query && criteria.query.trim()) {
+      const q = criteria.query.toLowerCase().trim();
+      filtered = filtered.filter((doc) => doc.displayName.toLowerCase().includes(q));
+    }
+
     // Filter by specialty if requested
     if (criteria.specialty) {
       const specQuery = criteria.specialty.toLowerCase();

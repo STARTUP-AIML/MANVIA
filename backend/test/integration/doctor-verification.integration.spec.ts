@@ -30,15 +30,39 @@ describe('Doctor Verification Integration Tests with PostgreSQL', () => {
 
   afterAll(async () => {
     if (createdUserIds.length > 0) {
-      await prismaService.verificationReview.deleteMany({});
-      await prismaService.verificationDocument.deleteMany({});
-      await prismaService.doctorVerification.deleteMany({});
-      await prismaService.doctorProfile.deleteMany({
-        where: { userId: { in: createdUserIds } },
-      });
-      await prismaService.user.deleteMany({
-        where: { id: { in: createdUserIds } },
-      });
+      try {
+        const testDocs = await prismaService.doctorProfile.findMany({
+          where: { userId: { in: createdUserIds } },
+          select: { id: true },
+        });
+        const testDocIds = testDocs.map((d) => d.id);
+        if (testDocIds.length > 0) {
+          const testVerifs = await prismaService.doctorVerification.findMany({
+            where: { doctorId: { in: testDocIds } },
+            select: { id: true },
+          });
+          const testVerifIds = testVerifs.map((v) => v.id);
+          if (testVerifIds.length > 0) {
+            await prismaService.verificationReview.deleteMany({
+              where: { verificationId: { in: testVerifIds } },
+            });
+            await prismaService.verificationDocument.deleteMany({
+              where: { verificationId: { in: testVerifIds } },
+            });
+            await prismaService.doctorVerification.deleteMany({
+              where: { id: { in: testVerifIds } },
+            });
+          }
+        }
+        await prismaService.doctorProfile.deleteMany({
+          where: { userId: { in: createdUserIds } },
+        });
+        await prismaService.user.deleteMany({
+          where: { id: { in: createdUserIds } },
+        });
+      } catch {
+        // Safe teardown
+      }
     }
     await prismaService.onApplicationShutdown();
   });

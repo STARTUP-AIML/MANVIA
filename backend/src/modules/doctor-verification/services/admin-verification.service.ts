@@ -1,5 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common';
-import { ConflictError, NotFoundError, ValidationError } from '../../../common/errors/app-error.js';
+import {
+  ConflictError,
+  ForbiddenError,
+  NotFoundError,
+  ValidationError,
+} from '../../../common/errors/app-error.js';
 import { DoctorVerificationStatus } from '../enums/doctor-verification-status.enum.js';
 import {
   DOCTOR_VERIFICATION_REPOSITORY,
@@ -76,6 +81,13 @@ export class AdminVerificationService {
       throw new NotFoundError(`Doctor verification submission '${verificationId}' not found`);
     }
 
+    // Prevent unauthorized self-approval
+    if (existing.doctorProfile?.userId === adminId) {
+      throw new ForbiddenError(
+        'Administrators cannot approve their own physician verification submissions',
+      );
+    }
+
     // Concurrency / current-state checks
     if (existing.status === DoctorVerificationStatus.APPROVED) {
       throw new ConflictError('Verification submission has already been approved');
@@ -123,6 +135,13 @@ export class AdminVerificationService {
     const existing = await this.verificationRepo.findById(verificationId);
     if (!existing) {
       throw new NotFoundError(`Doctor verification submission '${verificationId}' not found`);
+    }
+
+    // Prevent unauthorized self-rejection
+    if (existing.doctorProfile?.userId === adminId) {
+      throw new ForbiddenError(
+        'Administrators cannot reject their own physician verification submissions',
+      );
     }
 
     // Concurrency / current-state checks

@@ -36,6 +36,14 @@ export interface DoctorProfileEntity {
   verificationStatus: VerificationStatus;
   defaultConsultationFee: number;
   currency: string;
+  clinicName?: string | null | undefined;
+  city?: string | null | undefined;
+  state?: string | null | undefined;
+  clinicalInterests?: string[] | undefined;
+  consultationModes?: string[] | undefined;
+  contactDisplay?: string | null | undefined;
+  profileImageUrl?: string | null | undefined;
+  isDemo?: boolean | undefined;
   verifiedAt?: Date | null | undefined;
   createdAt: Date;
   updatedAt: Date;

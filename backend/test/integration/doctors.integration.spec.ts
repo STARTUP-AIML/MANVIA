@@ -26,9 +26,15 @@ describe('Doctors Repository Integration & PostgreSQL Persistence', () => {
 
   afterAll(async () => {
     if (createdUserIds.length > 0) {
-      await prismaService.doctorSpecialty.deleteMany({});
-      await prismaService.doctorLanguage.deleteMany({});
-      await prismaService.doctorQualification.deleteMany({});
+      await prismaService.doctorSpecialty.deleteMany({
+        where: { doctor: { userId: { in: createdUserIds } } },
+      });
+      await prismaService.doctorLanguage.deleteMany({
+        where: { doctor: { userId: { in: createdUserIds } } },
+      });
+      await prismaService.doctorQualification.deleteMany({
+        where: { doctor: { userId: { in: createdUserIds } } },
+      });
       await prismaService.doctorProfile.deleteMany({
         where: { userId: { in: createdUserIds } },
       });
@@ -204,7 +210,7 @@ describe('Doctors Repository Integration & PostgreSQL Persistence', () => {
       new Date(),
     );
 
-    const publicDocs = await repository.findPublicDoctors({});
+    const publicDocs = await repository.findPublicDoctors({ limit: 100 });
     const foundDraft = publicDocs.doctors.some((d) => d.id === draftDoctor.id);
     const foundVerified = publicDocs.doctors.some((d) => d.id === verifiedDoctor.id);
 

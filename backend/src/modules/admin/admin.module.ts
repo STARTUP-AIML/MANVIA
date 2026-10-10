@@ -1,5 +1,6 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { DatabaseModule } from '../../database/database.module.js';
+import { AppointmentsModule } from '../appointments/appointments.module.js';
 
 // Guards
 import { AdminAuthGuard } from './guards/admin-auth.guard.js';
@@ -21,7 +22,7 @@ import { AdminSystemController } from './controllers/admin-system.controller.js'
 import { AdminClinicalIncidentController } from './controllers/admin-clinical-incident.controller.js';
 
 @Module({
-  imports: [DatabaseModule],
+  imports: [DatabaseModule, forwardRef(() => AppointmentsModule)],
   controllers: [
     AdminUsersController,
     AdminOversightController,

@@ -16,23 +16,23 @@ export interface EmptyChatStateProps {
 const SUGGESTED_PROMPTS = [
   {
     icon: "🌙",
-    label: "Sleep Routine",
+    label: "Sleep Habits",
     prompt: "How can I improve my sleep routine naturally?",
   },
   {
+    icon: "🌅",
+    label: "Daily Routine",
+    prompt: "How can I build a consistent, healthy daily routine?",
+  },
+  {
     icon: "🧘",
-    label: "Stress Relief",
-    prompt: "Tips for managing daily stress and taking mindful breaks",
+    label: "Stress Management",
+    prompt: "Can you teach me simple stress-management and breathing techniques?",
   },
   {
-    icon: "💧",
-    label: "Hydration",
-    prompt: "Healthy hydration habits for workdays",
-  },
-  {
-    icon: "🥗",
-    label: "Nutrition Basics",
-    prompt: "Understanding balanced nutrition and mindful eating basics",
+    icon: "🩺",
+    label: "Doctor Preparation",
+    prompt: "Help me organize and prepare clear questions for my upcoming doctor appointment",
   },
 ];
 
@@ -57,19 +57,27 @@ export const EmptyChatState: React.FC<EmptyChatStateProps> = ({
     >
       <div
         style={{
-          width: "64px",
-          height: "64px",
+          width: "68px",
+          height: "68px",
           borderRadius: "50%",
-          backgroundColor: "var(--color-primary-subtle)",
+          overflow: "hidden",
+          border: "2.5px solid var(--manvia-primary-500)",
+          boxShadow: "0 4px 16px rgba(13, 148, 136, 0.2)",
+          marginBottom: "var(--space-4)",
+          backgroundColor: "#f1f5f9",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          fontSize: "2rem",
-          marginBottom: "var(--space-4)",
         }}
-        aria-hidden="true"
       >
-        🤖
+        <img
+          src="/manvia-companion-portrait.jpg"
+          alt="MANVIA Healthcare Companion"
+          style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center 20%" }}
+          onError={(e) => {
+            e.currentTarget.style.display = "none";
+          }}
+        />
       </div>
 
       <h2

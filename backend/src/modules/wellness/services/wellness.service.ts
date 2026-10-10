@@ -1,4 +1,4 @@
-import { Inject, Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import { NotFoundError, ValidationError } from '../../../common/errors/app-error.js';
 import {
   WELLNESS_REPOSITORY,
@@ -13,6 +13,8 @@ import {
   CARE_RELATIONSHIP_REPOSITORY,
   type ICareRelationshipRepository,
 } from '../../care-relationships/interfaces/care-relationship-repository.interface.js';
+import { HealthTimelineService } from '../../health-records/services/health-timeline.service.js';
+import { TimelineEventType } from '../../health-records/enums/timeline-event-type.enum.js';
 import type {
   CreateWellnessCheckInDto,
   UpdateWellnessCheckInDto,
@@ -38,6 +40,9 @@ export class WellnessService {
     private readonly careRelService: CareRelationshipsService,
     @Inject(CARE_RELATIONSHIP_REPOSITORY)
     private readonly careRelRepo: ICareRelationshipRepository,
+    @Optional()
+    @Inject(HealthTimelineService)
+    private readonly healthTimelineService?: HealthTimelineService,
   ) {}
 
   /**
@@ -79,6 +84,30 @@ export class WellnessService {
         checkInId: checkIn.id,
       },
     });
+
+    // Record on longitudinal Health Timeline
+    if (this.healthTimelineService) {
+      try {
+        await this.healthTimelineService.recordEvent({
+          patientId: patient.id,
+          eventType: TimelineEventType.WELLNESS_CHECK_IN,
+          title: `Daily Wellness Check-in (${checkIn.mood})`,
+          summary: `Mood: ${checkIn.mood}, Energy: ${checkIn.energy}/10, Stress: ${checkIn.stress}/10, Sleep: ${checkIn.sleepQuality}/10`,
+          sourceType: 'WELLNESS_CHECK_IN',
+          sourceId: checkIn.id,
+          eventTimestamp: checkIn.recordedAt,
+          metadata: {
+            mood: checkIn.mood,
+            energy: checkIn.energy,
+            stress: checkIn.stress,
+            sleepQuality: checkIn.sleepQuality,
+            sleepDurationMinutes: checkIn.sleepDurationMinutes,
+          },
+        });
+      } catch {
+        // Non-fatal error; failure to record timeline event does not abort check-in
+      }
+    }
 
     return this.mapToCheckInDto(checkIn);
   }

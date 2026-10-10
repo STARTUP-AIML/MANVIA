@@ -52,10 +52,10 @@ export const AiDisclosureBanner: React.FC<AiDisclosureBannerProps> = ({
           }}
         >
           <span
-            style={{ fontSize: "1.25rem", lineHeight: 1 }}
+            style={{ fontSize: "1.25rem", lineHeight: 1, color: "var(--color-primary-600)" }}
             aria-hidden="true"
           >
-            🤖
+            ✦
           </span>
           <span
             style={{
