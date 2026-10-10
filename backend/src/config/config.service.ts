@@ -117,6 +117,14 @@ export class ConfigService {
     return this.config.GEMINI_MODEL;
   }
 
+  public get groqApiKey(): string {
+    return this.config.GROQ_API_KEY || '';
+  }
+
+  public get groqModel(): string {
+    return this.config.GROQ_MODEL || 'openai/gpt-oss-20b';
+  }
+
   public get isAiSafetyEnabled(): boolean {
     return this.config.AI_SAFETY_ENABLED;
   }

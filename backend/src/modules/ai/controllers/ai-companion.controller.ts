@@ -7,6 +7,7 @@ import {
   HttpCode,
   HttpStatus,
   Param,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -28,9 +29,12 @@ import {
   AIFeedbackResponseDto,
   CreateAIConversationDto,
   PaginatedAIConversationsResponseDto,
+  ProcessAttachmentDto,
   SendAIMessageDto,
   SendAIMessageResponseDto,
   SubmitAIFeedbackDto,
+  TranscribeAudioDto,
+  UpdateAIConversationDto,
 } from '../dto/index.js';
 import { CreateAIMemoryDto } from '../memory/dto/create-memory.dto.js';
 import { AIMemoryResponseDto } from '../memory/dto/ai-memory-response.dto.js';
@@ -154,6 +158,33 @@ export class AICompanionController {
     return this.companionService.deleteConversation(conversationId, user.userId);
   }
 
+  @Patch('conversations/:conversationId')
+  @ApiOperation({
+    summary: 'Update or rename an AI conversation',
+    description: 'Renames an active AI conversation session owned by the authenticated user.',
+  })
+  @ApiParam({
+    name: 'conversationId',
+    description: 'Internal UUID or public identifier (e.g., AIC-XXXXXXXX)',
+    example: 'AIC-7X9B2K5M',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Conversation updated successfully',
+    type: AIConversationResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Validation failed' })
+  @ApiResponse({ status: 401, description: 'Authentication credentials required' })
+  @ApiResponse({ status: 403, description: 'Access denied: You do not own this conversation' })
+  @ApiResponse({ status: 404, description: 'Conversation not found' })
+  public async updateConversation(
+    @CurrentUser() user: CurrentUserContext,
+    @Param('conversationId') conversationId: string,
+    @Body() dto: UpdateAIConversationDto,
+  ): Promise<AIConversationResponseDto> {
+    return this.companionService.updateConversation(conversationId, user.userId, dto);
+  }
+
   @Post('conversations/:conversationId/messages')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
@@ -221,6 +252,57 @@ export class AICompanionController {
     @Body() dto: SubmitAIFeedbackDto,
   ): Promise<AIFeedbackResponseDto> {
     return this.companionService.submitFeedback(messageId, user.userId, dto);
+  }
+
+  @Post('transcribe')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Transcribe spoken audio into text using Groq Whisper',
+    description:
+      'Receives base64-encoded audio recorded by user action and transcribes it using Groq whisper-large-v3-turbo. ' +
+      'Strictly requires authenticated session. Provider credentials remain on server.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Audio transcribed successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Invalid audio payload or payload exceeds size limit' })
+  @ApiResponse({ status: 401, description: 'Authentication credentials required' })
+  public async transcribeAudio(
+    @CurrentUser() user: CurrentUserContext,
+    @Body() dto: TranscribeAudioDto,
+  ): Promise<{ text: string; language?: string; duration?: number }> {
+    return this.companionService.transcribeAudio(user.userId, dto);
+  }
+
+  @Post('attachments/process')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Process and extract text from supported document attachments',
+    description:
+      'Extracts clean textual content from supported document attachments (.txt, .md, .csv, .json, .pdf). ' +
+      'Enforces size limits (max 5MB) and character limits. Informs user when image OCR is unsupported.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Document processed and text extracted successfully',
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Unsupported format, invalid content, or exceeds size limits',
+  })
+  @ApiResponse({ status: 401, description: 'Authentication credentials required' })
+  public async processAttachment(
+    @CurrentUser() user: CurrentUserContext,
+    @Body() dto: ProcessAttachmentDto,
+  ): Promise<{
+    filename: string;
+    mimeType: string;
+    extractedText: string;
+    characterCount: number;
+    truncated: boolean;
+  }> {
+    return this.companionService.processAttachment(user.userId, dto);
   }
 
   // ============================================================================

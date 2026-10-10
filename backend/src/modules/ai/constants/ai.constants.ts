@@ -20,3 +20,9 @@ export const MAX_MESSAGE_CONTENT_LENGTH = 4000;
 export const MOCK_AI_PROVIDER_NAME = 'MOCK_PROVIDER';
 
 export const MOCK_AI_MODEL_NAME = 'mock-companion-v1';
+
+export const GROQ_AI_PROVIDER_NAME = 'groq';
+
+export const DEFAULT_GROQ_MODEL = 'openai/gpt-oss-20b';
+
+export const GROQ_API_BASE_URL = 'https://api.groq.com/openai/v1';

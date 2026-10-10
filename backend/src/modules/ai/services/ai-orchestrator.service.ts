@@ -169,13 +169,18 @@ export class AIOrchestratorService {
           conversationId,
           userMessageId,
           correlationId,
-          error: 'Provider call failed',
+          error: errorMessage,
         },
       });
 
-      throw new InternalServerError(
-        'AI service is temporarily unavailable. Please try again shortly.',
-      );
+      const userFacing =
+        errorMessage.includes('rate limit') ||
+        errorMessage.includes('timed out') ||
+        errorMessage.includes('temporarily unavailable')
+          ? errorMessage
+          : 'AI service is temporarily unavailable. Please try again shortly.';
+
+      throw new InternalServerError(userFacing);
     }
 
     // 6. Safety Post-check

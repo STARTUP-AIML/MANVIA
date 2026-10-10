@@ -10,6 +10,7 @@ import { AIContextService } from './services/ai-context.service.js';
 import { AIAuditService } from './services/ai-audit.service.js';
 import { MockAIProvider } from './providers/mock-ai.provider.js';
 import { GeminiAIProvider } from './providers/gemini-ai.provider.js';
+import { GroqAIProvider } from './providers/groq-ai.provider.js';
 import { InMemoryAIRepository } from './repositories/in-memory-ai.repository.js';
 import { PrismaAIRepository } from './repositories/prisma-ai.repository.js';
 import {
@@ -50,6 +51,7 @@ import { AIHandoffService } from './handoff/ai-handoff.service.js';
     // Real and Mock Provider Implementations
     MockAIProvider,
     GeminiAIProvider,
+    GroqAIProvider,
     InMemoryAIRepository,
     PrismaAIRepository,
     // Safety Services & Classifiers
@@ -73,19 +75,57 @@ import { AIHandoffService } from './handoff/ai-handoff.service.js';
     // Runtime DI Token Bindings with Real Provider Defaults & Test Fallbacks
     {
       provide: AI_PROVIDER,
-      useFactory: (config: ConfigService, gemini: GeminiAIProvider, mock: MockAIProvider) => {
+      useFactory: (
+        config: ConfigService,
+        gemini: GeminiAIProvider,
+        groq: GroqAIProvider,
+        mock: MockAIProvider,
+      ) => {
         const providerName = (config.aiProvider || '').toLowerCase();
         const isTest = process.env.NODE_ENV === 'test' || Boolean(process.env.VITEST);
+
         // Test default: MOCK PROVIDER (unless explicitly requested via AI_USE_REAL_PROVIDER=true)
         if (isTest && process.env.AI_USE_REAL_PROVIDER !== 'true') {
           return mock;
         }
+
         if (providerName === 'mock') {
+          if (config.isProduction) {
+            throw new Error(
+              'AI provider configuration error: mock provider cannot be used in production',
+            );
+          }
           return mock;
         }
-        return gemini;
+
+        if (providerName === 'groq') {
+          if (!config.groqApiKey) {
+            throw new Error(
+              'AI provider configuration error: GROQ_API_KEY is not configured in environment',
+            );
+          }
+          return groq;
+        }
+
+        if (providerName === 'gemini') {
+          // If Gemini is specified but GEMINI_API_KEY is not configured, fall back to MockAIProvider in dev
+          // so local development works reliably out-of-the-box instead of throwing unhandled 500s.
+          if (!config.geminiApiKey) {
+            if (config.isProduction) {
+              throw new Error(
+                'AI provider configuration error: GEMINI_API_KEY is not configured in environment',
+              );
+            }
+            return mock;
+          }
+          return gemini;
+        }
+
+        throw new Error(
+          `AI provider configuration error: unsupported AI_PROVIDER "${config.aiProvider}". Supported values: "groq", "gemini", "mock"`,
+        );
       },
-      inject: [ConfigService, GeminiAIProvider, MockAIProvider],
+      inject: [ConfigService, GeminiAIProvider, GroqAIProvider, MockAIProvider],
     },
     {
       provide: AI_REPOSITORY,
@@ -164,6 +204,9 @@ import { AIHandoffService } from './handoff/ai-handoff.service.js';
         if (providerName === 'mock') {
           return mockRealtime;
         }
+        if (providerName === 'gemini' && !config.geminiApiKey) {
+          return mockRealtime;
+        }
         return geminiRealtime;
       },
       inject: [ConfigService, GeminiRealtimeProvider, MockRealtimeProvider],
@@ -189,6 +232,7 @@ import { AIHandoffService } from './handoff/ai-handoff.service.js';
     PrismaAIRepository,
     MockAIProvider,
     GeminiAIProvider,
+    GroqAIProvider,
     MockSafetyClassifier,
     LayeredSafetyClassifier,
     MockMedicalRetriever,

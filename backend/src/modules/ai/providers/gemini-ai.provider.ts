@@ -55,7 +55,11 @@ export class GeminiAIProvider implements IAIProvider {
     }
 
     const apiKey = this.configService.geminiApiKey;
-    const model = this.configService.geminiModel || 'gemini-3.8-flash';
+    let model = this.configService.geminiModel || 'gemini-1.5-flash';
+    // Normalize any legacy/placeholder model names to valid Gemini v1beta model
+    if (model === 'gemini-3.8-flash' || model === 'gemini-3.8-live') {
+      model = 'gemini-1.5-flash';
+    }
 
     if (!apiKey) {
       this.logger.error('GEMINI_API_KEY is not configured in environment');
@@ -78,25 +82,53 @@ export class GeminiAIProvider implements IAIProvider {
 
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
-    let response: Response;
-    try {
-      response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(bodyPayload),
-        signal: AbortSignal.timeout(30000),
-      });
-    } catch (err) {
-      const isTimeout = err instanceof Error && err.name === 'TimeoutError';
+    let response: Response | null = null;
+    let lastError: Error | null = null;
+    const maxRetries = 1;
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(bodyPayload),
+          signal: AbortSignal.timeout(15000), // 15s bounded timeout
+        });
+
+        // Retry transient upstream rate limit (429) or temporary server errors (502/503)
+        if (
+          (response.status === 429 || response.status === 502 || response.status === 503) &&
+          attempt < maxRetries
+        ) {
+          this.logger.warn(`Gemini API returned status ${response.status}; retrying in 1000ms...`);
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          continue;
+        }
+
+        break;
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+        if (attempt < maxRetries) {
+          this.logger.warn(
+            `Gemini network/timeout error: ${lastError.message}; retrying in 1000ms...`,
+          );
+          await new Promise((resolve) => setTimeout(resolve, 1000));
+          continue;
+        }
+        break;
+      }
+    }
+
+    if (!response) {
+      const isTimeout =
+        lastError?.name === 'TimeoutError' || lastError?.message.includes('timeout');
       const msg = isTimeout
-        ? 'Request timed out after 30s'
-        : err instanceof Error
-          ? err.message
-          : 'Network error';
+        ? 'AI service request timed out after 15s. Please try again.'
+        : `AI service connection failed: ${lastError?.message || 'Network error'}`;
       this.logger.error(`Gemini API connection error: ${msg}`);
-      throw new Error(`AI service connection failed: ${msg}`);
+      throw new Error(msg);
     }
 
     const latencyMs = Math.max(1, Date.now() - startTime);
@@ -115,6 +147,11 @@ export class GeminiAIProvider implements IAIProvider {
       this.logger.error(`Gemini API failed: ${errorDetails} (latency: ${latencyMs}ms)`);
       if (response.status === 429) {
         throw new Error('AI service rate limit exceeded. Please try again shortly.');
+      }
+      if (response.status === 502 || response.status === 503) {
+        throw new Error(
+          'AI upstream provider is temporarily unavailable. Please try again shortly.',
+        );
       }
       throw new Error(`AI service provider error: ${errorDetails}`);
     }

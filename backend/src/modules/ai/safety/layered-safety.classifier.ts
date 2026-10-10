@@ -187,7 +187,10 @@ export class LayeredSafetyClassifier implements SafetyClassifier {
     locale: string,
     apiKey: string,
   ): Promise<SafetyClassificationResult | null> {
-    const model = this.configService?.aiSafetyModel || 'gemini-3.8-flash';
+    let model = this.configService?.aiSafetyModel || 'gemini-1.5-flash';
+    if (model === 'gemini-3.8-flash' || model === 'gemini-3.8-live') {
+      model = 'gemini-1.5-flash';
+    }
     const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
     const prompt = `You are a healthcare safety classifier for the MANVIA AI companion platform.

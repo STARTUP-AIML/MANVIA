@@ -84,10 +84,12 @@ export const EnvSchema = z
     // AI & Realtime Configuration (Milestone 6)
     AI_PROVIDER: z.string().default('gemini'),
     GEMINI_API_KEY: z.string().optional().default(''),
-    GEMINI_MODEL: z.string().default('gemini-3.8-flash'),
+    GEMINI_MODEL: z.string().default('gemini-1.5-flash'),
+    GROQ_API_KEY: z.string().optional().default(''),
+    GROQ_MODEL: z.string().default('openai/gpt-oss-20b'),
     AI_SAFETY_ENABLED: z.coerce.boolean().default(true),
     AI_SAFETY_PROVIDER: z.string().default('gemini'),
-    AI_SAFETY_MODEL: z.string().default('gemini-3.8-flash'),
+    AI_SAFETY_MODEL: z.string().default('gemini-1.5-flash'),
     RAG_ENABLED: z.coerce.boolean().default(true),
     RAG_TOP_K: z.coerce.number().int().positive().default(5),
     RAG_MIN_RELEVANCE: z.coerce.number().min(0).max(1).default(0.7),
@@ -121,7 +123,26 @@ export const EnvSchema = z
     FRONTEND_URL: z.string().default('http://localhost:5173'),
   })
   .superRefine((data, ctx) => {
+    const normalizedAiProvider = data.AI_PROVIDER.toLowerCase();
+    if (!['gemini', 'groq', 'mock'].includes(normalizedAiProvider)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['AI_PROVIDER'],
+        message: `Invalid AI_PROVIDER: "${data.AI_PROVIDER}". Supported providers are "gemini", "groq", or "mock".`,
+      });
+    }
+
     if (data.NODE_ENV === 'production') {
+      if (
+        normalizedAiProvider === 'groq' &&
+        (!data.GROQ_API_KEY || data.GROQ_API_KEY.includes('placeholder'))
+      ) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['GROQ_API_KEY'],
+          message: 'In production with AI_PROVIDER=groq, GROQ_API_KEY must be configured.',
+        });
+      }
       if (
         data.JWT_SECRET.toLowerCase().includes('placeholder') ||
         data.JWT_SECRET.toLowerCase().includes('dev-only') ||

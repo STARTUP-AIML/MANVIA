@@ -1,4 +1,7 @@
 export * from './create-conversation.dto.js';
+export * from './update-conversation.dto.js';
+export * from './transcribe-audio.dto.js';
+export * from './process-attachment.dto.js';
 export * from './send-message.dto.js';
 export * from './ai-feedback.dto.js';
 export * from './ai-query.dto.js';
