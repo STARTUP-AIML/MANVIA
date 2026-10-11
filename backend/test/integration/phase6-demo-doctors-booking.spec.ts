@@ -71,7 +71,7 @@ describe('Phase 6 — 10 Indian Demo Doctors, Offers, Availability, and Booking 
     for (const doc of demoDoctors) {
       const primary = doc.specialties.find((s) => s.isPrimary)?.specialty.name;
       if (primary && primary in counts) {
-        counts[primary]++;
+        counts[primary] = (counts[primary] ?? 0) + 1;
       }
     }
 
@@ -141,6 +141,10 @@ describe('Phase 6 — 10 Indian Demo Doctors, Offers, Availability, and Booking 
     expect(publicDocs.doctors).toHaveLength(10);
 
     const first = publicDocs.doctors[0];
+    if (!first) {
+      throw new Error('Expected at least one demo doctor');
+    }
+
     expect(first.isDemo).toBe(true);
     expect(first.currency).toBe('INR');
     expect(first.contactDisplay).toMatch(/^DEMO-/);

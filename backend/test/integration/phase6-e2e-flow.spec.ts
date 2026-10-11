@@ -103,6 +103,9 @@ describe('Phase 6 End-to-End Booking, Accept/Decline & Notification Workflow', (
     tomorrow.setUTCHours(10, 0, 0, 0);
 
     const startAt = new Date(tomorrow);
+    if (!offer) {
+      throw new Error('Expected a consultation offer for the test');
+    }
     const endAt = new Date(startAt.getTime() + offer.durationMinutes * 60 * 1000);
 
     const appt = await prisma.appointment.create({

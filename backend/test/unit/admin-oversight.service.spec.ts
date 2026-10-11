@@ -13,10 +13,13 @@ describe('AdminOversightService (Unit)', () => {
     doctorProfile: {
       findMany: ReturnType<typeof vi.fn>;
       count: ReturnType<typeof vi.fn>;
+      groupBy: ReturnType<typeof vi.fn>;
     };
     appointment: {
       findMany: ReturnType<typeof vi.fn>;
       count: ReturnType<typeof vi.fn>;
+      findFirst: ReturnType<typeof vi.fn>;
+      groupBy: ReturnType<typeof vi.fn>;
     };
     careRelationship: {
       findMany: ReturnType<typeof vi.fn>;
