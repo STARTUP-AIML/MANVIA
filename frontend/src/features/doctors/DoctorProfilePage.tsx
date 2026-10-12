@@ -116,16 +116,16 @@ export const DoctorProfilePage: React.FC = () => {
         </Link>
       </div>
 
-      {/* Healthcare Integrity / Fictional Demo Clinician Notice */}
+      {/* Healthcare Integrity / Demonstration Environment Notice */}
       {doctor.isDemo && (
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
             gap: '12px',
-            padding: '14px 18px',
+            padding: '12px 16px',
             backgroundColor: '#fef3c7',
-            borderRadius: '14px',
+            borderRadius: '12px',
             border: '1px solid #fde68a',
             color: '#92400e',
             fontSize: '13px',
@@ -134,9 +134,9 @@ export const DoctorProfilePage: React.FC = () => {
           role="note"
           aria-label="Fictional Demo Clinician Notice"
         >
-          <span style={{ fontSize: '20px' }}>⚠️</span>
+          <span style={{ fontSize: '16px' }}>ℹ️</span>
           <div>
-            <strong>Fictional Demo Clinician Profile:</strong> This profile represents a demonstration practitioner ({doctor.displayName}) designed for evaluating consultation options, scheduling, and pre-consultation flows within the MANVIA platform.
+            <strong>Demo clinician ({doctor.displayName}):</strong> Demonstration environment profile designed for evaluation of consultation scheduling and care pathways.
           </div>
         </div>
       )}

@@ -11,7 +11,7 @@ import {
   type UseMutationResult,
   type UseQueryResult,
 } from "@tanstack/react-query";
-import { useAuth } from "@/auth/AuthContext";
+
 import { aiCompanionService } from '@/features/ai-companion/api/aiCompanionService';
 import {
   AIMessageRole,
@@ -50,13 +50,11 @@ export function useAiConversationsQuery(
   },
   options?: { enabled?: boolean },
 ): UseQueryResult<PaginatedAIConversationsResponseDto, ApiError> {
-  const { isAuthenticated, status } = useAuth();
-  const isAuthReady = isAuthenticated && status === "AUTHENTICATED";
   return useQuery<PaginatedAIConversationsResponseDto, ApiError>({
     queryKey: AI_QUERY_KEYS.conversations(params),
     queryFn: () => aiCompanionService.listConversations(params),
     staleTime: 1000 * 60 * 1, // 1 minute
-    enabled: isAuthReady && (options?.enabled ?? true),
+    enabled: options?.enabled ?? true,
   });
 }
 
@@ -67,16 +65,14 @@ export function useAiConversationQuery(
   conversationId?: string,
   options?: { enabled?: boolean },
 ): UseQueryResult<AIConversationDetailResponseDto, ApiError> {
-  const { isAuthenticated, status } = useAuth();
-  const isAuthReady = isAuthenticated && status === "AUTHENTICATED";
   return useQuery<AIConversationDetailResponseDto, ApiError>({
     queryKey: AI_QUERY_KEYS.conversation(conversationId || ""),
     queryFn: () => aiCompanionService.getConversation(conversationId!),
     enabled:
-      isAuthReady &&
       Boolean(conversationId && conversationId.trim().length > 0) &&
       (options?.enabled ?? true),
     staleTime: 1000 * 30, // 30 seconds
+    retry: false,
   });
 }
 

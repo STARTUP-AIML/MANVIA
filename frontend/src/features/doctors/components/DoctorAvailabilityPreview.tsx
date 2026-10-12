@@ -100,14 +100,14 @@ export const DoctorAvailabilityPreview: React.FC<DoctorAvailabilityPreviewProps>
           style={{
             fontSize: '11px',
             fontWeight: 700,
-            color: '#0284c7',
-            backgroundColor: '#f0f9ff',
-            border: '1px solid #bae6fd',
+            color: '#0f766e',
+            backgroundColor: '#f0fdfa',
+            border: '1px solid #99f6e4',
             padding: '4px 10px',
             borderRadius: '20px',
           }}
         >
-          Phase 6 Preview Only
+          Weekly Schedule
         </span>
       </div>
 

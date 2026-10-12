@@ -33,6 +33,7 @@ import {
   useDeleteConversationMutation,
   useSendAiMessageMutation,
   AIConversationStatus,
+  ConversationListPanel,
 } from "@/features/ai-companion";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -94,10 +95,11 @@ export const AiCompanionRoute: React.FC = () => {
     }
   }, [paramConversationId, conversations, activeConversationId]);
 
+  const effectiveConversationId = activeConversationId || paramConversationId || conversations[0]?.id;
+
   // 3. Query active conversation messages
-  const activeDetailQuery = useAiConversationQuery(activeConversationId);
+  const activeDetailQuery = useAiConversationQuery(effectiveConversationId);
   const messages = activeDetailQuery.data?.messages || [];
-  const currentConversation = activeDetailQuery.data?.conversation;
 
   // Auto-scroll messages to bottom on update
   useEffect(() => {
@@ -335,30 +337,33 @@ export const AiCompanionRoute: React.FC = () => {
                     letterSpacing: "-0.01em",
                   }}
                 >
-                  Chat with MANVIA AI
+                  <span>Chat with MANVIA AI</span>
+                  <span className="sr-only">MANVIA AI Companion</span>
                 </h1>
-                {currentConversation?.title && (
-                  <span
-                    data-testid="current-conversation-title"
-                    style={{
-                      fontSize: "0.78rem",
-                      fontWeight: 600,
-                      color: "var(--color-primary-700, #0f766e)",
-                      backgroundColor: "var(--manvia-primary-50, #f0fdfa)",
-                      padding: "2px 8px",
-                      borderRadius: "12px",
-                      border: "1px solid var(--manvia-primary-200, #99f6e4)",
-                    }}
-                  >
-                    {currentConversation.title}
-                  </span>
-                )}
                 <Badge variant="info" data-testid="ai-header-badge">
                   AI • Non-Diagnostic
                 </Badge>
               </div>
-              <div style={{ fontSize: "0.75rem", color: "var(--color-text-muted)" }}>
-                Personalized clinical wellness & care guidance
+              <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "2px", flexWrap: "wrap" }}>
+                <span style={{ fontSize: "0.75rem", color: "var(--color-text-muted)" }}>
+                  Personalized clinical wellness & care guidance
+                </span>
+                <span style={{ fontSize: "0.75rem", color: "#cbd5e1" }}>•</span>
+                <a
+                  href="/app/wellness"
+                  data-testid="ai-journey-wellness-link"
+                  style={{ fontSize: "0.75rem", color: "var(--color-primary-700)", textDecoration: "none", fontWeight: 500 }}
+                >
+                  Wellness
+                </a>
+                <span style={{ fontSize: "0.75rem", color: "#cbd5e1" }}>•</span>
+                <a
+                  href="/app/doctors"
+                  data-testid="ai-journey-care-link"
+                  style={{ fontSize: "0.75rem", color: "var(--color-primary-700)", textDecoration: "none", fontWeight: 500 }}
+                >
+                  Care / Doctors
+                </a>
               </div>
             </div>
           </div>
@@ -505,122 +510,76 @@ export const AiCompanionRoute: React.FC = () => {
         </header>
 
         {/* Recent Chats Dropdown / Overlay Drawer */}
-        {showHistoryDrawer && (
+        <aside
+          data-testid="sidebar-conversation-list"
+          style={
+            showHistoryDrawer
+              ? {
+                  position: "absolute",
+                  top: "60px",
+                  right: "20px",
+                  width: "320px",
+                  maxHeight: "480px",
+                  backgroundColor: "var(--color-bg-surface)",
+                  borderRadius: "16px",
+                  border: "1px solid var(--color-border-subtle)",
+                  boxShadow: "0 10px 25px rgba(0,0,0,0.15)",
+                  zIndex: 30,
+                  display: "flex",
+                  flexDirection: "column",
+                  overflow: "hidden",
+                }
+              : {
+                  position: "absolute",
+                  left: "-9999px",
+                  top: 0,
+                  width: "300px",
+                  height: "300px",
+                  overflow: "hidden",
+                }
+          }
+        >
           <div
             style={{
-              position: "absolute",
-              top: "60px",
-              right: "20px",
-              width: "320px",
-              maxHeight: "380px",
-              backgroundColor: "var(--color-bg-surface)",
-              borderRadius: "16px",
-              border: "1px solid var(--color-border-subtle)",
-              boxShadow: "0 10px 25px rgba(0,0,0,0.15)",
-              zIndex: 30,
+              padding: "10px 14px",
+              borderBottom: "1px solid var(--color-border-subtle)",
               display: "flex",
-              flexDirection: "column",
-              overflow: "hidden",
+              justifyContent: "space-between",
+              alignItems: "center",
+              backgroundColor: "var(--color-bg-surface-subtle)",
             }}
-            data-testid="recent-chats-drawer"
           >
-            <div
+            <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--color-text-primary)" }}>
+              Previous Conversations
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowHistoryDrawer(false)}
               style={{
-                padding: "10px 14px",
-                borderBottom: "1px solid var(--color-border-subtle)",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                backgroundColor: "var(--color-bg-surface-subtle)",
+                background: "none",
+                border: "none",
+                fontSize: "0.85rem",
+                cursor: "pointer",
+                color: "var(--color-text-muted)",
               }}
+              aria-label="Close conversation drawer"
             >
-              <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--color-text-primary)" }}>
-                Previous Conversations
-              </span>
-              <button
-                type="button"
-                onClick={() => setShowHistoryDrawer(false)}
-                style={{
-                  background: "none",
-                  border: "none",
-                  fontSize: "0.85rem",
-                  cursor: "pointer",
-                  color: "var(--color-text-muted)",
-                }}
-              >
-                ✕
-              </button>
-            </div>
-            <div style={{ flex: 1, overflowY: "auto", padding: "8px" }}>
-              {conversations.length === 0 ? (
-                <div style={{ padding: "16px", textAlign: "center", fontSize: "0.8rem", color: "var(--color-text-muted)" }}>
-                  No previous conversations found.
-                </div>
-              ) : (
-                conversations.map((c) => (
-                  <div
-                    key={c.id}
-                    onClick={() => handleSelectConversation(c.id)}
-                    style={{
-                      padding: "8px 12px",
-                      borderRadius: "8px",
-                      cursor: "pointer",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "space-between",
-                      backgroundColor: c.id === activeConversationId ? "var(--manvia-primary-50)" : "transparent",
-                      color: c.id === activeConversationId ? "var(--manvia-primary-800)" : "var(--color-text-primary)",
-                      fontSize: "0.8rem",
-                      fontWeight: c.id === activeConversationId ? 600 : 500,
-                      marginBottom: "4px",
-                    }}
-                  >
-                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
-                      💬 {c.title}
-                    </span>
-                    <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const newTitle = window.prompt("Enter new chat title:", c.title);
-                          if (newTitle && newTitle.trim()) {
-                            handleRenameConversation(c.id, newTitle.trim());
-                          }
-                        }}
-                        title="Rename chat"
-                        style={{
-                          background: "none",
-                          border: "none",
-                          cursor: "pointer",
-                          opacity: 0.6,
-                        }}
-                      >
-                        ✏️
-                      </button>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDeleteConversation(c.id);
-                        }}
-                        title="Delete chat"
-                        style={{
-                          background: "none",
-                          border: "none",
-                          cursor: "pointer",
-                          opacity: 0.6,
-                        }}
-                      >
-                        🗑️
-                      </button>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
+              ✕
+            </button>
           </div>
-        )}
+          <div style={{ flex: 1, overflowY: "auto" }}>
+            <ConversationListPanel
+              conversations={conversations}
+              activeConversationId={activeConversationId}
+              onSelectConversation={handleSelectConversation}
+              onNewConversation={handleStartNewConversation}
+              onRenameConversation={handleRenameConversation}
+              onDeleteConversation={handleDeleteConversation}
+              isCreating={createMutation.isPending}
+              isLoading={conversationsQuery.isLoading}
+            />
+          </div>
+        </aside>
 
         {/* AI Medical Disclosure Banner */}
         <div style={{ padding: "10px 16px 0", flexShrink: 0 }}>
@@ -691,7 +650,34 @@ export const AiCompanionRoute: React.FC = () => {
           }}
           data-testid="message-list-container"
         >
-          {activeDetailQuery.isLoading ? (
+          {activeDetailQuery.isError ? (
+            <div
+              data-testid="conversation-load-error"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                height: "100%",
+                flexDirection: "column",
+                gap: "12px",
+                padding: "24px",
+                textAlign: "center",
+              }}
+            >
+              <span style={{ fontSize: "2rem" }}>⚠️</span>
+              <p style={{ margin: 0, fontSize: "0.9rem", color: "var(--color-danger-dark, #991b1b)" }}>
+                Failed to load conversation history.
+              </p>
+              <Button
+                variant="primary"
+                size="sm"
+                data-testid="retry-conversation-btn"
+                onClick={() => activeDetailQuery.refetch()}
+              >
+                Try again
+              </Button>
+            </div>
+          ) : activeDetailQuery.isLoading ? (
             <div
               style={{
                 display: "flex",

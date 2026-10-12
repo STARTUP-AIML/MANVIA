@@ -162,7 +162,7 @@ export const AppRoutes: React.FC = () => {
         path="/consents"
         element={<RedirectWithSearch to="/app/health-records?tab=consents" />}
       />
-      <Route path="/account" element={<RedirectWithSearch to="/app/settings" />} />
+      <Route path="/account" element={<RedirectWithSearch to="/app/account" />} />
       <Route path="/profile" element={<RedirectWithSearch to="/app/settings" />} />
       <Route path="/ai-companion" element={<RedirectWithSearch to="/app/ai" />} />
 
@@ -191,7 +191,7 @@ export const AppRoutes: React.FC = () => {
         />
         <Route path="health-records" element={<HealthRecordsPage />} />
         <Route path="health-records/:recordId" element={<HealthRecordDetailPage />} />
-        <Route path="account" element={<Navigate to="/app/settings" replace />} />
+        <Route path="account" element={<PatientSettingsRoute />} />
         <Route path="profile" element={<PatientProfileRoute />} />
         <Route path="settings" element={<PatientSettingsRoute />} />
         <Route path="records" element={<Navigate to="/app/health-records" replace />} />

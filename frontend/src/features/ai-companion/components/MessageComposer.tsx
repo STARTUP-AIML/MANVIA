@@ -67,10 +67,28 @@ export const MessageComposer = forwardRef<
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const plusMenuRef = useRef<HTMLDivElement>(null);
+  const [isPlusMenuOpen, setIsPlusMenuOpen] = useState(false);
+
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioStreamRef = useRef<MediaStream | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Close plus menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (plusMenuRef.current && !plusMenuRef.current.contains(event.target as Node)) {
+        setIsPlusMenuOpen(false);
+      }
+    };
+    if (isPlusMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isPlusMenuOpen]);
 
   // Notify parent of recording and transcribing state changes
   useEffect(() => {
@@ -173,24 +191,28 @@ export const MessageComposer = forwardRef<
   // File Attachment Handling
   // ==========================================
 
-  const handlePaperclipClick = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.click();
-    }
-  };
+
 
   const processFile = async (file: File) => {
     setAttachmentError(null);
 
-    // Max 3 attachments
-    if (attachments.length >= 3) {
-      setAttachmentError("Maximum of 3 attachments allowed per message.");
+    // Extension check:
+    const supportedExts = [".txt", ".md", ".csv", ".json", ".pdf", ".png", ".jpg", ".jpeg", ".webp"];
+    const ext = "." + (file.name.split(".").pop() || "").toLowerCase();
+    if (!supportedExts.includes(ext)) {
+      setAttachmentError("Unsupported file type. Please upload a .txt, .md, .csv, .json, or .pdf document.");
       return;
     }
 
     // Size check: max 5MB
     if (file.size > 5 * 1024 * 1024) {
-      setAttachmentError(`"${file.name}" exceeds the maximum 5MB size limit.`);
+      setAttachmentError(`File size exceeds the 5MB limit (${file.name}).`);
+      return;
+    }
+
+    // Max 3 attachments
+    if (attachments.length >= 3) {
+      setAttachmentError("Maximum of 3 attachments allowed per message.");
       return;
     }
 
@@ -452,14 +474,36 @@ export const MessageComposer = forwardRef<
         margin: "0 auto",
       }}
     >
-      {/* Hidden File Input */}
+      {/* Hidden File Inputs */}
       <input
         type="file"
         ref={fileInputRef}
+        data-testid="file-upload-input"
         onChange={handleFileInputChange}
         style={{ display: "none" }}
         multiple
         accept=".txt,.md,.csv,.json,.pdf,image/png,image/jpeg,image/webp"
+        aria-hidden="true"
+        tabIndex={-1}
+      />
+      <input
+        type="file"
+        ref={photoInputRef}
+        data-testid="photo-upload-input"
+        onChange={handleFileInputChange}
+        style={{ display: "none" }}
+        accept="image/png,image/jpeg,image/webp"
+        aria-hidden="true"
+        tabIndex={-1}
+      />
+      <input
+        type="file"
+        ref={cameraInputRef}
+        data-testid="camera-upload-input"
+        onChange={handleFileInputChange}
+        style={{ display: "none" }}
+        accept="image/*"
+        capture="environment"
         aria-hidden="true"
         tabIndex={-1}
       />
@@ -649,43 +693,146 @@ export const MessageComposer = forwardRef<
           flexDirection: "column",
           gap: "4px",
           backgroundColor: "#ffffff",
-          border: "1px solid var(--color-border-subtle)",
-          borderRadius: "24px",
-          padding: "8px 12px",
-          boxShadow: "0 2px 6px rgba(0,0,0,0.06)",
+          border: "1px solid var(--color-border-subtle, #e2e8f0)",
+          borderRadius: "28px",
+          padding: "12px 16px",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
           transition: "border-color 0.2s, box-shadow 0.2s",
         }}
       >
         <div
           style={{
             display: "flex",
-            alignItems: "flex-end",
-            gap: "8px",
+            alignItems: "center",
+            gap: "10px",
           }}
         >
-          {/* Paperclip Button */}
-          <button
-            type="button"
-            onClick={handlePaperclipClick}
-            disabled={disabled || isLoading || isRecording}
-            aria-label="Attach document"
-            title="Attach document (.txt, .md, .csv, .json, .pdf)"
-            style={{
-              background: "none",
-              border: "none",
-              cursor: disabled || isLoading ? "not-allowed" : "pointer",
-              padding: "6px 8px",
-              borderRadius: "50%",
-              fontSize: "1.1rem",
-              color: "var(--color-text-secondary)",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexShrink: 0,
-            }}
-          >
-            📎
-          </button>
+          {/* Plus Attachment Button & Dropdown Menu */}
+          <div style={{ position: "relative" }} ref={plusMenuRef}>
+            <button
+              type="button"
+              onClick={() => setIsPlusMenuOpen(!isPlusMenuOpen)}
+              disabled={disabled || isLoading || isRecording}
+              aria-label="Add attachment"
+              title="Attach document (.txt, .md, .csv, .json, .pdf, photo)"
+              data-testid="add-attachment-btn"
+              style={{
+                width: "34px",
+                height: "34px",
+                borderRadius: "50%",
+                border: "1px solid #cbd5e1",
+                backgroundColor: isPlusMenuOpen ? "#f1f5f9" : "#ffffff",
+                cursor: disabled || isLoading ? "not-allowed" : "pointer",
+                padding: 0,
+                fontSize: "1.3rem",
+                lineHeight: "1",
+                color: "#475569",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+                transition: "all 0.15s ease",
+              }}
+            >
+              +
+            </button>
+
+            {isPlusMenuOpen && (
+              <div
+                data-testid="attachment-plus-menu"
+                style={{
+                  position: "absolute",
+                  bottom: "44px",
+                  left: 0,
+                  backgroundColor: "#ffffff",
+                  border: "1px solid #e2e8f0",
+                  borderRadius: "16px",
+                  boxShadow: "0 10px 25px rgba(0,0,0,0.12)",
+                  padding: "6px",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "2px",
+                  minWidth: "185px",
+                  zIndex: 50,
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPlusMenuOpen(false);
+                    fileInputRef.current?.click();
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    padding: "8px 12px",
+                    borderRadius: "10px",
+                    border: "none",
+                    backgroundColor: "transparent",
+                    color: "#1e293b",
+                    fontSize: "13px",
+                    fontWeight: 500,
+                    cursor: "pointer",
+                    textAlign: "left",
+                  }}
+                >
+                  <span style={{ fontSize: "16px" }}>📁</span>
+                  <span>Upload from files</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPlusMenuOpen(false);
+                    photoInputRef.current?.click();
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    padding: "8px 12px",
+                    borderRadius: "10px",
+                    border: "none",
+                    backgroundColor: "transparent",
+                    color: "#1e293b",
+                    fontSize: "13px",
+                    fontWeight: 500,
+                    cursor: "pointer",
+                    textAlign: "left",
+                  }}
+                >
+                  <span style={{ fontSize: "16px" }}>🖼️</span>
+                  <span>Choose a photo</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPlusMenuOpen(false);
+                    cameraInputRef.current?.click();
+                  }}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                    padding: "8px 12px",
+                    borderRadius: "10px",
+                    border: "none",
+                    backgroundColor: "transparent",
+                    color: "#1e293b",
+                    fontSize: "13px",
+                    fontWeight: 500,
+                    cursor: "pointer",
+                    textAlign: "left",
+                  }}
+                >
+                  <span style={{ fontSize: "16px" }}>📷</span>
+                  <span>Take a photo</span>
+                </button>
+              </div>
+            )}
+          </div>
 
           {/* Multiline Text Area */}
           <div style={{ flex: 1, position: "relative" }}>
@@ -700,15 +847,15 @@ export const MessageComposer = forwardRef<
               onChange={handleChange}
               onKeyDown={handleKeyDown}
               disabled={disabled || isLoading || isRecording}
-              placeholder="Ask MANVIA AI a wellness question... (Press Enter to send)"
+              placeholder="Ask MANVIA AI a wellness question or about your wellness..."
               style={{
                 width: "100%",
                 resize: "none",
                 border: "none",
                 outline: "none",
                 backgroundColor: "transparent",
-                color: "var(--color-text-primary)",
-                fontSize: "var(--font-size-sm)",
+                color: "var(--color-text-primary, #0f172a)",
+                fontSize: "14px",
                 lineHeight: 1.5,
                 fontFamily: "inherit",
                 padding: "6px 0",

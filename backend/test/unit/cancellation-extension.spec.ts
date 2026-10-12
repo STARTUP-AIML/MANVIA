@@ -192,8 +192,16 @@ describe('Appointments Cancellation Extension (Unit Tests)', () => {
     expect(updatedWaitlist.offeredAppointmentPublicId).toBeDefined();
   });
 
+  const getNextMondaySlot = (hour: number) => {
+    const d = new Date();
+    const daysUntilMonday = (1 + 7 - d.getUTCDay()) % 7 || 7;
+    d.setUTCDate(d.getUTCDate() + daysUntilMonday + (daysUntilMonday === 1 ? 7 : 0));
+    d.setUTCHours(hour, 0, 0, 0);
+    return d;
+  };
+
   it('doctor cancellation should initiate 100% refund to patient regardless of time', async () => {
-    const slotStart = new Date('2026-10-12T14:00:00.000Z');
+    const slotStart = getNextMondaySlot(14);
     const appt = await appointmentsService.createAppointment(PATIENT_USER, {
       doctorId,
       consultationOfferId: offerId,
@@ -218,7 +226,7 @@ describe('Appointments Cancellation Extension (Unit Tests)', () => {
   });
 
   it('admin override cancellation should initiate 100% refund', async () => {
-    const slotStart = new Date('2026-10-12T15:00:00.000Z');
+    const slotStart = getNextMondaySlot(15);
     const appt = await appointmentsService.createAppointment(PATIENT_USER, {
       doctorId,
       consultationOfferId: offerId,

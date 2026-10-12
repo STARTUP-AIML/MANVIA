@@ -259,21 +259,21 @@ export const DoctorDiscoveryPage: React.FC = () => {
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '12px',
-          padding: '12px 18px',
-          backgroundColor: '#eff6ff',
-          borderRadius: '12px',
-          border: '1px solid #bfdbfe',
-          color: '#1e40af',
-          fontSize: '13px',
-          marginBottom: '24px',
+          gap: '10px',
+          padding: '10px 14px',
+          backgroundColor: '#f8fafc',
+          borderRadius: '10px',
+          border: '1px solid #e2e8f0',
+          color: '#475569',
+          fontSize: '12px',
+          marginBottom: '20px',
         }}
         role="note"
         aria-label="Clinical Demonstration Notice"
       >
-        <span style={{ fontSize: '18px' }}>ℹ️</span>
+        <span style={{ fontSize: '14px' }}>ℹ️</span>
         <div style={{ lineHeight: 1.4 }}>
-          <strong>Platform Demonstration Mode:</strong> All doctor profiles displayed below are fictional Indian demo clinicians provided to validate discovery, scheduling, and pre-consultation flows.
+          <strong>Demonstration environment:</strong> Clinician profiles are fictional demo clinicians provided to evaluate discovery, scheduling, and pre-consultation flows.
         </div>
       </div>
 

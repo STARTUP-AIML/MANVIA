@@ -231,6 +231,251 @@ describe('Wellness Module — Phase 5', () => {
         ).toBeInTheDocument();
       });
     });
+
+    it('does not render hardcoded 8-hour target line or unverified target legend in sleep chart', async () => {
+      vi.spyOn(wellnessApi, 'getWellnessTrendsApi').mockResolvedValue({
+        period: '7d',
+        startDate: '2026-09-25T00:00:00.000Z',
+        endDate: '2026-10-02T00:00:00.000Z',
+        totalCheckIns: 3,
+        hasSufficientData: true,
+        averageMood: 4.0,
+        averageStress: 2.0,
+        averageEnergy: 4.0,
+        averageSleepQuality: 4.0,
+        averageSleepDurationMinutes: 480,
+        descriptiveInsights: [],
+      });
+
+      vi.spyOn(wellnessApi, 'getWellnessCheckInsApi').mockResolvedValue({
+        data: [
+          {
+            id: 'chk-1',
+            patientId: 'pat-1',
+            mood: 4,
+            stress: 2,
+            energy: 4,
+            sleepQuality: 4,
+            sleepDurationMinutes: 480,
+            recordedAt: '2026-10-01T10:00:00.000Z',
+            createdAt: '2026-10-01T10:00:00.000Z',
+            updatedAt: '2026-10-01T10:00:00.000Z',
+          },
+        ],
+        total: 1,
+        page: 1,
+        limit: 100,
+        totalPages: 1,
+      });
+
+      render(<WellnessTrendsSection />, { wrapper: createWrapper() });
+
+      await waitFor(() => {
+        expect(screen.getByText('Sleep Duration History')).toBeInTheDocument();
+      });
+
+      // Target line and legends should not exist
+      expect(screen.queryByText(/8h target/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/7–9h Target/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/clinical benchmark/i)).not.toBeInTheDocument();
+    });
+
+    it('handles missing mood, stress, energy, and sleep duration without treating missing data as zero', async () => {
+      vi.spyOn(wellnessApi, 'getWellnessTrendsApi').mockResolvedValue({
+        period: '7d',
+        startDate: '2026-09-25T00:00:00.000Z',
+        endDate: '2026-10-02T00:00:00.000Z',
+        totalCheckIns: 3,
+        hasSufficientData: true,
+        averageMood: 4.0,
+        averageStress: 2.0,
+        averageEnergy: 4.0,
+        averageSleepQuality: 4.0,
+        averageSleepDurationMinutes: 450,
+        descriptiveInsights: [],
+      });
+
+      vi.spyOn(wellnessApi, 'getWellnessCheckInsApi').mockResolvedValue({
+        data: [
+          {
+            id: 'chk-1',
+            patientId: 'pat-1',
+            mood: 4,
+            stress: 2,
+            energy: 4,
+            sleepQuality: 4,
+            sleepDurationMinutes: 480,
+            recordedAt: '2026-10-01T10:00:00.000Z',
+            createdAt: '2026-10-01T10:00:00.000Z',
+            updatedAt: '2026-10-01T10:00:00.000Z',
+          },
+          {
+            id: 'chk-2',
+            patientId: 'pat-1',
+            mood: null as any,
+            stress: 3,
+            energy: null as any,
+            sleepQuality: 3,
+            sleepDurationMinutes: null,
+            recordedAt: '2026-10-02T10:00:00.000Z',
+            createdAt: '2026-10-02T10:00:00.000Z',
+            updatedAt: '2026-10-02T10:00:00.000Z',
+          },
+          {
+            id: 'chk-3',
+            patientId: 'pat-1',
+            mood: 5,
+            stress: 1,
+            energy: 5,
+            sleepQuality: 5,
+            sleepDurationMinutes: 420,
+            recordedAt: '2026-10-03T10:00:00.000Z',
+            createdAt: '2026-10-03T10:00:00.000Z',
+            updatedAt: '2026-10-03T10:00:00.000Z',
+          },
+        ],
+        total: 3,
+        page: 1,
+        limit: 100,
+        totalPages: 1,
+      });
+
+      render(<WellnessTrendsSection />, { wrapper: createWrapper() });
+
+      await waitFor(() => {
+        expect(screen.getByText('Sleep Duration History')).toBeInTheDocument();
+      });
+
+      // Missing sleep duration is not treated as zero bar, but labeled as not logged
+      expect(screen.getByLabelText(/Sleep duration not logged/i)).toBeInTheDocument();
+
+      // Valid observations have explicit labels
+      expect(screen.getByLabelText(/Mood 4 out of 5/i)).toBeInTheDocument();
+      expect(screen.getByLabelText(/Mood 5 out of 5/i)).toBeInTheDocument();
+
+      // Check-in 2 has missing mood, so no Mood point is rendered for it
+      expect(screen.queryByLabelText(/Oct 2.*Mood/i)).not.toBeInTheDocument();
+    });
+
+    it('supports keyboard and touch accessibility for interactive chart points', async () => {
+      vi.spyOn(wellnessApi, 'getWellnessTrendsApi').mockResolvedValue({
+        period: '7d',
+        startDate: '2026-09-25T00:00:00.000Z',
+        endDate: '2026-10-02T00:00:00.000Z',
+        totalCheckIns: 3,
+        hasSufficientData: true,
+        averageMood: 4.0,
+        averageStress: 2.0,
+        averageEnergy: 4.0,
+        averageSleepQuality: 4.0,
+        averageSleepDurationMinutes: 480,
+        descriptiveInsights: [],
+      });
+
+      vi.spyOn(wellnessApi, 'getWellnessCheckInsApi').mockResolvedValue({
+        data: [
+          {
+            id: 'chk-1',
+            patientId: 'pat-1',
+            mood: 4,
+            stress: 2,
+            energy: 4,
+            sleepQuality: 4,
+            sleepDurationMinutes: 480,
+            recordedAt: '2026-10-01T10:00:00.000Z',
+            createdAt: '2026-10-01T10:00:00.000Z',
+            updatedAt: '2026-10-01T10:00:00.000Z',
+          },
+        ],
+        total: 1,
+        page: 1,
+        limit: 100,
+        totalPages: 1,
+      });
+
+      render(<WellnessTrendsSection />, { wrapper: createWrapper() });
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/Mood 4 out of 5/i)).toBeInTheDocument();
+      });
+
+      const moodPoint = screen.getByLabelText(/Mood 4 out of 5/i);
+      expect(moodPoint).toHaveAttribute('tabindex', '0');
+      expect(moodPoint).toHaveAttribute('role', 'button');
+
+      // Focus triggers tooltip
+      fireEvent.focus(moodPoint);
+      expect(screen.getByText('Mood: 4/5')).toBeInTheDocument();
+
+      // Blur dismisses tooltip
+      fireEvent.blur(moodPoint);
+      expect(screen.queryByText('Mood: 4/5')).not.toBeInTheDocument();
+
+      // Touch triggers tooltip
+      fireEvent.touchStart(moodPoint);
+      expect(screen.getByText('Mood: 4/5')).toBeInTheDocument();
+    });
+
+    it('formats dates using application localization context', async () => {
+      vi.spyOn(wellnessApi, 'getWellnessTrendsApi').mockResolvedValue({
+        period: '7d',
+        startDate: '2026-09-25T00:00:00.000Z',
+        endDate: '2026-10-02T00:00:00.000Z',
+        totalCheckIns: 3,
+        hasSufficientData: true,
+        averageMood: 4.0,
+        averageStress: 2.0,
+        averageEnergy: 4.0,
+        averageSleepQuality: 4.0,
+        averageSleepDurationMinutes: 480,
+        descriptiveInsights: [],
+      });
+
+      vi.spyOn(wellnessApi, 'getWellnessCheckInsApi').mockResolvedValue({
+        data: [
+          {
+            id: 'chk-1',
+            patientId: 'pat-1',
+            mood: 4,
+            stress: 2,
+            energy: 4,
+            sleepQuality: 4,
+            sleepDurationMinutes: 480,
+            recordedAt: '2026-10-01T10:00:00.000Z',
+            createdAt: '2026-10-01T10:00:00.000Z',
+            updatedAt: '2026-10-01T10:00:00.000Z',
+          },
+        ],
+        total: 1,
+        page: 1,
+        limit: 100,
+        totalPages: 1,
+      });
+
+      const { I18nProvider } = await import('@/i18n/i18nContext');
+      const queryClient = new QueryClient({
+        defaultOptions: { queries: { retry: false, gcTime: 0 } },
+      });
+
+      render(
+        <QueryClientProvider client={queryClient}>
+          <I18nProvider initialLanguage="te">
+            <WellnessTrendsSection />
+          </I18nProvider>
+        </QueryClientProvider>
+      );
+
+      await waitFor(() => {
+        expect(screen.getByRole('img', { name: /Mood, Stress, and Energy Trend Line Chart/i })).toBeInTheDocument();
+      });
+
+      const teluguExpectedDate = new Intl.DateTimeFormat('te-IN', {
+        month: 'short',
+        day: 'numeric',
+      }).format(new Date('2026-10-01T10:00:00.000Z'));
+
+      expect(screen.getAllByText(teluguExpectedDate).length).toBeGreaterThan(0);
+    });
   });
 
   describe('WellnessHistoryTable Component', () => {

@@ -23,7 +23,7 @@ export const PatientShell: React.FC<{ children?: ReactNode }> = ({
     { label: "Find Doctors", href: "/app/doctors", icon: "🩺" },
     { label: "Appointments", href: "/app/appointments", icon: "📅" },
     { label: "Health Records", href: "/app/health-records", icon: "📁" },
-    { label: "My Account", href: "/app/settings", icon: "⚙️" },
+    { label: "My Account", href: "/app/account", icon: "⚙️" },
   ];
 
   return (
