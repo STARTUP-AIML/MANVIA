@@ -1,15 +1,24 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { Specialty, Language } from '@/types/doctors';
 
-interface DoctorFiltersProps {
+export interface DoctorFiltersProps {
   searchQuery: string;
   onSearchChange: (query: string) => void;
   selectedSpecialty: string;
   onSpecialtyChange: (specialty: string) => void;
   selectedLanguage: string;
   onLanguageChange: (language: string) => void;
+  selectedCity?: string;
+  onCityChange?: (city: string) => void;
+  selectedMode?: string;
+  onModeChange?: (mode: string) => void;
+  selectedExperience?: string;
+  onExperienceChange?: (experience: string) => void;
+  selectedSort?: string;
+  onSortChange?: (sort: string) => void;
   specialties: Specialty[];
   languages: Language[];
+  availableCities?: string[];
   onClearFilters: () => void;
   isFiltered: boolean;
   totalResults: number;
@@ -22,12 +31,23 @@ export const DoctorFilters: React.FC<DoctorFiltersProps> = ({
   onSpecialtyChange,
   selectedLanguage,
   onLanguageChange,
+  selectedCity = '',
+  onCityChange = () => {},
+  selectedMode = '',
+  onModeChange = () => {},
+  selectedExperience = '',
+  onExperienceChange = () => {},
+  selectedSort = 'default',
+  onSortChange = () => {},
   specialties,
   languages,
+  availableCities = ['Bengaluru', 'Mumbai', 'New Delhi', 'Hyderabad', 'Chennai', 'Pune', 'Kochi', 'Nagpur'],
   onClearFilters,
   isFiltered,
   totalResults,
 }) => {
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
   return (
     <div
       style={{
@@ -39,6 +59,7 @@ export const DoctorFilters: React.FC<DoctorFiltersProps> = ({
         boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
       }}
     >
+      {/* Primary Search & Core Filters Row */}
       <div
         style={{
           display: 'grid',
@@ -69,7 +90,7 @@ export const DoctorFilters: React.FC<DoctorFiltersProps> = ({
               type="text"
               value={searchQuery}
               onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="e.g. Dr. Mitchell, cardiologist..."
+              placeholder="e.g. Dr. Rao, Bengaluru, Anxiety..."
               style={{
                 width: '100%',
                 padding: '10px 14px',
@@ -187,14 +208,86 @@ export const DoctorFilters: React.FC<DoctorFiltersProps> = ({
           </select>
         </div>
 
-        {/* Actions & Result Count */}
+        {/* Sorting Dropdown */}
+        <div>
+          <label
+            htmlFor="doctor-sort"
+            style={{
+              display: 'block',
+              fontSize: '12px',
+              fontWeight: 700,
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+              color: '#475569',
+              marginBottom: '6px',
+            }}
+          >
+            Sort By
+          </label>
+          <select
+            id="doctor-sort"
+            value={selectedSort}
+            onChange={(e) => onSortChange(e.target.value)}
+            style={{
+              width: '100%',
+              padding: '10px 14px',
+              borderRadius: '10px',
+              border: '1px solid #cbd5e1',
+              fontSize: '14px',
+              backgroundColor: '#f8fafc',
+              color: '#1e293b',
+              outline: 'none',
+              boxSizing: 'border-box',
+            }}
+          >
+            <option value="default">Default (Relevance)</option>
+            <option value="fee-asc">Fee: Low to High</option>
+            <option value="fee-desc">Fee: High to Low</option>
+            <option value="exp-desc">Experience: High to Low</option>
+            <option value="name-asc">Doctor Name (A to Z)</option>
+          </select>
+        </div>
+      </div>
+
+      {/* Advanced Filter Toggles (City, Mode, Experience) */}
+      <div
+        style={{
+          marginTop: '16px',
+          paddingTop: '14px',
+          borderTop: '1px solid #f1f5f9',
+          display: 'flex',
+          flexWrap: 'wrap',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '12px',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <button
+            type="button"
+            onClick={() => setShowAdvanced((prev) => !prev)}
+            style={{
+              background: 'none',
+              border: 'none',
+              color: '#096ed3',
+              fontSize: '13px',
+              fontWeight: 600,
+              cursor: 'pointer',
+              padding: 0,
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+          >
+            <span>{showAdvanced ? '▲ Less Filters' : '▼ More Filters (Location, Mode, Experience)'}</span>
+          </button>
+        </div>
+
         <div
           style={{
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
             gap: '12px',
-            minHeight: '42px',
           }}
         >
           <div style={{ fontSize: '13px', color: '#64748b' }}>
@@ -206,7 +299,7 @@ export const DoctorFilters: React.FC<DoctorFiltersProps> = ({
               type="button"
               onClick={onClearFilters}
               style={{
-                padding: '8px 14px',
+                padding: '6px 12px',
                 borderRadius: '8px',
                 border: '1px solid #cbd5e1',
                 backgroundColor: '#ffffff',
@@ -214,6 +307,7 @@ export const DoctorFilters: React.FC<DoctorFiltersProps> = ({
                 fontSize: '12px',
                 fontWeight: 600,
                 cursor: 'pointer',
+                transition: 'background-color 0.15s ease',
               }}
             >
               Reset Filters
@@ -221,6 +315,126 @@ export const DoctorFilters: React.FC<DoctorFiltersProps> = ({
           )}
         </div>
       </div>
+
+      {/* Collapsible Advanced Filters Drawer */}
+      {showAdvanced && (
+        <div
+          style={{
+            marginTop: '16px',
+            paddingTop: '16px',
+            borderTop: '1px dashed #e2e8f0',
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+            gap: '16px',
+          }}
+        >
+          {/* Location / City Filter */}
+          <div>
+            <label
+              htmlFor="doctor-city"
+              style={{
+                display: 'block',
+                fontSize: '12px',
+                fontWeight: 700,
+                color: '#475569',
+                marginBottom: '6px',
+              }}
+            >
+              Location / City
+            </label>
+            <select
+              id="doctor-city"
+              value={selectedCity}
+              onChange={(e) => onCityChange(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '9px 12px',
+                borderRadius: '10px',
+                border: '1px solid #cbd5e1',
+                fontSize: '13px',
+                backgroundColor: '#f8fafc',
+                color: '#1e293b',
+              }}
+            >
+              <option value="">All Locations</option>
+              {availableCities.map((city) => (
+                <option key={city} value={city}>
+                  {city}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Consultation Mode Filter */}
+          <div>
+            <label
+              htmlFor="doctor-mode"
+              style={{
+                display: 'block',
+                fontSize: '12px',
+                fontWeight: 700,
+                color: '#475569',
+                marginBottom: '6px',
+              }}
+            >
+              Consultation Mode
+            </label>
+            <select
+              id="doctor-mode"
+              value={selectedMode}
+              onChange={(e) => onModeChange(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '9px 12px',
+                borderRadius: '10px',
+                border: '1px solid #cbd5e1',
+                fontSize: '13px',
+                backgroundColor: '#f8fafc',
+                color: '#1e293b',
+              }}
+            >
+              <option value="">All Modes</option>
+              <option value="VIDEO">Video Consultation</option>
+              <option value="IN_PERSON">In-Person Clinic Visit</option>
+              <option value="AUDIO">Audio Call</option>
+            </select>
+          </div>
+
+          {/* Experience Filter */}
+          <div>
+            <label
+              htmlFor="doctor-exp"
+              style={{
+                display: 'block',
+                fontSize: '12px',
+                fontWeight: 700,
+                color: '#475569',
+                marginBottom: '6px',
+              }}
+            >
+              Minimum Experience
+            </label>
+            <select
+              id="doctor-exp"
+              value={selectedExperience}
+              onChange={(e) => onExperienceChange(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '9px 12px',
+                borderRadius: '10px',
+                border: '1px solid #cbd5e1',
+                fontSize: '13px',
+                backgroundColor: '#f8fafc',
+                color: '#1e293b',
+              }}
+            >
+              <option value="">Any Experience</option>
+              <option value="10">10+ Years</option>
+              <option value="15">15+ Years</option>
+            </select>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

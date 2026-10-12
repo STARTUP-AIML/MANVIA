@@ -272,11 +272,24 @@ export const DoctorBookingPage: React.FC = () => {
               Book with {doctor.displayName}
             </h1>
             <p className="text-sm text-slate-500">
-              {doctor.primarySpecialty || 'General Practitioner'} • Real Doctor Care
+              {doctor.primarySpecialty || 'General Practitioner'} •{' '}
+              {doctor.isDemo ? 'Fictional Demo Clinician' : 'Verified Clinical Practitioner'}
             </p>
           </div>
         </div>
       </div>
+
+      {doctor.isDemo && (
+        <div
+          role="note"
+          className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl text-amber-900 text-xs flex items-center gap-2.5"
+        >
+          <span className="text-base">ℹ️</span>
+          <span>
+            <strong>Demo Appointment Simulation:</strong> You are scheduling a demonstration consultation with a fictional Indian clinician. This confirms appointment pipeline workflows without clinical implications.
+          </span>
+        </div>
+      )}
 
       {/* Conflict / Race condition banner */}
       {conflictWarning && (

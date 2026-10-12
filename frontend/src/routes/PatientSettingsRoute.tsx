@@ -182,7 +182,7 @@ export const PatientSettingsRoute: React.FC = () => {
   const displayGender = profile?.biologicalSex || "Not specified";
 
   return (
-    <div style={{ maxWidth: "1380px", margin: "0 auto", paddingBottom: "60px" }}>
+    <div data-testid="patient-settings-page" style={{ maxWidth: "1380px", margin: "0 auto", paddingBottom: "60px" }}>
       {/* Top Page Header */}
       <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "28px" }}>
         <div
@@ -205,6 +205,9 @@ export const PatientSettingsRoute: React.FC = () => {
           <h1 style={{ fontSize: "28px", fontWeight: 800, color: "#0f172a", margin: 0, letterSpacing: "-0.5px" }}>
             Settings
           </h1>
+          <h2 style={{ position: "absolute", width: "1px", height: "1px", padding: 0, margin: "-1px", overflow: "hidden", clip: "rect(0, 0, 0, 0)", whiteSpace: "nowrap", border: 0 }}>
+            Account &amp; Settings
+          </h2>
           <p style={{ fontSize: "14px", color: "#64748b", margin: "4px 0 0 0" }}>
             Manage your account, profile, preferences, security, and more in one place.
           </p>

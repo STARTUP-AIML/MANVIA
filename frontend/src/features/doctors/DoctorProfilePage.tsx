@@ -1,5 +1,5 @@
-import React from 'react';
-import { useParams, Link } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useParams, Link, useLocation } from 'react-router-dom';
 import {
   useDoctorDetail,
   useDoctorAvailability,
@@ -13,6 +13,8 @@ import { ErrorAlert } from '@/components/common/ErrorAlert';
 
 export const DoctorProfilePage: React.FC = () => {
   const { doctorId } = useParams<{ doctorId: string }>();
+  const location = useLocation();
+  const [imageError, setImageError] = useState(false);
 
   const {
     data: doctor,
@@ -32,6 +34,8 @@ export const DoctorProfilePage: React.FC = () => {
     isLoading: isLoadingOffers,
   } = useDoctorOffers(doctor?.publicDoctorId);
 
+  const backPath = location.pathname.startsWith('/app') ? '/app/doctors' : '/doctors';
+
   if (isLoadingDoctor) {
     return <LoadingSpinner message="Retrieving physician profile..." />;
   }
@@ -40,7 +44,7 @@ export const DoctorProfilePage: React.FC = () => {
     return (
       <div style={{ maxWidth: '800px', margin: '0 auto', padding: '40px 0' }}>
         <Link
-          to="/app/doctors"
+          to={backPath}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -68,17 +72,36 @@ export const DoctorProfilePage: React.FC = () => {
   }
 
   const primarySpec = doctor.primarySpecialty || 'General Practice';
-  const feeDisplay =
-    doctor.defaultConsultationFee > 0
-      ? `${doctor.currency === 'INR' ? '₹' : doctor.currency} ${doctor.defaultConsultationFee}`
-      : 'Consultation fee provided upon request';
+
+  const formatFeeDisplay = () => {
+    if (doctor.defaultConsultationFee <= 0) {
+      return 'Consultation fee provided upon request';
+    }
+    if (doctor.currency === 'INR') {
+      return `₹ ${Number(doctor.defaultConsultationFee).toLocaleString('en-IN')}`;
+    }
+    return `${doctor.currency} ${Number(doctor.defaultConsultationFee).toFixed(2)}`;
+  };
+
+  const getInitials = (name: string) => {
+    const clean = name.replace(/^Dr\.\s*/i, '').trim();
+    const parts = clean.split(/\s+/);
+    if (parts.length >= 2) {
+      return `${parts[0]?.[0] || ''}${parts[parts.length - 1]?.[0] || ''}`.toUpperCase();
+    }
+    return (parts[0]?.substring(0, 2) || 'DR').toUpperCase();
+  };
+
+  const bookingPath = location.pathname.startsWith('/app')
+    ? `/app/doctors/${doctor.publicDoctorId}/book`
+    : `/doctors/${doctor.publicDoctorId}/book`;
 
   return (
     <div style={{ maxWidth: '960px', margin: '0 auto', paddingBottom: '80px' }}>
       {/* Back Link */}
       <div style={{ marginBottom: '20px' }}>
         <Link
-          to="/app/doctors"
+          to={backPath}
           style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -92,6 +115,31 @@ export const DoctorProfilePage: React.FC = () => {
           &larr; Back to Doctor Discovery
         </Link>
       </div>
+
+      {/* Healthcare Integrity / Fictional Demo Clinician Notice */}
+      {doctor.isDemo && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+            padding: '14px 18px',
+            backgroundColor: '#fef3c7',
+            borderRadius: '14px',
+            border: '1px solid #fde68a',
+            color: '#92400e',
+            fontSize: '13px',
+            marginBottom: '20px',
+          }}
+          role="note"
+          aria-label="Fictional Demo Clinician Notice"
+        >
+          <span style={{ fontSize: '20px' }}>⚠️</span>
+          <div>
+            <strong>Fictional Demo Clinician Profile:</strong> This profile represents a demonstration practitioner ({doctor.displayName}) designed for evaluating consultation options, scheduling, and pre-consultation flows within the MANVIA platform.
+          </div>
+        </div>
+      )}
 
       {/* Main Profile Header Card */}
       <div
@@ -110,56 +158,110 @@ export const DoctorProfilePage: React.FC = () => {
             justifyContent: 'space-between',
             alignItems: 'flex-start',
             flexWrap: 'wrap',
-            gap: '16px',
+            gap: '20px',
             marginBottom: '16px',
           }}
         >
-          <div>
+          {/* Avatar & Title Group */}
+          <div style={{ display: 'flex', gap: '20px', alignItems: 'flex-start' }}>
+            {/* Large Avatar */}
             <div
               style={{
+                width: '72px',
+                height: '72px',
+                borderRadius: '50%',
+                overflow: 'hidden',
+                backgroundColor: '#e0f2fe',
+                color: '#0284c7',
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px',
-                marginBottom: '8px',
+                justifyContent: 'center',
+                fontWeight: 800,
+                fontSize: '22px',
+                flexShrink: 0,
+                border: '3px solid #bae6fd',
+                boxShadow: '0 4px 6px rgba(0,0,0,0.05)',
               }}
             >
-              <span
-                style={{
-                  fontSize: '12px',
-                  fontWeight: 800,
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.8px',
-                  color: '#073a78',
-                  backgroundColor: '#e0f2fe',
-                  padding: '4px 10px',
-                  borderRadius: '6px',
-                }}
-              >
-                {primarySpec}
-              </span>
-              <DoctorVerificationBadge status={doctor.verificationStatus} />
+              {doctor.profileImageUrl && !imageError ? (
+                <img
+                  src={doctor.profileImageUrl}
+                  alt={`Portrait of ${doctor.displayName}`}
+                  onError={() => setImageError(true)}
+                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                />
+              ) : (
+                <span>{getInitials(doctor.displayName)}</span>
+              )}
             </div>
 
-            <h1
-              style={{
-                fontSize: '28px',
-                fontWeight: 800,
-                color: '#0f172a',
-                margin: '0 0 6px 0',
-                letterSpacing: '-0.5px',
-              }}
-            >
-              {doctor.displayName}
-            </h1>
+            <div>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  marginBottom: '8px',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: '12px',
+                    fontWeight: 800,
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.8px',
+                    color: '#073a78',
+                    backgroundColor: '#e0f2fe',
+                    padding: '4px 10px',
+                    borderRadius: '6px',
+                  }}
+                >
+                  {primarySpec}
+                </span>
 
-            <div
-              style={{
-                fontSize: '12px',
-                color: '#94a3b8',
-                fontFamily: 'monospace',
-              }}
-            >
-              Identifier: {doctor.publicDoctorId}
+                <DoctorVerificationBadge status={doctor.verificationStatus} />
+
+                {doctor.isDemo && (
+                  <span
+                    style={{
+                      fontSize: '11px',
+                      fontWeight: 700,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.5px',
+                      color: '#b45309',
+                      backgroundColor: '#fef3c7',
+                      border: '1px solid #fde68a',
+                      padding: '3px 8px',
+                      borderRadius: '6px',
+                    }}
+                  >
+                    Demo Clinician
+                  </span>
+                )}
+              </div>
+
+              <h1
+                style={{
+                  fontSize: '28px',
+                  fontWeight: 800,
+                  color: '#0f172a',
+                  margin: '0 0 6px 0',
+                  letterSpacing: '-0.5px',
+                }}
+              >
+                {doctor.displayName}
+              </h1>
+
+              <div
+                style={{
+                  fontSize: '12px',
+                  color: '#94a3b8',
+                  fontFamily: 'monospace',
+                }}
+              >
+                Identifier: {doctor.publicDoctorId}
+              </div>
             </div>
           </div>
 
@@ -177,7 +279,7 @@ export const DoctorProfilePage: React.FC = () => {
               Base Consultation
             </div>
             <div style={{ fontSize: '20px', fontWeight: 800, color: '#0f172a' }}>
-              {feeDisplay}
+              {formatFeeDisplay()}
             </div>
           </div>
         </div>
@@ -367,7 +469,7 @@ export const DoctorProfilePage: React.FC = () => {
         isLoading={isLoadingAvailability}
       />
 
-      {/* Phase 7 Consultation Booking Action */}
+      {/* Consultation Booking Action */}
       <div
         style={{
           padding: '24px',
@@ -391,7 +493,7 @@ export const DoctorProfilePage: React.FC = () => {
         </div>
 
         <Link
-          to={`/app/doctors/${doctor.publicDoctorId}/book`}
+          to={bookingPath}
           style={{
             display: 'inline-flex',
             alignItems: 'center',

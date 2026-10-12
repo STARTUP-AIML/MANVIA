@@ -24,6 +24,7 @@ import {
   LoginRoute,
   RegisterRoute,
   PatientHomeRoute,
+  PatientProfileRoute,
   PatientSettingsRoute,
   AiCompanionRoute,
   DoctorRoute,
@@ -191,7 +192,7 @@ export const AppRoutes: React.FC = () => {
         <Route path="health-records" element={<HealthRecordsPage />} />
         <Route path="health-records/:recordId" element={<HealthRecordDetailPage />} />
         <Route path="account" element={<Navigate to="/app/settings" replace />} />
-        <Route path="profile" element={<Navigate to="/app/settings" replace />} />
+        <Route path="profile" element={<PatientProfileRoute />} />
         <Route path="settings" element={<PatientSettingsRoute />} />
         <Route path="records" element={<Navigate to="/app/health-records" replace />} />
         <Route path="consultations" element={<Navigate to="/app/doctors" replace />} />
